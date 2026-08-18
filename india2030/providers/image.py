@@ -333,7 +333,7 @@ def render_text_overlay(path: Path, size: Tuple[int, int], caption: str,
 
     # 자막
     if caption:
-        cf = _font(font_path, max(28, int(w / (8.0 if big else 13.0))))
+        cf = _font(font_path, max(28, int(w / (10.5 if big else 13.0))))
         max_w = int(w * 0.84)
         lines = _wrap(d, caption, cf, max_w)
         line_h = int(cf.size * 1.34)

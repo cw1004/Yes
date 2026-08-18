@@ -189,8 +189,16 @@ output/
 
 ## 7. 제작 시간 참고
 
-1080x1920 / 30fps 기준, 한 편에 약 **1분**(`--preset medium`), `--preset veryfast` 는 절반 수준입니다.
-`--workers 4` 로 100편이면 대략 **25~40분**(장비에 따라 다름).
+1080x1920 / 30fps 기준 한 편의 렌더링 시간은 **CPU 성능에 크게 좌우**됩니다.
+(참고: 2코어 컨테이너에서 워커 3 · `--preset veryfast` 로 한 편당 약 2분)
+
+빠르게 뽑고 싶다면:
+
+```bash
+python3 -m india2030 make --range 1-100 --workers 8 --preset veryfast --crf 26
+```
+
+먼저 `--range 1-3` 으로 시간을 재보고 100편 소요 시간을 가늠하는 것을 권합니다.
 
 ## 8. 구조
 
