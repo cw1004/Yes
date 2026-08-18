@@ -1,0 +1,11 @@
+output/
+__pycache__/
+*.pyc
+.venv/
+venv/
+assets/bgm/*
+assets/stock/*
+!assets/bgm/.gitkeep
+!assets/stock/.gitkeep
+!assets/**/README.md
+.DS_Store
