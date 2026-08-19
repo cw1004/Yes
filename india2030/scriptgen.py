@@ -202,7 +202,7 @@ def build_script_template(ep: Episode, cfg: Optional[Config] = None,
     pack = get_pack(lang)
     ends = pack["sentence_end"]
     cps = pack["chars_per_sec"]
-    cap_len = 26 if lang == "ko" else 34
+    cap_len = 26 if lang == "ko" else 44
 
     rng = random.Random(cfg.seed + ep.no * 7919)
     motif_ko, motif_en = detect_motif(ep.title)     # 모티프 판별은 원본(한국어) 제목 기준

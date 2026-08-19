@@ -134,7 +134,7 @@ def build_script_llm(ep: Episode, cfg: Config) -> Optional[VideoScript]:
     fallback = build_script_template(ep, cfg, lang=cfg.lang)
     ends = pack["sentence_end"]
     cps = pack["chars_per_sec"]
-    cap_len = 26 if cfg.lang == "ko" else 34
+    cap_len = 26 if cfg.lang == "ko" else 44
     beats: List[Beat] = []
     for name, tpl in zip(BEAT_ORDER, fallback.beats):
         b = by_name[name]
