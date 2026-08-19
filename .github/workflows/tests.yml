@@ -1,8 +1,11 @@
 name: tests
 
 on:
+  # PR 이 열린 브랜치는 pull_request 가 이미 잡습니다. push 까지 '**' 로 두면
+  # 같은 커밋에 대해 워크플로가 두 번 돌아 러너 시간이 두 배로 나갑니다.
+  # 그래서 push 는 기본 브랜치에만, 나머지는 PR 이벤트로 커버합니다.
   push:
-    branches: ['**']
+    branches: ['claude/india-2030-video-generator-coz8kp']
   pull_request:
   workflow_dispatch:
 
