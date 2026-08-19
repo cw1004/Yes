@@ -33,7 +33,7 @@ ASPECTS: Dict[str, tuple] = {
     "16:9": (1920, 1080),
 }
 
-# 한글 폰트 후보 (앞에서부터 존재하는 것을 사용)
+# 언어별 폰트 후보 (앞에서부터 존재하는 것을 사용)
 FONT_CANDIDATES: List[str] = [
     "/usr/share/fonts/truetype/nanum/NanumGothicBold.ttf",
     "/usr/share/fonts/truetype/nanum/NanumGothic.ttf",
@@ -49,9 +49,30 @@ FONT_CANDIDATES: List[str] = [
 ]
 
 
-def find_font(explicit: Optional[str] = None) -> Optional[str]:
-    """사용 가능한 한글 폰트 경로를 반환."""
-    candidates = ([explicit] if explicit else []) + FONT_CANDIDATES
+# 데바나가리(힌디어) 폰트 후보
+DEVANAGARI_FONT_CANDIDATES: List[str] = [
+    "/usr/share/fonts/truetype/noto/NotoSansDevanagari-Bold.ttf",
+    "/usr/share/fonts/truetype/noto/NotoSansDevanagari-Regular.ttf",
+    "/usr/share/fonts/opentype/noto/NotoSansDevanagari-Bold.otf",
+    "/usr/share/fonts/truetype/lohit-devanagari/Lohit-Devanagari.ttf",
+    "/usr/share/fonts/truetype/annapurna/AnnapurnaSIL-Bold.ttf",
+    "/usr/share/fonts/truetype/fonts-deva-extra/kalimati.ttf",
+    "/usr/share/fonts/truetype/Sarai/Sarai.ttf",
+    "/System/Library/Fonts/Supplemental/DevanagariMT.ttc",
+    "C:/Windows/Fonts/Nirmala.ttf",
+    "C:/Windows/Fonts/mangal.ttf",
+    "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",
+]
+
+FONTS_BY_LANG: Dict[str, List[str]] = {
+    "ko": FONT_CANDIDATES,
+    "hi": DEVANAGARI_FONT_CANDIDATES,
+}
+
+
+def find_font(explicit: Optional[str] = None, lang: str = "ko") -> Optional[str]:
+    """해당 언어를 표시할 수 있는 폰트 경로를 반환."""
+    candidates = ([explicit] if explicit else []) + FONTS_BY_LANG.get(lang, FONT_CANDIDATES)
     for path in candidates:
         if path and Path(path).exists():
             return path
@@ -59,7 +80,7 @@ def find_font(explicit: Optional[str] = None) -> Optional[str]:
     try:
         import subprocess
         out = subprocess.run(
-            ["fc-match", "-f", "%{file}", ":lang=ko"],
+            ["fc-match", "-f", "%{file}", f":lang={lang}"],
             capture_output=True, text=True, timeout=5,
         ).stdout.strip()
         if out and Path(out).exists():
@@ -81,6 +102,10 @@ class Config:
     crf: int = 20                   # 화질 (낮을수록 고화질/대용량)
     transition: str = "xfade"       # 비트 전환: xfade | fade | cut
 
+    # 언어 (ko: 한국어 / hi: 힌디어)
+    lang: str = "ko"                    # 내레이션 언어
+    caption_lang: Optional[str] = None  # 자막 언어 (None 이면 내레이션과 동일)
+
     # 텍스트/자막
     font: Optional[str] = None
     title_font: Optional[str] = None
@@ -93,7 +118,7 @@ class Config:
 
     # 음성: auto | gtts | edge | elevenlabs | espeak | silent
     tts_provider: str = "auto"
-    tts_voice: str = "ko-KR-InJoonNeural"
+    tts_voice: Optional[str] = None      # 미지정 시 언어별 기본 보이스
     tts_lang: str = "ko"
     narration_gain_db: float = 0.0
 
@@ -141,11 +166,25 @@ class Config:
     def work_dir(self) -> Path:
         return self.out_dir / "work"
 
+    @property
+    def effective_caption_lang(self) -> str:
+        return self.caption_lang or self.lang
+
     def resolved_font(self) -> Optional[str]:
-        return find_font(self.font)
+        """자막에 쓸 폰트 (자막 언어 기준)."""
+        return find_font(self.font, self.effective_caption_lang)
 
     def resolved_title_font(self) -> Optional[str]:
-        return find_font(self.title_font or self.font)
+        return find_font(self.title_font or self.font, self.effective_caption_lang)
+
+    def resolved_voice(self) -> str:
+        """내레이션 언어에 맞는 보이스 (사용자가 지정하면 그대로 사용)."""
+        from .langs import get_pack
+        return self.tts_voice or get_pack(self.lang)["tts_voice"]
+
+    def resolved_tts_lang(self) -> str:
+        from .langs import get_pack
+        return get_pack(self.lang)["tts_lang"]
 
     def ensure_dirs(self) -> None:
         for d in (self.out_dir, self.video_dir, self.script_dir, self.work_dir):

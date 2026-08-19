@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import json
 import random
-import re
 import shutil
 import time
 import traceback
@@ -19,7 +18,9 @@ from .config import Config
 from .episodes import Episode, get_episode
 from .providers import image as imgprov
 from .providers import tts as ttsprov
-from .scriptgen import VideoScript, build_script, load_script, save_script
+from .langs import get_pack
+from .scriptgen import (VideoScript, _split_sentences, build_script,
+                        load_script, save_script)
 
 
 @dataclass
@@ -51,11 +52,15 @@ def _ts(seconds: float) -> str:
     return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
 
 
-def write_srt(script: VideoScript, path: Path) -> Path:
+def write_srt(script: VideoScript, path: Path, use_caption: bool = False) -> Path:
+    """내레이션(기본) 또는 자막 언어 기준 SRT 를 만든다."""
+    lang = script.caption_lang if use_caption else script.lang
+    ends = get_pack(lang)["sentence_end"]
     cues: List[tuple] = []
     t = 0.0
     for beat in script.beats:
-        sentences = [s for s in re.split(r"(?<=[.!?])\s+", beat.narration.strip()) if s]
+        source = beat.caption if use_caption else beat.narration
+        sentences = _split_sentences(source, ends)
         if not sentences:
             t += beat.seconds
             continue
@@ -73,6 +78,14 @@ def write_srt(script: VideoScript, path: Path) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(lines), encoding="utf-8")
     return path
+
+
+def _write_subtitles(script: VideoScript, cfg: Config, no: int) -> None:
+    """내레이션 언어 SRT + (다르면) 자막 언어 SRT 를 함께 만든다."""
+    write_srt(script, cfg.script_dir / f"ep{no:03d}.{script.lang}.srt")
+    if script.caption_lang != script.lang:
+        write_srt(script, cfg.script_dir / f"ep{no:03d}.{script.caption_lang}.srt",
+                  use_caption=True)
 
 
 # ------------------------------------------------------------------ 소스 준비
@@ -93,7 +106,7 @@ def prepare_visuals(ep: Episode, script: VideoScript, cfg: Config,
             imgprov.render_background(bg, size, ep.act.palette, ep.act.accent,
                                       scene, seed=cfg.seed + ep.no * 100 + i)
         ov = workdir / f"tx_{i}_{beat.name.lower()}.png"
-        badge = f"ACT {ep.act.no} · {ep.no}화"
+        badge = get_pack(cfg.effective_caption_lang)["badge"].format(act=ep.act.no, no=ep.no)
         caption = beat.caption if cfg.subtitle else ""
         imgprov.render_text_overlay(
             ov, size, caption, badge, ep.act.accent, font,
@@ -111,7 +124,7 @@ def prepare_audio(script: VideoScript, cfg: Config, workdir: Path) -> tuple:
         target = workdir / f"na_{i}_{beat.name.lower()}.mp3"
         engine = ttsprov.synthesize(
             beat.narration, target, provider=cfg.tts_provider,
-            voice=cfg.tts_voice, lang=cfg.tts_lang,
+            voice=cfg.resolved_voice(), lang=cfg.resolved_tts_lang(),
             fallback_seconds=max(1.0, beat.seconds - vid.LEAD_IN - 0.2),
         )
         used = used or engine
@@ -144,7 +157,7 @@ def make_episode(no: int, cfg: Config, on_log=print) -> EpisodeResult:
         on_log(f"[{no:3d}] 대본 준비 완료 ({script.provider}, {script.total_seconds:.0f}s)")
 
         if cfg.dry_run:
-            write_srt(script, cfg.script_dir / f"ep{no:03d}.srt")
+            _write_subtitles(script, cfg, no)
             return EpisodeResult(no=no, ok=True, video=None, seconds=script.total_seconds,
                                  tts="dry-run", elapsed=time.time() - started,
                                  extras={"dry_run": True})
@@ -185,7 +198,7 @@ def make_episode(no: int, cfg: Config, on_log=print) -> EpisodeResult:
             shutil.copy2(merged, final)
 
         # 5) 부가물
-        write_srt(script, cfg.script_dir / f"ep{no:03d}.srt")
+        _write_subtitles(script, cfg, no)
         thumb = cfg.video_dir / f"ep{no:03d}_thumb.jpg"
         try:
             vid.make_thumbnail(thumb, final, at=min(3.0, script.total_seconds / 4))

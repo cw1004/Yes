@@ -22,8 +22,10 @@ from typing import List
 from . import __version__
 from . import ffmpeg as ff
 from .config import ASPECTS, Config, find_font
+from .langs import LANGUAGES, get_pack
 from .episodes import ACTS, all_episodes, get_episode, parse_range
-from .pipeline import EpisodeResult, make_episode, write_manifest, write_srt
+from .pipeline import (EpisodeResult, _write_subtitles, make_episode,
+                       write_manifest)
 from .providers import tts as ttsprov
 from .scriptgen import build_script, save_script
 
@@ -38,6 +40,7 @@ def build_config(args: argparse.Namespace) -> Config:
         "images": "image_provider", "stock": "stock_dir", "bgm": "bgm",
         "bgm_gain": "bgm_gain_db", "workers": "workers", "seed": "seed",
         "transition": "transition", "preset": "preset", "crf": "crf",
+        "lang": "lang", "caption_lang": "caption_lang",
     }
     for arg_name, field_name in m.items():
         val = getattr(args, arg_name, None)
@@ -55,6 +58,8 @@ def build_config(args: argparse.Namespace) -> Config:
 
 # ------------------------------------------------------------------ 서브커맨드
 def cmd_list(args: argparse.Namespace) -> int:
+    lang = getattr(args, "lang", None) or "ko"
+    titles = get_pack(lang)["titles"]
     eps = all_episodes()
     if args.act:
         eps = [e for e in eps if e.act.no == args.act]
@@ -65,7 +70,7 @@ def cmd_list(args: argparse.Namespace) -> int:
         print(f"\n■ ACT {act.no} — {act.name} ({act.subtitle})  [{act.first}~{act.last}화]")
         for e in rows:
             mark = " ⚑" if e.director_note else ""
-            print(f"  {e.no:3d}. {e.title}{mark}")
+            print(f"  {e.no:3d}. {titles[e.no - 1]}{mark}")
     print(f"\n총 {len(eps)}편")
     return 0
 
@@ -78,7 +83,7 @@ def cmd_script(args: argparse.Namespace) -> int:
         ep = get_episode(no)
         script = build_script(ep, cfg)
         path = save_script(script, cfg)
-        write_srt(script, cfg.script_dir / f"ep{no:03d}.srt")
+        _write_subtitles(script, cfg, no)
         if args.print:
             print(f"\n=== {script.hook_title}  [{script.total_seconds:.0f}초 / {script.provider}]")
             for b in script.beats:
@@ -97,6 +102,8 @@ def cmd_make(args: argparse.Namespace) -> int:
     started = time.time()
     print(f"INDIA 2030 영상 생성 시작 — {len(numbers)}편 "
           f"({cfg.aspect} {cfg.width}x{cfg.height} @{cfg.fps}fps, 워커 {cfg.workers})")
+    print(f"  내레이션 {get_pack(cfg.lang)['name']}({cfg.resolved_voice()}) · "
+          f"자막 {get_pack(cfg.effective_caption_lang)['name']}")
     if not cfg.dry_run:
         ff.ffmpeg_bin()   # 없으면 여기서 친절한 에러
 
@@ -176,8 +183,12 @@ def cmd_check(args: argparse.Namespace) -> int:
         print(f"  Pillow      : {PIL.__version__}")
     except Exception:
         print("  Pillow      : ✗  pip install pillow")
-    font = find_font(cfg.font)
-    print(f"  한글 폰트    : {font or '✗ (자막이 깨질 수 있음 — fonts-nanum 설치 권장)'}")
+    ko_font = find_font(cfg.font, "ko")
+    hi_font = find_font(cfg.font, "hi")
+    print(f"  한글 폰트    : {ko_font or '✗ (fonts-nanum 설치 권장)'}")
+    print(f"  힌디 폰트    : {hi_font or '✗ (fonts-lohit-deva 또는 Noto Sans Devanagari 설치 권장)'}")
+    print(f"  언어 설정    : 내레이션 {cfg.lang} / 자막 {cfg.effective_caption_lang} "
+          f"· 보이스 {cfg.resolved_voice()}")
     print(f"  TTS 가능    : {', '.join(ttsprov.available_providers())}")
     print(f"  화면비 옵션  : {', '.join(ASPECTS)}")
     print(f"  출력 경로    : {cfg.out_dir.resolve()}")
@@ -206,10 +217,15 @@ def build_parser() -> argparse.ArgumentParser:
         sp.add_argument("--script-provider", choices=["template", "llm"],
                         help="대본 생성 방식 (기본 template)")
         sp.add_argument("--llm-model", help="LLM 모델 이름")
+        sp.add_argument("--lang", choices=list(LANGUAGES),
+                        help="내레이션 언어: ko(한국어) | hi(힌디어). 기본 ko")
+        sp.add_argument("--caption-lang", choices=list(LANGUAGES),
+                        help="화면 자막 언어 (기본: 내레이션과 동일)")
         sp.add_argument("--seed", type=int, help="난수 시드")
 
     sp = sub.add_parser("list", help="100개 소제목 목록 보기")
     sp.add_argument("--act", type=int, choices=[1, 2, 3, 4, 5], help="특정 ACT 만 보기")
+    sp.add_argument("--lang", choices=list(LANGUAGES), help="제목 언어 (기본 ko)")
     sp.set_defaults(func=cmd_list)
 
     sp = sub.add_parser("script", help="대본(JSON/SRT)만 생성")
@@ -223,7 +239,7 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--range", default="1-100", help="회차 범위 (예: 1-100, 3, 5-9)")
     sp.add_argument("--workers", type=int, help="동시 처리 수 (기본 2)")
     sp.add_argument("--tts", dest="tts", help="음성 엔진: auto|edge|gtts|elevenlabs|silent")
-    sp.add_argument("--voice", help="TTS 보이스 (기본 ko-KR-InJoonNeural)")
+    sp.add_argument("--voice", help="TTS 보이스 (기본: ko-KR-InJoonNeural / hi-IN-MadhurNeural)")
     sp.add_argument("--images", dest="images", choices=["auto", "pillow", "stock"],
                     help="이미지 소스 (기본 pillow)")
     sp.add_argument("--stock", help="스톡 이미지 폴더 (assets/stock)")

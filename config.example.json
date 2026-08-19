@@ -7,6 +7,9 @@
   "crf": 20,
   "transition": "xfade",
 
+  "lang": "ko",
+  "caption_lang": null,
+
   "font": null,
   "subtitle": true,
   "watermark": "INDIA 2030",
@@ -15,8 +18,7 @@
   "llm_model": "claude-opus-5",
 
   "tts_provider": "auto",
-  "tts_voice": "ko-KR-InJoonNeural",
-  "tts_lang": "ko",
+  "tts_voice": null,
 
   "image_provider": "pillow",
   "stock_dir": null,

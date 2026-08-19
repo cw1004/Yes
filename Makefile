@@ -2,8 +2,12 @@
 PY ?= python3
 RANGE ?= 1-100
 WORKERS ?= 4
+# 내레이션 언어(ko|hi). 셸의 LANG(로케일) 변수와 충돌하지 않도록 NARRATION 사용
+NARRATION ?= ko
+CAPTION ?=            # 비우면 내레이션과 동일 (예: CAPTION=ko)
+LANG_OPT = --lang $(NARRATION) $(if $(CAPTION),--caption-lang $(CAPTION),)
 
-.PHONY: help setup check scripts all fast test clean
+.PHONY: help setup check scripts all hindi fast test clean
 
 help:            ## 사용 가능한 명령 보기
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -16,13 +20,16 @@ check:           ## 실행 환경 점검 (ffmpeg / 폰트 / TTS)
 	$(PY) -m india2030 check
 
 scripts:         ## 대본(JSON/SRT)만 100편 생성
-	$(PY) -m india2030 script --range $(RANGE)
+	$(PY) -m india2030 script --range $(RANGE) $(LANG_OPT)
 
-all:             ## 영상 100편 생성 (고화질)
-	$(PY) -m india2030 make --range $(RANGE) --workers $(WORKERS) --bgm assets/bgm
+all:             ## 영상 100편 생성 (고화질)  예) make all NARRATION=hi
+	$(PY) -m india2030 make --range $(RANGE) --workers $(WORKERS) $(LANG_OPT) --bgm assets/bgm
+
+hindi:           ## 힌디어 내레이션 + 한국어 자막으로 100편 생성
+	$(PY) -m india2030 make --range $(RANGE) --workers $(WORKERS) --lang hi --caption-lang ko --bgm assets/bgm
 
 fast:            ## 영상 100편 빠르게 생성 (미리보기 화질)
-	$(PY) -m india2030 make --range $(RANGE) --workers $(WORKERS) --preset veryfast --crf 26
+	$(PY) -m india2030 make --range $(RANGE) --workers $(WORKERS) $(LANG_OPT) --preset veryfast --crf 26
 
 test:            ## 테스트 실행
 	$(PY) -m unittest discover -s tests

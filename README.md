@@ -4,11 +4,19 @@
 **명령어 한 줄로 100편 전부** 만들어 내는 파이프라인입니다.
 
 ```bash
+# 한국어 내레이션
 python3 -m india2030 make --range 1-100 --workers 4
+
+# 힌디어 내레이션 (인도 현지용)
+python3 -m india2030 make --range 1-100 --workers 4 --lang hi
+
+# 힌디어 내레이션 + 한국어 자막
+python3 -m india2030 make --range 1-100 --workers 4 --lang hi --caption-lang ko
 ```
 
-- 100개 소제목이 코드에 내장되어 있고, 각 편은 **HOOK → EMOTION → ACTION → DREAM → MESSAGE**
+- 100개 소제목이 **한국어·힌디어 두 벌** 내장되어 있고, 각 편은 **HOOK → EMOTION → ACTION → DREAM → MESSAGE**
   5단계로 구성된 **정확히 60초** 완결 서사로 만들어집니다.
+- 내레이션 언어와 자막 언어를 따로 고를 수 있습니다(`--lang` / `--caption-lang`).
 - 외부 API 키가 없어도 동작합니다(오프라인 템플릿 대본 + 절차적 배경 생성 + 무음 폴백).
   키가 있으면 Claude 대본·고품질 TTS로 바로 품질이 올라갑니다.
 - 결과물: `mp4` 영상, 썸네일 `jpg`, 대본 `json`, 자막 `srt`, 업로드용 `upload_index.csv`.
@@ -23,8 +31,9 @@ sudo apt-get install -y ffmpeg          # Ubuntu/Debian
 brew install ffmpeg                     # macOS
 #   윈도우는 https://www.gyan.dev/ffmpeg/builds/ 에서 받아 PATH 에 추가
 
-# 2) 한글 폰트 (자막 깨짐 방지 — 리눅스에서 권장)
-sudo apt-get install -y fonts-nanum
+# 2) 폰트 (자막 깨짐 방지 — 리눅스에서 권장)
+sudo apt-get install -y fonts-nanum          # 한국어 자막
+sudo apt-get install -y fonts-lohit-deva     # 힌디어(데바나가리) 자막
 
 # 3) 파이썬 패키지
 pip install -r requirements.txt
@@ -40,8 +49,12 @@ python3 -m india2030 check
   ffprobe     : /usr/bin/ffprobe
   Pillow      : 12.3.0
   한글 폰트    : /usr/share/fonts/truetype/nanum/NanumGothicBold.ttf
+  힌디 폰트    : /usr/share/fonts/truetype/lohit-devanagari/Lohit-Devanagari.ttf
+  언어 설정    : 내레이션 hi / 자막 ko · 보이스 hi-IN-MadhurNeural
   TTS 가능    : edge, gtts, silent
 ```
+
+> 언어 설정을 바꿔 확인하려면 `python3 -m india2030 check --lang hi --caption-lang ko`
 
 ## 2. 바로 실행
 
@@ -60,7 +73,7 @@ python3 -m india2030 make --range 1
 
 | 명령 | 설명 |
 | --- | --- |
-| `python3 -m india2030 list` | 100개 소제목을 ACT 별로 출력 (`--act 3` 으로 필터) |
+| `python3 -m india2030 list` | 100개 소제목을 ACT 별로 출력 (`--act 3`, `--lang hi` 로 필터/언어 변경) |
 | `python3 -m india2030 script --range 1-100 --print` | 대본(JSON/SRT)만 생성·확인 |
 | `python3 -m india2030 make --range 1-100` | 영상 생성 |
 | `python3 -m india2030 check` | 환경 점검 |
@@ -70,10 +83,12 @@ python3 -m india2030 make --range 1
 | 옵션 | 기본값 | 설명 |
 | --- | --- | --- |
 | `--range 1-100` | `1-100` | 회차 범위. `--range 5`, `--range 1-20,55,91-95` 형태 모두 가능 |
+| `--lang hi` | `ko` | **내레이션 언어** — `ko`(한국어) / `hi`(힌디어) |
+| `--caption-lang ko` | 내레이션과 동일 | **화면 자막 언어** — 힌디 더빙 + 한국어 자막 조합에 사용 |
 | `--workers 4` | `2` | 동시 처리 편수 (CPU 코어 수 정도가 적당) |
 | `--aspect 9:16` | `9:16` | `9:16`(쇼츠/릴스), `1:1`, `16:9` |
 | `--tts edge` | `auto` | `auto\|edge\|gtts\|elevenlabs\|silent` |
-| `--voice ko-KR-InJoonNeural` | 남성 | 여성은 `ko-KR-SunHiNeural` |
+| `--voice hi-IN-MadhurNeural` | 언어별 기본 | 한국어 `ko-KR-InJoonNeural`(남)/`ko-KR-SunHiNeural`(여), 힌디어 `hi-IN-MadhurNeural`(남)/`hi-IN-SwaraNeural`(여) |
 | `--images stock` | `pillow` | `assets/stock/ep001/` 의 실제 사진 사용 |
 | `--bgm assets/bgm` | 없음 | 배경음악 파일 또는 폴더 (`--bgm-gain -18` 로 볼륨 조절) |
 | `--script-provider llm` | `template` | Claude API 로 대본 생성 (아래 4번 참고) |
@@ -87,11 +102,16 @@ python3 -m india2030 make --range 1
 
 ### 4-1. 내레이션 음성
 
-기본은 무료 `edge-tts`(한국어 자연스러움)를 자동으로 씁니다.
+기본은 무료 `edge-tts` 를 자동으로 씁니다. 언어를 바꾸면 보이스도 자동으로 바뀝니다.
 
 ```bash
 pip install edge-tts
+
+# 한국어 남성
 python3 -m india2030 make --range 1-100 --tts edge --voice ko-KR-InJoonNeural
+# 힌디어 남성(기본) / 여성
+python3 -m india2030 make --range 1-100 --lang hi --tts edge
+python3 -m india2030 make --range 1-100 --lang hi --tts edge --voice hi-IN-SwaraNeural
 ```
 
 ElevenLabs 를 쓰려면:
@@ -112,7 +132,7 @@ export ANTHROPIC_API_KEY=sk-ant-...
 python3 -m india2030 make --range 1-100 --script-provider llm
 ```
 
-- 회차별 ACT·무드·연출 메모·스포일러 금지 조건이 프롬프트에 자동으로 반영됩니다.
+- 회차별 ACT·무드·연출 메모·스포일러 금지 조건과 **내레이션 언어**가 프롬프트에 자동으로 반영됩니다.
 - API 호출이 실패하면 그 회차만 조용히 템플릿 대본으로 되돌아갑니다.
 
 ### 4-3. 실사 이미지 / AI 이미지 사용
@@ -146,7 +166,8 @@ output/
 │   └── ...
 ├── script/
 │   ├── ep001.json            # 5단계 대본 + 자막 + 이미지 프롬프트 + 해시태그
-│   ├── ep001.srt             # 업로드용 자막
+│   ├── ep001.hi.srt          # 내레이션 언어 자막(업로드용)
+│   ├── ep001.ko.srt          # 자막 언어가 다르면 함께 생성
 │   └── ...
 ├── manifest.json             # 생성 결과 요약 (성공/실패/길이/사용 엔진)
 └── upload_index.csv          # 업로드용 표 (제목·파일·해시태그) — 엑셀에서 바로 열림
@@ -181,6 +202,8 @@ output/
 | 4 | 61~80 | 국가대표 — 국가대표의 꿈 | 조명 자주빛 |
 | 5 | 81~100 | 2030 — 인도의 월드컵 도전 | 오렌지빛 물결 |
 
+힌디어 제목은 `python3 -m india2030 list --lang hi` 로 확인할 수 있습니다.
+
 제작 메모는 코드에 반영되어 있습니다.
 
 - **91~95화**는 다음 화 예고로 이어지도록 끝나며, **결과를 절대 노출하지 않습니다.**
@@ -204,8 +227,9 @@ python3 -m india2030 make --range 1-100 --workers 8 --preset veryfast --crf 26
 
 ```
 india2030/
-├── episodes.py      100개 소제목 + ACT 메타데이터(색감·무드·연출 메모)
-├── scriptgen.py     5단계 60초 대본 생성 (템플릿 엔진)
+├── episodes.py      100개 소제목(한국어) + ACT 메타데이터(색감·무드·연출 메모)
+├── langs.py         언어 팩 — 힌디어 100개 제목 + 언어별 문장 뱅크/보이스
+├── scriptgen.py     5단계 60초 대본 생성 (템플릿 엔진, 내레이션·자막 언어 분리)
 ├── config.py        설정 / 비트 길이 / 폰트 탐색
 ├── ffmpeg.py        ffmpeg·ffprobe 래퍼
 ├── video.py         켄번즈·자막 오버레이·크로스페이드·BGM 믹스
@@ -228,7 +252,8 @@ make test        # 또는 python3 -m unittest discover -s tests
 | 증상 | 해결 |
 | --- | --- |
 | `ffmpeg 을 찾을 수 없습니다` | ffmpeg 설치 또는 `pip install imageio-ffmpeg` |
-| 자막이 네모(□)로 나옴 | 한글 폰트 설치(`fonts-nanum`) 또는 `--font /경로/폰트.ttf` |
+| 한국어 자막이 네모(□)로 나옴 | `sudo apt-get install fonts-nanum` 또는 `--font /경로/폰트.ttf` |
+| 힌디어 자막이 깨지거나 모음이 어긋남 | `sudo apt-get install fonts-lohit-deva`, 그리고 Pillow 가 Raqm 지원으로 빌드됐는지 확인(`python3 -c "from PIL import features; print(features.check('raqm'))"`) |
 | 음성이 안 나옴 | `check` 의 `TTS 가능` 확인 → `pip install edge-tts`, 사내망이면 프록시/방화벽 확인 |
 | 너무 느림 | `--preset veryfast --crf 26 --workers 8` |
 | 특정 회차만 다시 | `python3 -m india2030 make --range 42 --overwrite` |
