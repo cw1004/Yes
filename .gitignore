@@ -1,0 +1,35 @@
+# secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# runtime state
+.kis_token.json
+.kis/
+data/
+*.db
+*.sqlite3
+logs/
+*.log
+KILL_SWITCH
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+.coverage
+htmlcov/
+
+# editors
+.idea/
+.vscode/
+.DS_Store
