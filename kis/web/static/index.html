@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="robots" content="noindex, nofollow">
+<title>KIS 대시보드</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232563eb'/%3E%3Cpath d='M7 21l5-6 4 4 8-9' stroke='white' stroke-width='2.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<style>
+  :root {
+    --bg: #f4f5f7; --card: #ffffff; --text: #16181d; --muted: #6b7280;
+    --line: #e3e5e9; --accent: #2563eb;
+    --up: #d92b2b; --down: #1f6feb;      /* 국내 관례: 상승 빨강 / 하락 파랑 */
+    --warn: #b45309; --danger: #c62828; --ok: #15803d;
+    --shadow: 0 1px 3px rgba(0,0,0,.07);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1115; --card: #171a21; --text: #e7e9ee; --muted: #9aa1ae;
+      --line: #262b35; --accent: #5b8cff;
+      --up: #ff5c5c; --down: #5b9bff;
+      --warn: #d99a2b; --danger: #ff6b6b; --ok: #4ade80;
+      --shadow: none;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic",
+          "Noto Sans KR", system-ui, sans-serif;
+    padding: 0 0 env(safe-area-inset-bottom);
+    -webkit-text-size-adjust: 100%;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 12px 12px 40px; }
+
+  header { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 6px 2px 14px; }
+  header h1 { font-size: 17px; margin: 0; font-weight: 700; letter-spacing: -.2px; }
+  .badge {
+    font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 999px;
+    border: 1px solid var(--line); color: var(--muted); white-space: nowrap;
+  }
+  .badge.real { background: var(--danger); border-color: var(--danger); color: #fff; }
+  .badge.paper { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .badge.dry { background: var(--warn); border-color: var(--warn); color: #fff; }
+  .badge.open { color: var(--ok); border-color: currentColor; }
+  .spacer { flex: 1; }
+  .updated { font-size: 11px; color: var(--muted); }
+
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    padding: 14px; margin-bottom: 12px; box-shadow: var(--shadow);
+  }
+  .card h2 {
+    font-size: 12px; font-weight: 700; color: var(--muted); margin: 0 0 10px;
+    letter-spacing: .04em; text-transform: uppercase;
+  }
+  .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  @media (min-width: 560px) { .grid { grid-template-columns: repeat(4, 1fr); } }
+  .stat .label { font-size: 11px; color: var(--muted); margin-bottom: 3px; }
+  .stat .value { font-size: 19px; font-weight: 700; letter-spacing: -.4px; font-variant-numeric: tabular-nums; }
+  .stat .sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .up { color: var(--up); } .down { color: var(--down); }
+
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  th, td { padding: 9px 6px; text-align: right; border-bottom: 1px solid var(--line); font-size: 13px; }
+  th { font-size: 11px; color: var(--muted); font-weight: 600; white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; }
+  tbody tr:last-child td { border-bottom: 0; }
+  .name { font-weight: 600; white-space: nowrap; }
+  td:first-child { min-width: 88px; }
+  td .sub { font-size: 11px; color: var(--muted); font-weight: 400; margin-top: 1px; }
+  @media (max-width: 480px) { .wide-only { display: none; } th, td { padding: 9px 4px; } }
+  .code { font-size: 11px; color: var(--muted); }
+  .scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+  button {
+    font: inherit; font-weight: 600; border-radius: 9px; border: 1px solid var(--line);
+    background: var(--card); color: var(--text); padding: 9px 14px; cursor: pointer;
+    min-height: 40px; touch-action: manipulation;
+  }
+  button:active { transform: translateY(1px); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.danger { background: var(--danger); border-color: var(--danger); color: #fff; }
+  button.ghost { background: transparent; }
+  button.small { padding: 5px 10px; min-height: 32px; font-size: 12px; }
+  .stop-btn { width: 100%; font-size: 16px; padding: 15px; min-height: 54px; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+  .halted-banner {
+    background: var(--danger); color: #fff; border-radius: 10px;
+    padding: 11px 14px; font-weight: 700; margin-bottom: 12px; font-size: 14px;
+  }
+  .empty { color: var(--muted); font-size: 13px; padding: 10px 2px; }
+  .muted { color: var(--muted); font-size: 12px; }
+
+  input, select {
+    font: inherit; padding: 9px 10px; border-radius: 9px; min-height: 40px;
+    border: 1px solid var(--line); background: var(--card); color: var(--text); width: 100%;
+  }
+  .form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+
+  #login { max-width: 380px; margin: 15vh auto; }
+  #toast {
+    position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%);
+    background: #16181d; color: #fff; padding: 11px 18px; border-radius: 10px;
+    font-size: 13px; max-width: 92vw; opacity: 0; pointer-events: none;
+    transition: opacity .2s; z-index: 50; box-shadow: 0 4px 16px rgba(0,0,0,.3);
+  }
+  #toast.show { opacity: .97; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<!-- ─────────────────────────── 로그인 ─────────────────────────── -->
+<div id="login" class="wrap hidden">
+  <div class="card">
+    <h2>접속 토큰</h2>
+    <p class="muted" style="margin-top:0">서버를 실행한 터미널에 출력된 토큰을 입력하세요.</p>
+    <input id="token-input" type="password" placeholder="토큰" autocomplete="off" autocapitalize="off" spellcheck="false">
+    <div class="row" style="margin-top:10px">
+      <button class="primary" id="login-btn" style="flex:1">접속</button>
+    </div>
+    <p id="login-error" class="muted hidden" style="color:var(--danger)"></p>
+  </div>
+</div>
+
+<!-- ─────────────────────────── 대시보드 ─────────────────────────── -->
+<div id="app" class="wrap hidden">
+  <header>
+    <h1>KIS 대시보드</h1>
+    <span id="env-badge" class="badge"></span>
+    <span id="dry-badge" class="badge dry hidden">DRY-RUN</span>
+    <span id="market-badge" class="badge"></span>
+    <span class="spacer"></span>
+    <span id="updated" class="updated"></span>
+  </header>
+
+  <div id="halted-banner" class="halted-banner hidden">⛔ 매매 중단 상태 — 킬 스위치가 켜져 있습니다</div>
+
+  <div class="card">
+    <div class="grid">
+      <div class="stat"><div class="label">순자산</div><div class="value" id="net-asset">-</div><div class="sub" id="account"></div></div>
+      <div class="stat"><div class="label">당일 손익</div><div class="value" id="daily-pnl">-</div><div class="sub" id="daily-pnl-rate"></div></div>
+      <div class="stat"><div class="label">평가 손익</div><div class="value" id="total-pnl">-</div><div class="sub" id="total-pnl-rate"></div></div>
+      <div class="stat"><div class="label">주문가능현금</div><div class="value" id="available-cash">-</div><div class="sub" id="cash"></div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>비상 제어</h2>
+    <button id="stop-btn" class="danger stop-btn">⛔ 매매 즉시 중단</button>
+    <div class="row" style="margin-top:9px">
+      <button id="cancel-all-btn" class="ghost small">미체결 전량 취소</button>
+      <button id="refresh-btn" class="ghost small">새로고침</button>
+      <span class="spacer"></span>
+      <span class="muted" id="limits-info"></span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>보유 종목 <span id="position-count" class="muted"></span></h2>
+    <div class="scroll"><table id="positions-table">
+      <thead><tr><th>종목 / 매입가</th><th>수량</th><th>현재가</th><th>평가손익 / 수익률</th></tr></thead>
+      <tbody></tbody>
+    </table></div>
+    <div id="positions-empty" class="empty hidden">보유 종목이 없습니다.</div>
+  </div>
+
+  <div class="card">
+    <h2>미체결 주문</h2>
+    <div class="scroll"><table id="orders-table">
+      <thead><tr><th>종목</th><th>구분</th><th>잔량 / 주문</th><th>단가</th><th></th></tr></thead>
+      <tbody></tbody>
+    </table></div>
+    <div id="orders-empty" class="empty hidden">미체결 주문이 없습니다.</div>
+  </div>
+
+  <div class="card" id="quotes-card">
+    <h2>관심 종목</h2>
+    <div class="scroll"><table id="quotes-table">
+      <thead><tr><th>종목</th><th>현재가</th><th>대비 / 등락률</th><th class="wide-only">거래량</th></tr></thead>
+      <tbody></tbody>
+    </table></div>
+    <div id="quotes-empty" class="empty hidden">--watch 옵션으로 관심 종목을 지정하세요.</div>
+  </div>
+
+  <div class="card hidden" id="order-card">
+    <h2>수동 주문</h2>
+    <div class="form-grid">
+      <input id="order-symbol" placeholder="종목코드 (예: 005930)" inputmode="numeric" autocomplete="off">
+      <select id="order-side"><option value="buy">매수</option><option value="sell">매도</option></select>
+      <input id="order-qty" type="number" min="1" placeholder="수량" inputmode="numeric">
+      <input id="order-price" type="number" min="0" placeholder="가격 (시장가는 비움)" inputmode="numeric">
+    </div>
+    <div class="row" style="margin-top:9px">
+      <label class="muted row" style="gap:5px"><input type="checkbox" id="order-market" style="width:auto;min-height:auto"> 시장가</label>
+      <span class="spacer"></span>
+      <button id="order-btn" class="primary">주문 실행</button>
+    </div>
+    <p class="muted" style="margin-bottom:0">주문은 리스크 한도 검증을 거칩니다. 한도를 넘으면 수량이 자동으로 줄어듭니다.</p>
+  </div>
+
+  <div class="card">
+    <h2>최근 주문 기록</h2>
+    <div class="scroll"><table id="journal-table">
+      <thead><tr><th>시각</th><th>종목</th><th>구분</th><th>수량</th><th>가격</th><th>결과</th></tr></thead>
+      <tbody></tbody>
+    </table></div>
+    <div id="journal-empty" class="empty hidden">기록된 주문이 없습니다.</div>
+  </div>
+
+  <div class="row" style="justify-content:center;margin-top:16px">
+    <button class="ghost small" id="logout-btn">토큰 지우고 로그아웃</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+(() => {
+  "use strict";
+  const KEY = "kis-dashboard-token";
+  const $ = (id) => document.getElementById(id);
+  let token = localStorage.getItem(KEY) || "";
+  let config = { allow_control: false, refresh_seconds: 10 };
+  let timer = null;
+
+  // URL 에 ?token=... 으로 들어왔다면 저장하고 주소창에서 지운다(기록에 남지 않도록).
+  const urlToken = new URLSearchParams(location.search).get("token");
+  if (urlToken) {
+    token = urlToken;
+    localStorage.setItem(KEY, token);
+    history.replaceState(null, "", location.pathname);
+  }
+
+  // ───────────────────────── 유틸
+  const won = (n) => (n === null || n === undefined || isNaN(n) ? "-" : Number(n).toLocaleString("ko-KR") + "원");
+  const num = (n) => (n === null || n === undefined || isNaN(n) ? "-" : Number(n).toLocaleString("ko-KR"));
+  const signClass = (n) => (n > 0 ? "up" : n < 0 ? "down" : "");
+  const signed = (n) => (n > 0 ? "+" : "") + num(n);
+  const pct = (n) => (n > 0 ? "+" : "") + Number(n || 0).toFixed(2) + "%";
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+  let toastTimer = null;
+  function toast(message) {
+    const el = $("toast");
+    el.textContent = message;
+    el.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove("show"), 3200);
+  }
+
+  async function api(path, options = {}) {
+    const res = await fetch(path, {
+      ...options,
+      headers: { "X-Auth-Token": token, "Content-Type": "application/json", ...(options.headers || {}) },
+    });
+    if (res.status === 401) { logout(); throw new Error("인증이 만료되었습니다"); }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || data.message || `요청 실패 (${res.status})`);
+    return data;
+  }
+
+  // ───────────────────────── 로그인
+  function showLogin(message) {
+    stopPolling();
+    $("app").classList.add("hidden");
+    $("login").classList.remove("hidden");
+    if (message) { $("login-error").textContent = message; $("login-error").classList.remove("hidden"); }
+  }
+  function logout() {
+    localStorage.removeItem(KEY);
+    token = "";
+    showLogin();
+  }
+  async function login(candidate) {
+    const res = await fetch("/api/config", { headers: { "X-Auth-Token": candidate } });
+    if (!res.ok) throw new Error("토큰이 올바르지 않습니다");
+    return res.json();
+  }
+
+  $("login-btn").addEventListener("click", async () => {
+    const candidate = $("token-input").value.trim();
+    if (!candidate) return;
+    try {
+      config = await login(candidate);
+      token = candidate;
+      localStorage.setItem(KEY, token);
+      start();
+    } catch (err) { showLogin(err.message); }
+  });
+  $("token-input").addEventListener("keydown", (e) => { if (e.key === "Enter") $("login-btn").click(); });
+  $("logout-btn").addEventListener("click", logout);
+
+  // ───────────────────────── 렌더링
+  function renderSummary(s) {
+    $("env-badge").textContent = s.is_paper ? "모의투자" : "실전투자";
+    $("env-badge").className = "badge " + (s.is_paper ? "paper" : "real");
+    $("dry-badge").classList.toggle("hidden", !s.dry_run);
+    $("market-badge").textContent = s.market_open ? "장중" : "장 마감";
+    $("market-badge").className = "badge" + (s.market_open ? " open" : "");
+    $("updated").textContent = "갱신 " + s.server_time.slice(11);
+
+    $("net-asset").textContent = won(s.net_asset);
+    $("account").textContent = s.account;
+
+    const daily = $("daily-pnl");
+    daily.textContent = s.opening_equity ? signed(s.daily_pnl) + "원" : "-";
+    daily.className = "value " + signClass(s.daily_pnl);
+    $("daily-pnl-rate").textContent = s.opening_equity
+      ? pct(s.daily_pnl_rate) + " · 한도 " + won(s.limits.max_daily_loss)
+      : "기준 순자산 미기록";
+
+    const total = $("total-pnl");
+    total.textContent = signed(s.total_pnl) + "원";
+    total.className = "value " + signClass(s.total_pnl);
+    $("total-pnl-rate").textContent = pct(s.total_pnl_rate);
+
+    $("available-cash").textContent = won(s.available_cash);
+    $("cash").textContent = "예수금 " + won(s.cash);
+
+    $("halted-banner").classList.toggle("hidden", !s.halted);
+    const stop = $("stop-btn");
+    if (s.halted) {
+      stop.textContent = "✅ 매매 재개";
+      stop.className = "stop-btn " + (config.allow_control ? "primary" : "ghost");
+      stop.disabled = !config.allow_control;
+      stop.title = config.allow_control ? "" : "읽기 전용 모드에서는 재개할 수 없습니다";
+    } else {
+      stop.textContent = "⛔ 매매 즉시 중단";
+      stop.className = "danger stop-btn";
+      stop.disabled = false;
+      stop.title = "";
+    }
+
+    $("position-count").textContent = `${s.position_count} / ${s.limits.max_positions}`;
+    $("limits-info").textContent =
+      `오늘 주문 ${s.orders_today}/${s.limits.max_orders_per_day}건 · 1회 한도 ${won(s.limits.max_order_amount)}`;
+  }
+
+  function renderPositions(rows) {
+    const body = $("positions-table").querySelector("tbody");
+    $("positions-empty").classList.toggle("hidden", rows.length > 0);
+    $("positions-table").classList.toggle("hidden", rows.length === 0);
+    body.innerHTML = rows.map((p) => `
+      <tr>
+        <td>
+          <div class="name">${esc(p.name || p.symbol)}</div>
+          <div class="sub">${esc(p.symbol)} · ${num(Math.round(p.avg_price))}</div>
+        </td>
+        <td>${num(p.quantity)}</td>
+        <td>${num(p.current_price)}</td>
+        <td class="${signClass(p.pnl)}">
+          ${signed(p.pnl)}
+          <div class="sub ${signClass(p.pnl_rate)}">${pct(p.pnl_rate)}</div>
+        </td>
+      </tr>`).join("");
+  }
+
+  function renderOrders(rows) {
+    const body = $("orders-table").querySelector("tbody");
+    $("orders-empty").classList.toggle("hidden", rows.length > 0);
+    $("orders-table").classList.toggle("hidden", rows.length === 0);
+    body.innerHTML = rows.map((o) => `
+      <tr>
+        <td><div class="name">${esc(o.name || o.symbol)}</div><div class="sub">${esc(o.symbol)}</div></td>
+        <td class="${o.side === "buy" ? "up" : "down"}">${esc(o.side_ko || o.side)}</td>
+        <td>${num(o.remaining_qty)}<div class="sub">/ ${num(o.order_qty)}</div></td>
+        <td>${num(o.order_price)}</td>
+        <td>${config.allow_control
+          ? `<button class="small ghost" data-cancel data-order="${esc(o.order_no)}" data-org="${esc(o.org_no)}">취소</button>`
+          : ""}</td>
+      </tr>`).join("");
+    body.querySelectorAll("[data-cancel]").forEach((btn) => {
+      btn.addEventListener("click", () => cancelOrder(btn.dataset.order, btn.dataset.org));
+    });
+  }
+
+  function renderQuotes(rows) {
+    const body = $("quotes-table").querySelector("tbody");
+    $("quotes-empty").classList.toggle("hidden", rows.length > 0);
+    $("quotes-table").classList.toggle("hidden", rows.length === 0);
+    body.innerHTML = rows.map((q) => q.error
+      ? `<tr><td>${esc(q.symbol)}</td><td colspan="3" class="muted">${esc(q.error)}</td></tr>`
+      : `<tr>
+          <td><div class="name">${esc(q.name || q.symbol)}</div><div class="sub">${esc(q.symbol)}</div></td>
+          <td>${num(q.price)}</td>
+          <td class="${signClass(q.change)}">
+            ${signed(q.change)}
+            <div class="sub ${signClass(q.change_rate)}">${pct(q.change_rate)}</div>
+          </td>
+          <td class="wide-only">${num(q.volume)}</td>
+        </tr>`).join("");
+  }
+
+  function renderJournal(rows) {
+    const body = $("journal-table").querySelector("tbody");
+    $("journal-empty").classList.toggle("hidden", rows.length > 0);
+    $("journal-table").classList.toggle("hidden", rows.length === 0);
+    body.innerHTML = rows.map((r) => {
+      let status = r.success ? "성공" : "실패";
+      if (r.dry_run) status += "(dry)";
+      return `<tr>
+        <td>${esc((r.ts || "").slice(5, 16).replace("T", " "))}</td>
+        <td>${esc(r.symbol)}</td>
+        <td class="${r.side === "buy" ? "up" : "down"}">${r.side === "buy" ? "매수" : "매도"}</td>
+        <td>${num(r.quantity)}</td>
+        <td>${num(r.price)}</td>
+        <td class="${r.success ? "" : "down"}">${esc(status)}</td>
+      </tr>`;
+    }).join("");
+  }
+
+  // ───────────────────────── 동작
+  async function refresh() {
+    try {
+      const data = await api("/api/snapshot");
+      renderSummary(data.summary);
+      renderPositions(data.positions);
+      renderOrders(data.orders);
+      renderQuotes(data.quotes);
+      renderJournal(data.journal);
+    } catch (err) {
+      $("updated").textContent = "갱신 실패";
+      console.error(err);
+    }
+  }
+
+  async function toggleHalt() {
+    const halted = !$("halted-banner").classList.contains("hidden");
+    const turnOn = !halted;
+    if (turnOn && !confirm("매매를 즉시 중단할까요?\n실행 중인 엔진은 다음 주문 시도부터 차단됩니다.")) return;
+    if (!turnOn && !confirm("매매를 재개할까요? 자동매매가 다시 주문을 낼 수 있습니다.")) return;
+    try {
+      await api("/api/halt", { method: "POST", body: JSON.stringify({ on: turnOn }) });
+      toast(turnOn ? "매매를 중단했습니다" : "매매를 재개했습니다");
+      refresh();
+    } catch (err) { toast(err.message); }
+  }
+
+  async function cancelOrder(orderNo, orgNo) {
+    if (!confirm(`주문 ${orderNo} 을(를) 취소할까요?`)) return;
+    try {
+      const res = await api("/api/cancel", { method: "POST", body: JSON.stringify({ order_no: orderNo, org_no: orgNo }) });
+      toast(res.success ? "취소 요청을 보냈습니다" : "취소 실패: " + res.message);
+      refresh();
+    } catch (err) { toast(err.message); }
+  }
+
+  async function cancelAll() {
+    if (!confirm("미체결 주문을 전부 취소할까요?")) return;
+    try {
+      const res = await api("/api/cancel-all", { method: "POST" });
+      toast(`${res.count}건 취소 요청을 보냈습니다`);
+      refresh();
+    } catch (err) { toast(err.message); }
+  }
+
+  async function placeOrder() {
+    const symbol = $("order-symbol").value.trim();
+    const side = $("order-side").value;
+    const quantity = parseInt($("order-qty").value, 10);
+    const market = $("order-market").checked;
+    const price = parseInt($("order-price").value, 10) || 0;
+    if (!symbol || !quantity) return toast("종목코드와 수량을 입력하세요");
+    const label = side === "buy" ? "매수" : "매도";
+    if (!confirm(`${symbol} ${quantity}주 ${market ? "시장가" : price.toLocaleString() + "원"} ${label} 주문을 실행할까요?`)) return;
+    try {
+      const res = await api("/api/order", {
+        method: "POST",
+        body: JSON.stringify({ symbol, side, quantity, price, market }),
+      });
+      toast(res.success ? `주문 접수 (${res.quantity}주, ${res.order_no || "-"})` : "실패: " + res.message);
+      if (res.success) { $("order-qty").value = ""; $("order-price").value = ""; }
+      refresh();
+    } catch (err) { toast(err.message); }
+  }
+
+  $("stop-btn").addEventListener("click", toggleHalt);
+  $("cancel-all-btn").addEventListener("click", cancelAll);
+  $("refresh-btn").addEventListener("click", refresh);
+  $("order-btn").addEventListener("click", placeOrder);
+
+  // ───────────────────────── 폴링 (탭이 숨겨지면 중단해 배터리·유량 절약)
+  function startPolling() {
+    stopPolling();
+    timer = setInterval(() => { if (!document.hidden) refresh(); }, (config.refresh_seconds || 10) * 1000);
+  }
+  function stopPolling() { if (timer) { clearInterval(timer); timer = null; } }
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
+
+  function start() {
+    $("login").classList.add("hidden");
+    $("app").classList.remove("hidden");
+    $("order-card").classList.toggle("hidden", !config.allow_control);
+    $("cancel-all-btn").disabled = !config.allow_control;
+    refresh();
+    startPolling();
+  }
+
+  // ───────────────────────── 진입
+  (async () => {
+    if (!token) return showLogin();
+    try {
+      config = await login(token);
+      start();
+    } catch (err) { showLogin("저장된 토큰이 더 이상 유효하지 않습니다."); }
+  })();
+})();
+</script>
+</body>
+</html>

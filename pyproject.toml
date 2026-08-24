@@ -16,13 +16,17 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0", "pytest-cov>=5.0", "responses>=0.25", "ruff>=0.5"]
+web = ["flask>=3.0,<4"]
+dev = ["pytest>=8.0", "pytest-cov>=5.0", "responses>=0.25", "ruff>=0.5", "flask>=3.0,<4"]
 
 [project.scripts]
 kis = "kis.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["kis*"]
+
+[tool.setuptools.package-data]
+"kis.web" = ["static/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

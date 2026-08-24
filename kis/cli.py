@@ -5,12 +5,14 @@
     python -m kis balance               잔고
     python -m kis buy 005930 -q 1 -p 70000
     python -m kis run --strategy sma_cross --symbols 005930,000660
+    python -m kis web --host 0.0.0.0    폰 브라우저용 대시보드
 """
 
 from __future__ import annotations
 
 import argparse
 import logging
+import os
 import sys
 from datetime import date
 
@@ -313,6 +315,37 @@ def cmd_run(trader: KisTrader, args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_web(trader: KisTrader, args: argparse.Namespace) -> int:
+    from .web import WebConfig, create_app, generate_token, print_startup_banner
+
+    token = args.token or os.getenv("KIS_WEB_TOKEN") or generate_token()
+    watchlist = _split_symbols(args.watch or os.getenv("KIS_WATCHLIST") or "")
+
+    config = WebConfig(
+        token=token,
+        allow_control=args.allow_control,
+        host=args.host,
+        port=args.port,
+        watchlist=watchlist,
+        refresh_seconds=args.refresh,
+    )
+
+    if args.allow_control and not trader.settings.is_paper and not trader.settings.dry_run and not args.yes:
+        print("\n" + "!" * 60)
+        print("  실전 계좌에서 제어(주문·취소·매매재개)를 허용하려 합니다.")
+        print("  대시보드 접속자는 실제 주문을 낼 수 있습니다.")
+        print("!" * 60)
+        if input("계속하려면 '실행' 을 입력하세요: ").strip() != "실행":
+            print("취소했습니다.")
+            return 1
+
+    app = create_app(trader, config)
+    print_startup_banner(config, trader)
+    # 개인용 LAN 대시보드이므로 내장 서버로 충분하다. 외부에 공개하지 말 것.
+    app.run(host=args.host, port=args.port, threaded=True, debug=False, use_reloader=False)
+    return 0
+
+
 def cmd_journal(trader: KisTrader, args: argparse.Namespace) -> int:
     rows = trader.storage.recent_orders(args.limit)
     if not rows:
@@ -428,6 +461,18 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--ignore-market-hours", action="store_true", help="장 시간 밖에서도 실행(테스트용)")
     p.add_argument("--yes", action="store_true")
     p.set_defaults(func=cmd_run)
+
+    p = sub.add_parser("web", help="모니터링 대시보드 실행 (폰 브라우저용)")
+    p.add_argument("--host", default="127.0.0.1",
+                   help="바인딩 주소. 폰에서 접속하려면 0.0.0.0 (같은 와이파이에서만 사용)")
+    p.add_argument("--port", type=int, default=8000)
+    p.add_argument("--token", default=None, help="접속 토큰. 생략하면 자동 생성해 출력합니다")
+    p.add_argument("--allow-control", action="store_true",
+                   help="주문·취소·매매재개 허용 (기본은 읽기 전용 + 비상정지만 가능)")
+    p.add_argument("--watch", default=None, help="관심 종목 (쉼표 구분)")
+    p.add_argument("--refresh", type=int, default=10, help="자동 갱신 주기(초)")
+    p.add_argument("--yes", action="store_true")
+    p.set_defaults(func=cmd_web)
 
     p = sub.add_parser("journal", help="매매 기록 조회")
     p.add_argument("--limit", type=int, default=20)
