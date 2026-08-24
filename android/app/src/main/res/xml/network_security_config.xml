@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  집 안 사설 IP 대역에 대해서만 평문 HTTP 를 허용한다.
+
+  대시보드 서버는 TLS 를 쓰지 않으므로 평문 통신이 필요하지만, 허용 범위를 사설
+  대역으로 좁혀 두면 앱이 실수로 공인 인터넷 주소에 평문으로 붙는 일을 막을 수 있다.
+-->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">127.0.0.1</domain>
+        <domain includeSubdomains="false">10.0.2.2</domain>   <!-- 에뮬레이터에서 본 PC -->
+        <domain includeSubdomains="true">localhost</domain>
+    </domain-config>
+
+    <!--
+      192.168.x.x / 10.x.x.x 는 도메인 규칙으로 한 번에 지정할 수 없어 base-config 로
+      허용한다. 공인 주소로는 붙지 않도록 앱에서도 한 번 더 막는다(PrivateHost.kt).
+    -->
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

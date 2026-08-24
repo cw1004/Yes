@@ -259,3 +259,16 @@ def test_unknown_path_returns_404_not_500(trader):
     """catch-all 예외 핸들러가 정상적인 404 를 500 으로 바꾸지 않아야 한다."""
     assert make_client(trader).get("/favicon.ico").status_code == 404
     assert make_client(trader).get("/api/nope", headers=auth()).status_code == 404
+
+
+def test_health_needs_no_token_and_leaks_nothing(trader, settings):
+    """health 는 토큰 없이 열려 있으므로 계좌 정보가 새면 안 된다."""
+    response = make_client(trader).get("/api/health")
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["service"] == "kis-trader" and payload["version"]
+
+    text = str(payload)
+    for secret in (settings.app_key, settings.app_secret, settings.account_no):
+        assert secret not in text
+    assert "cash" not in text and "net_asset" not in text

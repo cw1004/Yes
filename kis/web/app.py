@@ -20,6 +20,7 @@ from functools import wraps
 from pathlib import Path
 from typing import Any
 
+from .. import __version__
 from .service import DashboardService
 
 log = logging.getLogger(__name__)
@@ -102,11 +103,21 @@ def create_app(trader, config: WebConfig):
     def index():
         return send_from_directory(STATIC_DIR, "index.html")
 
+    @app.get("/api/health")
+    def api_health():
+        """인증 없이 호출 가능한 상태 확인. 앱 설정 화면에서 서버 주소 검증에 쓴다.
+
+        계좌 정보는 일절 싣지 않는다 — 토큰 없이 접근할 수 있는 유일한 API 이기 때문이다.
+        """
+        return jsonify({"service": "kis-trader", "version": __version__})
+
     @app.get("/api/config")
     @require_auth
     def api_config():
         """로그인 성공 확인 + 화면 동작 설정."""
         return jsonify({
+            "service": "kis-trader",
+            "version": __version__,
             "allow_control": config.allow_control,
             "refresh_seconds": config.refresh_seconds,
             "env": trader.settings.env,

@@ -27,6 +27,7 @@
 | `kis/engine.py` | 전략 → 리스크 → 주문 → 기록 사이클 실행기 |
 | `kis/storage.py` | SQLite 매매 저널 (주문/체결/일별 순자산/이벤트) |
 | `kis/web/` | 폰 브라우저용 모니터링·비상제어 대시보드 (Flask) |
+| `android/` | 안드로이드 앱 (Kotlin/Compose) — 조회·비상정지·수동주문 |
 | `kis/cli.py` | `kis` 명령줄 도구 |
 
 ```
@@ -38,7 +39,8 @@
                                   │
                               저널(Storage · SQLite)
                                   │
-                            대시보드(kis web) ◀──── 폰 브라우저 (조회 · 비상정지)
+                            대시보드(kis web) ◀──┬─ 폰 브라우저 (조회 · 비상정지)
+                              REST /api/*        └─ 안드로이드 앱 (android/)
 ```
 
 ## 2. 설치
@@ -203,6 +205,20 @@ python -m kis web --host 0.0.0.0 --watch 005930,000660
   주소창에서 즉시 지웁니다.
 - 밖에서 접속해야 한다면 포트를 여는 대신 Tailscale 같은 VPN 을 쓰세요.
 
+### 안드로이드 앱
+
+브라우저 대신 네이티브 앱으로 보고 싶다면 `android/` 에 Kotlin/Compose 앱이 있습니다.
+Android Studio 에서 `android/` 폴더를 열고 실행하면 됩니다.
+
+앱은 위 대시보드와 **같은 REST API** 를 씁니다. 즉 서버 실행 방법과 권한 모델이 동일하고,
+`--allow-control` 없이 띄우면 앱에서도 조회와 매매 중단만 가능합니다.
+
+**앱키·시크릿은 앱에 넣지 않습니다.** APK 는 디컴파일이 쉬워 키를 심으면 그대로 노출되므로,
+매매와 인증은 서버가 하고 앱은 접속 토큰만 보관합니다. 토큰은 기기에 암호화 저장되고
+클라우드 백업에서 제외됩니다.
+
+자세한 빌드·사용법과 안전장치는 [`android/README.md`](android/README.md) 를 보세요.
+
 ## 6. 파이썬 코드로 쓰기
 
 ```python
@@ -304,6 +320,15 @@ python -m ruff check .              # 린트
 
 테스트는 `responses` 로 KIS 응답을 모킹하므로 실제 API 키 없이 실행됩니다.
 대시보드는 Flask 테스트 클라이언트로 인증·권한 게이팅까지 검증합니다.
+
+안드로이드 앱의 순수 Kotlin 계층(모델·JSON·HTTP·포맷)은 에뮬레이터 없이 검증합니다.
+
+```bash
+cd android
+./gradlew :core:test                                  # 유닛 테스트
+KIS_TEST_SERVER=http://127.0.0.1:8000 KIS_TEST_TOKEN=... \
+    ./gradlew :core:test                              # 실제 서버에 붙는 통합 테스트
+```
 
 ## 11. 알아둘 점
 

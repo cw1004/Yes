@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 실제 색은 Compose 의 Theme.kt 가 정한다. 여기서는 스플래시 배경만 맞춘다. -->
+    <style name="Theme.KisTrader" parent="android:Theme.Material.DayNight.NoActionBar">
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:windowBackground">@color/window_background</item>
+    </style>
+</resources>
