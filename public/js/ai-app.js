@@ -20,7 +20,10 @@
     horizon: LS.get('horizon', null),
     risk: LS.get('risk', null),
     running: false,
+    providers: [],            // 서버가 알려준 엔진 상태
+    selected: LS.get('selected', null),  // 사용자가 고른 엔진 (null = 전부)
     result: null,
+    performance: null,
     startedAt: 0,
     timer: null,
   };
@@ -79,13 +82,17 @@
         horizon: state.horizon || '',
         risk: state.risk || '',
       });
+      const chosen = selectedProviders();
+      if (chosen.length) q.set('providers', chosen.join(','));
       if (force) q.set('force', '1');
       const result = await api('/api/ai/recommend?' + q.toString());
       state.result = result;
       render();
       if (result.engine === 'rules') {
-        toast('ANTHROPIC_API_KEY 가 없어 지표 기반 결과만 표시합니다.', 'warn');
+        toast('사용 가능한 AI 엔진이 없어 지표 기반 결과만 표시합니다.', 'warn');
       }
+      (result.failures || []).forEach((f) => toast(`${f.label} 실패: ${f.error}`, 'warn'));
+      loadPerformance();
     } catch (err) {
       toast('분석 실패: ' + err.message, 'err');
       $('#picks').innerHTML = `<div class="empty-state">분석에 실패했습니다.<br />${esc(err.message)}</div>`;
@@ -113,16 +120,18 @@
       return;
     }
     const engine = r.engine === 'ai'
-      ? `<b class="up">AI 분석</b> <span class="muted">(${esc(r.model || '')})</span>`
-      : '<b class="warn-text">지표 전용</b> <span class="muted">(AI 키 없음)</span>';
+      ? `<b class="up">${(r.engines || []).map((e) => esc(e.label)).join(' + ') || 'AI'}</b> <span class="muted">(${esc(r.model || '')})</span>`
+      : '<b class="warn-text">지표 전용</b> <span class="muted">(AI 엔진 없음)</span>';
     const src = r.dataSource === 'mock' ? '<b class="warn-text">데모 데이터</b>' : `<b>${esc(r.dataSource)}</b>`;
     bar.innerHTML = `
       <div class="stat"><span>엔진</span>${engine}</div>
       <div class="stat"><span>시세</span>${src}</div>
       <div class="stat"><span>스캔</span><b>${r.scanned}종목</b></div>
       <div class="stat"><span>웹 검색</span><b>${r.webSearches}회</b></div>
+      ${r.news ? `<div class="stat"><span>뉴스</span><b>${r.news.articles}건</b>
+        <span class="muted">(피드 ${r.news.feedsOk}/${r.news.feedsTried})</span></div>` : ''}
       ${r.usage ? `<div class="stat"><span>토큰</span><b>${(r.usage.input_tokens + r.usage.output_tokens).toLocaleString()}</b></div>
-        <div class="stat"><span>예상 비용</span><b>$${r.usage.estimatedCostUsd.toFixed(3)}</b></div>` : ''}
+        ${r.usage.estimatedCostUsd != null ? `<div class="stat"><span>예상 비용</span><b>$${r.usage.estimatedCostUsd.toFixed(3)}</b></div>` : ''}` : ''}
       <div class="stat"><span>생성</span><b>${new Date(r.generatedAt).toLocaleTimeString('ko-KR', { hour12: false })}</b></div>
       ${r.cached ? '<div class="stat"><span>캐시된 결과</span></div>' : ''}
       <button id="forceBtn" class="mini-btn">새로 분석</button>`;
@@ -181,6 +190,7 @@
         <span class="pill">${esc(p.horizon)}</span>
         ${s ? `<span class="pill score ${cls(s.score)}">신호 ${s.score > 0 ? '+' : ''}${s.score}</span>
                <span class="pill">${esc(s.label)}</span>` : ''}
+        ${consensusPill(p)}
         ${p.inCandidates ? '' : '<span class="pill warn">후보 목록 밖 · 지표 미검증</span>'}
         ${s && s.score <= -20 ? '<span class="pill warn">⚠ 지표는 매도 신호</span>' : ''}
         ${s && s.plan && s.plan.side === 'SHORT' ? '<span class="pill warn">하락 방향 플랜</span>' : ''}
@@ -204,6 +214,8 @@
         <span>R:R <b>${s.plan.rr == null ? '—' : '1:' + s.plan.rr.toFixed(2)}</b></span>
       </div>` : ''}
 
+      ${perProviderBlock(p)}
+
       <div class="pick-section">
         <h4>출처 ${sources.length ? '' : '<span class="muted">(없음)</span>'}</h4>
         <div class="sources">
@@ -214,12 +226,122 @@
     </article>`;
   }
 
+  /** 몇 개 엔진이 이 종목을 골랐는지 */
+  function consensusPill(p) {
+    const c = p.consensus;
+    if (!c || !c.total) return '';
+    if (c.total === 1) return `<span class="pill">${esc(c.labels[0] || '')} 단독</span>`;
+    return c.agreed
+      ? `<span class="pill consensus">✓ ${c.votes}개 엔진 합의</span>`
+      : `<span class="pill solo">${esc(c.labels.join(', '))}만 선택 (${c.votes}/${c.total})</span>`;
+  }
+
+  /** 엔진별 서술 비교 (의견이 갈리는 지점을 직접 볼 수 있게) */
+  function perProviderBlock(p) {
+    const list = p.perProvider || [];
+    if (list.length < 2) return '';
+    return `<details class="per-provider">
+      <summary>엔진별 의견 ${list.length}건 비교</summary>
+      ${list.map((x) => `<div class="pp-item">
+        <div class="pp-head">
+          <span class="pp-name">${esc(x.label)}</span>
+          <span class="pill">${x.rank}순위</span>
+          <span class="pill">신뢰도 ${esc(x.confidence)}</span>
+        </div>
+        <div>${esc(x.thesis)}</div>
+      </div>`).join('')}
+    </details>`;
+  }
+
   function listSection(kind, title, items) {
     if (!items || !items.length) return '';
     return `<div class="pick-section ${kind}">
       <h4>${title}</h4>
       <ul>${items.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>
     </div>`;
+  }
+
+  /* --------------------------------------------------------- 엔진 선택 */
+
+  function selectedProviders() {
+    if (!state.selected) return [];   // 전부 사용
+    return state.selected.filter((n) => state.providers.some((p) => p.name === n && p.ready));
+  }
+
+  function renderEngineChips() {
+    const el = $('#engineChips');
+    if (!state.providers.length) { el.innerHTML = ''; return; }
+    const chosen = state.selected;
+    el.innerHTML = state.providers.map((p) => {
+      const on = !chosen || chosen.includes(p.name);
+      const title = p.ready ? `${p.model} · ${p.endpoint}` : (p.reason || '사용 불가');
+      return `<label class="engine-chip ${p.ready ? 'ready' : 'off'}" title="${esc(title)}">
+        <input type="checkbox" data-provider="${esc(p.name)}" ${p.ready ? '' : 'disabled'} ${p.ready && on ? 'checked' : ''} />
+        <i class="engine-dot"></i>${esc(p.label)}
+      </label>`;
+    }).join('');
+    el.querySelectorAll('input[data-provider]').forEach((input) => {
+      input.addEventListener('change', () => {
+        const picked = Array.from(el.querySelectorAll('input[data-provider]:checked')).map((i) => i.dataset.provider);
+        const readyNames = state.providers.filter((p) => p.ready).map((p) => p.name);
+        state.selected = picked.length === readyNames.length ? null : picked;
+        LS.set('selected', state.selected);
+      });
+    });
+  }
+
+  /* --------------------------------------------------------- 성과 추적 */
+
+  async function loadPerformance() {
+    try {
+      const perf = await api('/api/ai/performance');
+      state.performance = perf;
+      renderPerformance();
+    } catch (err) {
+      $('#perfBody').innerHTML = `<div class="muted">성과를 불러오지 못했습니다: ${esc(err.message)}</div>`;
+    }
+  }
+
+  function renderPerformance() {
+    const p = state.performance;
+    if (!p) return;
+    $('#perfNote').textContent = `기록 ${p.total}건 · 진행 중 ${p.open} · 종료 ${p.closed}`;
+
+    if (!p.closed) {
+      $('#perfBody').innerHTML = `<div class="muted" style="font-size:12.5px;line-height:1.7">
+        아직 채점이 끝난 추천이 없습니다. 추천이 나오면 그 시점의 가격이 함께 저장되고,
+        목표가·손절가에 닿거나 기간이 지나면 자동으로 채점됩니다.
+        ${p.open ? `<br />현재 <b>${p.open}건</b>이 결과를 기다리는 중입니다.` : ''}
+      </div>`;
+      return;
+    }
+
+    const o = p.overall;
+    const tbl = (title, obj) => {
+      const rows = Object.entries(obj).filter(([, v]) => v.n > 0);
+      if (!rows.length) return '';
+      return `<div><h4>${title}</h4><table class="perf-table">
+        <tr><th></th><th>건수</th><th>승률</th><th>평균</th></tr>
+        ${rows.map(([k, v]) => `<tr><td>${esc(k)}</td><td>${v.n}</td>
+          <td class="${v.winRate >= 50 ? 'up' : 'down'}">${v.winRate}%</td>
+          <td class="${cls(v.avgPnlPct)}">${pct(v.avgPnlPct)}</td></tr>`).join('')}
+      </table></div>`;
+    };
+
+    $('#perfBody').innerHTML = `
+      <div class="perf-cards">
+        <div><span>채점 완료</span><b>${o.n}건</b></div>
+        <div><span>승률</span><b class="${o.winRate >= 50 ? 'up' : 'down'}">${o.winRate}%</b></div>
+        <div><span>평균 수익률</span><b class="${cls(o.avgPnlPct)}">${pct(o.avgPnlPct)}</b></div>
+        <div><span>최고 / 최저</span><b class="pair"><span class="up">${pct(o.best)}</span> / <span class="down">${pct(o.worst)}</span></b></div>
+        <div><span>목표/손절/만료</span><b>${p.byOutcome.target} / ${p.byOutcome.stop} / ${p.byOutcome.expired}</b></div>
+      </div>
+      <div class="perf-split">
+        ${tbl('엔진별', p.byProvider)}
+        ${tbl('신뢰도별', p.byConfidence)}
+        ${tbl('시장별', p.byMarket)}
+      </div>
+      ${p.note ? `<div class="perf-warn">⚠ ${esc(p.note)}</div>` : ''}`;
   }
 
   /* ------------------------------------------------------------- 시작 */
@@ -243,9 +365,12 @@
 
     try {
       const h = await api('/api/ai/health');
+      state.providers = h.providers || [];
+      renderEngineChips();
+      const readyCount = state.providers.filter((p) => p.ready).length;
       const badge = $('#modeBadge');
-      badge.textContent = h.configured ? 'AI 연결됨' : 'AI 키 없음 · 지표 전용';
-      badge.className = 'badge ' + (h.configured ? 'live' : 'demo');
+      badge.textContent = readyCount ? `엔진 ${readyCount}개 연결됨` : 'AI 엔진 없음 · 지표 전용';
+      badge.className = 'badge ' + (readyCount ? 'live' : 'demo');
 
       fillSelect('#horizonSelect', h.horizons, state.horizon || h.horizons[1]);
       fillSelect('#riskSelect', h.risks, state.risk || h.risks[1]);
@@ -255,14 +380,15 @@
       $('#horizonSelect').addEventListener('change', (e) => { state.horizon = e.target.value; LS.set('horizon', state.horizon); });
       $('#riskSelect').addEventListener('change', (e) => { state.risk = e.target.value; LS.set('risk', state.risk); });
 
-      if (!h.configured) {
-        toast('ANTHROPIC_API_KEY 를 설정하면 실제 뉴스 분석이 켜집니다. 지금은 지표 기반 결과만 나옵니다.', 'warn');
+      if (!readyCount) {
+        toast('ANTHROPIC_API_KEY 를 넣거나 Llama 엔드포인트를 연결하면 뉴스 분석이 켜집니다. 지금은 지표 기반 결과만 나옵니다.', 'warn');
       }
     } catch (err) {
       toast('서버 상태 확인 실패: ' + err.message, 'err');
     }
 
     $('#picks').innerHTML = '<div class="empty-state">아직 분석 결과가 없습니다. 상단의 <b>AI 분석 실행</b>을 눌러 주세요.</div>';
+    loadPerformance();
   }
 
   function fillSelect(sel, options, selected) {

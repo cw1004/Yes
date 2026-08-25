@@ -295,8 +295,22 @@ function resetTraderState() {
   try { require('fs').unlinkSync(require('path').join(process.env.KR_STATE_DIR, '.kr-trader.json')); } catch (_) {}
 }
 
+/**
+ * 자동매매 테스트는 "정규장에 돌아가는 상황"을 검증한다.
+ * 실제 시각에 좌우되면 아침에만 통과하는 테스트가 되므로 장 상태와 강제청산 시각을 고정한다.
+ * (시간 의존 로직 자체는 아래 '장 운영 시간 판정' / '강제청산 시각' 테스트에서 따로 검증한다)
+ */
+const REAL_MARKET_PHASE = C.marketPhase;
+function withRegularSession() {
+  C.marketPhase = () => 'regular';
+}
+function restoreSession() {
+  C.marketPhase = REAL_MARKET_PHASE;
+}
+
 function makeTrader(overrides = {}, clientOverrides = {}) {
   resetTraderState();
+  withRegularSession();
   const hub = new EventEmitter();
   hub.get = () => ({ code: '005930', quote: { price: 74800, name: '삼성전자' }, market: 'KOSPI' });
   hub.watch = async () => {};
@@ -307,7 +321,11 @@ function makeTrader(overrides = {}, clientOverrides = {}) {
   trader.orders = [];
   const realOrder = client.order.bind(client);
   client.order = async (req) => { trader.orders.push(req); return realOrder(req); };
-  trader.setConfig(Object.assign({ enabled: true, dryRun: false, symbols: ['005930'] }, overrides));
+  trader.setConfig(Object.assign(
+    // '30:00' 은 하루 중 절대 도달하지 않는 시각 — 강제청산 로직을 테스트마다 비활성화한다
+    { enabled: true, dryRun: false, symbols: ['005930'], forceExitAt: '30:00' },
+    overrides
+  ));
   return trader;
 }
 
@@ -447,9 +465,10 @@ test('자동매매: 강한 상승 신호가 오면 봉 확정에서 진입까지
   hub.get = () => st;
 
   resetTraderState();
+  withRegularSession();
   const client = new MockKisClient();
   const trader = new Trader({ hub, client });
-  trader.setConfig({ enabled: true, dryRun: true, symbols: ['005930'], timeframe: '10s', entryScore: 30, maxHoldSeconds: 3600, cooldownSeconds: 0 });
+  trader.setConfig({ enabled: true, dryRun: true, symbols: ['005930'], timeframe: '10s', entryScore: 30, maxHoldSeconds: 3600, cooldownSeconds: 0, forceExitAt: '30:00' });
 
   await trader._evaluate(st);
   const pos = trader.positions.get('005930');
@@ -475,15 +494,23 @@ test('자동매매: 정규장이 아니면 봉이 확정돼도 진입하지 않�
   for (let i = 0; i < 200; i++) agg.addTick({ t: T0 + i * 1000, price: 74800 + i, volume: 10, side: 'buy' });
   const st = { code: '005930', market: 'KOSPI', agg, quote: { price: 75000 } };
 
-  const realPhase = C.marketPhase;
   C.marketPhase = () => 'closed';
   try {
     trader._onBar('10s', {}, st);
     await new Promise((r) => setTimeout(r, 30));
     assert.strictEqual(trader.positions.size, 0, '장 마감에는 진입하지 않는다');
+    assert.match(trader._gate('005930').reason, /정규장 아님/);
   } finally {
-    C.marketPhase = realPhase;
+    withRegularSession();
   }
+  trader.close();
+});
+
+test('자동매매: 강제청산 시각 이후에는 신규 진입이 막힌다', () => {
+  const trader = makeTrader({ forceExitAt: '00:01' });   // 이미 지난 시각
+  const gate = trader._gate('005930');
+  assert.strictEqual(gate.ok, false);
+  assert.match(gate.reason, /00:01 이후 신규 진입 금지/);
   trader.close();
 });
 
@@ -509,6 +536,11 @@ test('자동매매: 재기동하면 실전 발주 허용이 꺼진 채로 복원
   assert.strictEqual(restored.config.enabled, false, '엔진도 꺼진 채 시작');
   trader.close();
   restored.close();
+});
+
+test('테스트 정리: 장 상태 함수를 원래대로 되돌린다', () => {
+  restoreSession();
+  assert.strictEqual(C.marketPhase, REAL_MARKET_PHASE);
 });
 
 /* ------------------------------------------------------------------ 실행 */

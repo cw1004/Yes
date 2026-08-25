@@ -103,3 +103,51 @@ body.ai { overflow: hidden; }
   padding: 14px; border-top: 1px solid var(--line); margin: 6px 0 20px;
 }
 .empty-state { text-align: center; padding: 40px 20px; color: var(--muted); font-size: 13px; }
+
+/* 엔진 칩 */
+.engine-chips { display: flex; gap: 5px; align-items: center; }
+.engine-chip {
+  display: flex; align-items: center; gap: 5px; font-size: 11px;
+  background: var(--panel-2); border: 1px solid var(--line); border-radius: 999px; padding: 3px 9px;
+  color: var(--muted); cursor: pointer; user-select: none;
+}
+.engine-chip.ready { border-color: var(--up); color: var(--up); }
+.engine-chip.off { opacity: .5; cursor: not-allowed; }
+.engine-chip input { accent-color: var(--accent); margin: 0; }
+.engine-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); }
+.engine-chip.ready .engine-dot { background: var(--up); }
+
+/* 합의 배지 */
+.pill.consensus { border-color: var(--up); color: var(--up); font-weight: 700; }
+.pill.solo { border-color: var(--warn); color: var(--warn); }
+
+/* 엔진별 의견 비교 */
+.per-provider { border-top: 1px dashed var(--line); padding-top: 8px; }
+.per-provider summary {
+  cursor: pointer; font-size: 10.5px; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .5px; list-style: none;
+}
+.per-provider summary::-webkit-details-marker { display: none; }
+.per-provider summary::before { content: '▸ '; }
+.per-provider[open] summary::before { content: '▾ '; }
+.pp-item { margin-top: 7px; font-size: 12px; line-height: 1.6; }
+.pp-item .pp-head { display: flex; gap: 6px; align-items: center; margin-bottom: 2px; }
+.pp-item .pp-name { font-weight: 600; font-size: 11.5px; }
+
+/* 성과 패널 */
+.perf-panel { margin-bottom: 12px; }
+.perf-body { padding: 12px 14px; }
+.perf-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; }
+.perf-cards div { background: var(--panel-2); border-radius: 8px; padding: 8px 10px; }
+.perf-cards span { display: block; font-size: 10.5px; color: var(--muted); }
+.perf-cards b { font-size: 16px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.perf-cards b.pair { font-size: 13px; }
+.perf-split { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-top: 10px; }
+.perf-split h4 { font-size: 10.5px; color: var(--muted); text-transform: uppercase; margin: 0 0 5px; letter-spacing: .5px; }
+.perf-table { width: 100%; border-collapse: collapse; font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.perf-table th, .perf-table td { padding: 3px 6px; border-bottom: 1px solid var(--line); text-align: right; }
+.perf-table th:first-child, .perf-table td:first-child { text-align: left; color: var(--muted); }
+.perf-warn { margin-top: 8px; font-size: 11.5px; color: var(--warn); }
+
+/* 뉴스 요약 */
+.news-line { font-size: 11.5px; color: var(--muted); margin-top: 6px; }

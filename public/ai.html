@@ -32,6 +32,8 @@
     <button data-market="KR">한국</button>
   </div>
 
+  <div class="engine-chips" id="engineChips"></div>
+
   <label class="ai-select">기간
     <select id="horizonSelect"></select>
   </label>
@@ -54,6 +56,16 @@
   </section>
 
   <section class="picks" id="picks"></section>
+
+  <section class="panel perf-panel" id="perfPanel">
+    <div class="panel-head">
+      <h2>추천 성과 추적</h2>
+      <span class="muted" id="perfNote"></span>
+    </div>
+    <div class="perf-body" id="perfBody">
+      <div class="muted" style="padding:10px 14px">불러오는 중…</div>
+    </div>
+  </section>
 
   <section class="panel" id="candidatesPanel" hidden>
     <div class="panel-head">
