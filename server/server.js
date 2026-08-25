@@ -13,16 +13,16 @@ const { URL } = require('url');
 
 const yahoo = require('./providers/yahoo');
 const mock = require('./providers/mock');
+const marketdata = require('./marketdata');
 const krRoutes = require('./kr/routes');
+const aiRoutes = require('./ai/routes');
 
 const PORT = Number(process.env.PORT || 5173);
 const HOST = process.env.HOST || '127.0.0.1';
 const FORCE_MOCK = process.env.MOCK === '1' || process.env.MOCK === 'true';
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
 
-const VALID_INTERVALS = ['1m', '2m', '5m', '15m', '30m', '60m', '1d'];
-const VALID_RANGES = ['1d', '5d', '1mo', '3mo', '6mo', '1y'];
-const SYMBOL_RE = /^[A-Za-z0-9.\-^=]{1,15}$/;
+const SYMBOL_RE = marketdata.SYMBOL_RE;
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -61,40 +61,15 @@ function sendJSON(res, status, body) {
   res.end(payload);
 }
 
-function ttlFor(interval) {
-  if (interval === '1m' || interval === '2m') return 15e3;
-  if (interval === '5m') return 30e3;
-  if (interval === '1d') return 300e3;
-  return 60e3;
-}
-
 async function handleCandles(res, params) {
-  const symbol = String(params.get('symbol') || 'AAPL').trim().toUpperCase();
+  const symbol = String(params.get('symbol') || 'AAPL');
   const interval = String(params.get('interval') || '5m');
   const range = String(params.get('range') || '5d');
-
-  if (!SYMBOL_RE.test(symbol)) return sendJSON(res, 400, { error: '잘못된 심볼입니다.' });
-  if (!VALID_INTERVALS.includes(interval)) return sendJSON(res, 400, { error: '지원하지 않는 봉 주기입니다.' });
-  if (!VALID_RANGES.includes(range)) return sendJSON(res, 400, { error: '지원하지 않는 조회 기간입니다.' });
-
-  const key = `c:${symbol}:${interval}:${range}:${FORCE_MOCK ? 'm' : 'l'}`;
-  const cached = cacheGet(key);
-  if (cached) return sendJSON(res, 200, cached);
-
-  let data;
-  if (FORCE_MOCK) {
-    data = mock.generate(symbol, interval, range);
-  } else {
-    try {
-      data = await yahoo.chart(symbol, interval, range);
-      if (!data.candles.length) throw new Error('empty series');
-    } catch (err) {
-      data = mock.generate(symbol, interval, range);
-      data.notice = '실시간 시세를 가져오지 못해 데모 데이터로 대체했습니다. (' + err.message + ')';
-    }
+  try {
+    sendJSON(res, 200, await marketdata.getCandles(symbol, interval, range));
+  } catch (err) {
+    sendJSON(res, 400, { error: err.message });
   }
-  cacheSet(key, data, ttlFor(interval));
-  sendJSON(res, 200, data);
 }
 
 async function handleQuotes(res, params) {
@@ -193,6 +168,10 @@ const server = http.createServer(async (req, res) => {
     // 한국 시장(KIS) 라우트는 별도 모듈에서 처리한다
     if (pathname.startsWith('/api/kr/')) {
       if (await krRoutes.handle(req, res, url, sendJSON)) return;
+    }
+    // AI 추천 종목 라우트
+    if (pathname.startsWith('/api/ai/')) {
+      if (await aiRoutes.handle(req, res, url, sendJSON)) return;
     }
     if (pathname === '/api/candles') return await handleCandles(res, searchParams);
     if (pathname === '/api/quotes') return await handleQuotes(res, searchParams);

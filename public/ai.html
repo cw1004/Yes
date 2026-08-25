@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>ScalpDesk AI · 오늘의 추천 종목 3선</title>
+<meta name="description" content="자체 지표 스크리닝 + Claude 웹 검색으로 월가·글로벌 뉴스를 분석해 추천 종목 3개를 제시합니다." />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='26' font-size='26'%3E%F0%9F%A7%A0%3C/text%3E%3C/svg%3E" />
+<link rel="stylesheet" href="/styles.css" />
+<link rel="stylesheet" href="/kr.css" />
+<link rel="stylesheet" href="/ai.css" />
+</head>
+<body class="ai">
+
+<header class="topbar">
+  <div class="brand">
+    <span class="logo">🧠</span>
+    <div>
+      <strong>ScalpDesk AI</strong>
+      <small id="modeBadge" class="badge">확인 중…</small>
+    </div>
+  </div>
+
+  <div class="tf-group market-switch">
+    <a href="/" class="market-btn">🇺🇸 미국</a>
+    <a href="/kr.html" class="market-btn">🇰🇷 한국</a>
+    <a href="/ai.html" class="market-btn active">🧠 AI 추천</a>
+  </div>
+
+  <div class="tf-group" id="marketGroup" role="group" aria-label="시장">
+    <button data-market="US" class="active">미국</button>
+    <button data-market="KR">한국</button>
+  </div>
+
+  <label class="ai-select">기간
+    <select id="horizonSelect"></select>
+  </label>
+  <label class="ai-select">성향
+    <select id="riskSelect"></select>
+  </label>
+
+  <button id="runBtn" class="run-btn">✨ AI 분석 실행</button>
+</header>
+
+<main class="ai-main">
+
+  <section class="ai-status" id="statusBar">
+    <div class="muted">‘AI 분석 실행’을 누르면 종목을 스캔한 뒤 최신 뉴스를 조사합니다.</div>
+  </section>
+
+  <section class="panel context-card" id="contextCard" hidden>
+    <h2>시장 상황</h2>
+    <p id="marketContext"></p>
+  </section>
+
+  <section class="picks" id="picks"></section>
+
+  <section class="panel" id="candidatesPanel" hidden>
+    <div class="panel-head">
+      <h2>스캔한 후보 종목</h2>
+      <span class="muted" id="candidateNote"></span>
+    </div>
+    <div class="table-scroll">
+      <table class="cand-table" id="candTable">
+        <thead>
+          <tr>
+            <th>종목</th><th>현재가</th><th>등락</th><th>신호점수</th>
+            <th>RSI</th><th>거래량배율</th><th>ATR%</th><th>근거</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <p class="ai-disclaimer" id="disclaimer">
+    이 화면의 분석은 공개 정보와 기술적 지표를 정리한 <b>참고 자료</b>이며 투자 권유가 아닙니다.
+    최종 판단과 그 결과에 대한 책임은 투자자 본인에게 있습니다.
+  </p>
+</main>
+
+<div id="toasts" class="toasts"></div>
+
+<script src="/js/indicators.js"></script>
+<script src="/js/signals.js"></script>
+<script src="/js/ai-app.js"></script>
+</body>
+</html>
