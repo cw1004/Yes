@@ -3,3 +3,8 @@ node_modules/
 *.log
 .cache/
 .env
+
+# KIS 관련 로컬 파일
+.kis-token.json
+.kr-trader.json
+logs/

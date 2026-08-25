@@ -682,11 +682,12 @@
 
     fmtTime(ts) {
       const intraday = this.intraday !== false;
+      const withSeconds = this.secondsPrecision === true;  // 초봉에서는 초까지 표시
       try {
         return new Intl.DateTimeFormat('ko-KR', {
           timeZone: this.opt.timeZone,
           ...(intraday
-            ? { hour: '2-digit', minute: '2-digit', hour12: false }
+            ? { hour: '2-digit', minute: '2-digit', hour12: false, ...(withSeconds ? { second: '2-digit' } : {}) }
             : { month: '2-digit', day: '2-digit' }),
         }).format(new Date(ts));
       } catch (_) {
@@ -699,12 +700,13 @@
 
     fmtDateTime(ts) {
       const intraday = this.intraday !== false;
+      const withSeconds = this.secondsPrecision === true;
       try {
         return new Intl.DateTimeFormat('ko-KR', {
           timeZone: this.opt.timeZone,
           year: intraday ? undefined : 'numeric',
           month: '2-digit', day: '2-digit',
-          ...(intraday ? { hour: '2-digit', minute: '2-digit', hour12: false } : {}),
+          ...(intraday ? { hour: '2-digit', minute: '2-digit', hour12: false, ...(withSeconds ? { second: '2-digit' } : {}) } : {}),
         }).format(new Date(ts));
       } catch (_) {
         return new Date(ts).toLocaleString();
@@ -893,6 +895,8 @@
   }
   function fmtPrice(v) {
     if (v == null || !isFinite(v)) return '-';
+    // 원화 모드: 소수점 없이 천단위 구분 (한국 주식은 정수 호가)
+    if (root.PRICE_MODE === 'KRW') return Math.round(v).toLocaleString('ko-KR');
     const abs = Math.abs(v);
     return abs >= 1000 ? v.toFixed(1) : abs >= 1 ? v.toFixed(2) : v.toFixed(4);
   }

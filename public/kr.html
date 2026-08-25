@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>ScalpDesk KR · 한국 주식 초단타</title>
+<meta name="description" content="한국투자증권 API 기반 초단타 시스템 — 10초봉부터 5분봉까지, 호가창·체결틱·매매신호·자동매매" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='26' font-size='26'%3E%E2%9A%A1%3C/text%3E%3C/svg%3E" />
+<link rel="stylesheet" href="/styles.css" />
+<link rel="stylesheet" href="/kr.css" />
+</head>
+<body class="kr">
+
+<header class="topbar">
+  <div class="brand">
+    <span class="logo">⚡</span>
+    <div>
+      <strong>ScalpDesk KR</strong>
+      <small id="modeBadge" class="badge">연결 중…</small>
+    </div>
+  </div>
+
+  <div class="tf-group market-switch">
+    <a href="/" class="market-btn">🇺🇸 미국</a>
+    <a href="/kr.html" class="market-btn active">🇰🇷 한국</a>
+  </div>
+
+  <div class="search-wrap">
+    <input id="searchInput" type="text" placeholder="종목코드 6자리 또는 종목명 (예: 005930, 삼성전자)" autocomplete="off" spellcheck="false" />
+    <ul id="searchResults" class="search-results" hidden></ul>
+  </div>
+
+  <div class="tf-group" id="tfGroup" role="group" aria-label="봉 주기">
+    <button data-tf="10s" class="active">10초</button>
+    <button data-tf="20s">20초</button>
+    <button data-tf="30s">30초</button>
+    <button data-tf="1m">1분</button>
+    <button data-tf="3m">3분</button>
+    <button data-tf="5m">5분</button>
+  </div>
+
+  <span id="phaseBadge" class="badge">—</span>
+  <span id="connBadge" class="badge">SSE —</span>
+</header>
+
+<main class="layout kr-layout">
+
+  <!-- 좌: 종목 + 체결 테이프 -->
+  <aside class="panel side-left">
+    <div class="panel-head">
+      <h2>관심종목</h2>
+      <button id="addWatch" class="mini-btn">+ 추가</button>
+    </div>
+    <ul id="watchlist" class="watchlist"></ul>
+
+    <div class="panel-head"><h2>체결 테이프</h2></div>
+    <table class="tape" id="tape"><tbody></tbody></table>
+
+    <p class="disclaimer">
+      초봉(10·20·30초)은 <b>실시간 체결틱을 받아 직접 만든 봉</b>이라 접속한 순간부터 쌓입니다.
+      과거 초봉은 조회할 수 없습니다(KIS 최소 제공 단위는 1분봉).
+    </p>
+  </aside>
+
+  <!-- 중: 차트 -->
+  <section class="panel chart-area">
+    <div class="quote-head">
+      <div class="quote-main">
+        <h1 id="qName">—</h1>
+        <span id="qCode" class="muted"></span>
+      </div>
+      <div class="quote-price">
+        <span id="qPrice">—</span>
+        <span id="qChange" class="chg">—</span>
+      </div>
+      <dl class="quote-stats">
+        <div><dt>고가</dt><dd id="qHigh">—</dd></div>
+        <div><dt>저가</dt><dd id="qLow">—</dd></div>
+        <div><dt>거래량</dt><dd id="qVol">—</dd></div>
+        <div><dt>거래대금</dt><dd id="qValue">—</dd></div>
+        <div><dt>체결강도</dt><dd id="qStrength">—</dd></div>
+        <div><dt>호가단위</dt><dd id="qTick">—</dd></div>
+        <div><dt>상/하한</dt><dd id="qLimit">—</dd></div>
+      </dl>
+    </div>
+
+    <div class="chart-toolbar">
+      <div class="toggle-row" id="overlayToggles">
+        <label><input type="checkbox" data-show="ma" checked /> 이동평균선</label>
+        <label><input type="checkbox" data-show="bb" checked /> 볼린저밴드</label>
+        <label><input type="checkbox" data-show="vwap" checked /> VWAP</label>
+        <label><input type="checkbox" data-show="trend" checked /> 추세선</label>
+        <label><input type="checkbox" data-show="sr" /> 지지/저항</label>
+        <span class="divider"></span>
+        <label><input type="checkbox" data-show="volume" checked /> 거래량</label>
+        <label><input type="checkbox" data-show="rsi" checked /> RSI</label>
+        <label><input type="checkbox" data-show="macd" /> MACD</label>
+        <span class="divider"></span>
+        <span id="barInfo" class="muted"></span>
+      </div>
+      <div id="legend" class="legend"></div>
+    </div>
+
+    <div class="canvas-wrap"><canvas id="chart"></canvas></div>
+    <div id="hoverBar" class="hover-bar">실시간 체결을 기다리는 중…</div>
+  </section>
+
+  <!-- 우: 신호 · 호가 · 자동매매 -->
+  <aside class="panel side-right">
+    <div class="signal-card" id="signalCard">
+      <div class="signal-head">
+        <span class="signal-label" id="signalLabel">분석 중…</span>
+        <span class="signal-score" id="signalScore">0</span>
+      </div>
+      <div class="gauge"><div class="gauge-fill" id="gaugeFill"></div><i class="gauge-zero"></i></div>
+      <ul class="reasons" id="reasonList"></ul>
+    </div>
+
+    <div class="panel-head"><h2>초단타 플랜 (호가 기준)</h2></div>
+    <table class="kv" id="planTable"><tbody>
+      <tr><th>진입가</th><td id="pEntry">—</td></tr>
+      <tr><th>손절</th><td id="pStop">—</td></tr>
+      <tr><th>목표</th><td id="pTarget">—</td></tr>
+      <tr><th>본전 호가</th><td id="pBreakeven">—</td></tr>
+      <tr><th>주당 비용</th><td id="pCost">—</td></tr>
+      <tr><th>주당 순익</th><td id="pNet">—</td></tr>
+      <tr><th>손익비</th><td id="pRR">—</td></tr>
+    </tbody></table>
+
+    <div class="panel-head"><h2>호가</h2></div>
+    <div class="orderbook" id="orderbook"></div>
+
+    <div class="panel-head">
+      <h2>수동 주문</h2>
+      <span id="acctBadge" class="badge">—</span>
+    </div>
+    <div class="calc order-form">
+      <label>가격 <input type="number" id="ordPrice" step="1" placeholder="비우면 시장가" /></label>
+      <label>수량 <input type="number" id="ordQty" step="1" min="1" value="1" /></label>
+      <div class="order-est" id="ordEst">—</div>
+      <div class="order-buttons">
+        <button id="btnBuy" class="order-btn buy">매수</button>
+        <button id="btnSell" class="order-btn sell">매도</button>
+      </div>
+    </div>
+
+    <div class="panel-head">
+      <h2>자동매매</h2>
+      <span>
+        <button id="resumeBtn" class="mini-btn" hidden>▶ 정지 해제</button>
+        <button id="killBtn" class="mini-btn danger">■ 킬스위치</button>
+      </span>
+    </div>
+    <div class="calc auto-panel">
+      <div class="auto-status" id="autoStatus">—</div>
+      <label class="row"><span>엔진 가동</span><input type="checkbox" id="cfgEnabled" /></label>
+      <label class="row"><span>모의 실행(주문 안 나감)</span><input type="checkbox" id="cfgDryRun" checked /></label>
+      <label class="row live-row"><span>⚠️ 실전 주문 허용</span><input type="checkbox" id="cfgAllowLive" /></label>
+      <label>대상 종목 <input type="text" id="cfgSymbols" placeholder="005930,000660" /></label>
+      <label>판단 주기
+        <select id="cfgTimeframe">
+          <option value="10s">10초봉</option><option value="20s">20초봉</option>
+          <option value="30s">30초봉</option><option value="1m">1분봉</option>
+        </select>
+      </label>
+      <label>진입 점수 <input type="number" id="cfgEntryScore" value="45" min="10" max="100" /></label>
+      <label>청산 점수 <input type="number" id="cfgExitScore" value="-15" min="-100" max="50" /></label>
+      <label>1회 투입(원) <input type="number" id="cfgOrderAmount" value="1000000" step="100000" /></label>
+      <label>동시 보유 <input type="number" id="cfgMaxPositions" value="2" min="1" max="10" /></label>
+      <label>최대 보유(초) <input type="number" id="cfgMaxHold" value="180" min="5" /></label>
+      <label>트레일링(호가) <input type="number" id="cfgTrailing" value="0" min="0" /></label>
+      <label>일일 손실한도 <input type="number" id="cfgDailyLoss" value="300000" step="50000" /></label>
+      <label>강제청산 시각 <input type="text" id="cfgForceExit" value="15:15" /></label>
+      <button id="cfgSave" class="mini-btn primary">설정 저장</button>
+
+      <div class="positions" id="positions"></div>
+      <div class="trade-log" id="tradeLog"></div>
+    </div>
+  </aside>
+</main>
+
+<!-- 주문 확인 -->
+<div id="confirmModal" class="modal" hidden>
+  <div class="modal-box">
+    <h3 id="confirmTitle">주문 확인</h3>
+    <div id="confirmBody" class="confirm-body"></div>
+    <div class="modal-actions">
+      <button id="confirmCancel" class="mini-btn">취소</button>
+      <button id="confirmOk" class="mini-btn primary">전송</button>
+    </div>
+  </div>
+</div>
+
+<div id="toasts" class="toasts"></div>
+
+<script src="/js/indicators.js"></script>
+<script src="/js/signals.js"></script>
+<script src="/js/kr-config.js"></script>
+<script src="/js/kr-signal.js"></script>
+<script src="/js/chart.js"></script>
+<script src="/js/kr-app.js"></script>
+</body>
+</html>
