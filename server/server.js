@@ -4,7 +4,12 @@
  *   node server/server.js            # 실시간(야후) 우선, 실패 시 데모 데이터
  *   MOCK=1 node server/server.js     # 항상 데모 데이터 (오프라인)
  *   PORT=8080 node server/server.js
+ *
+ * API 키는 프로젝트 폴더의 .env 파일에 적어 두면 자동으로 읽힌다 (.env.example 참고).
  */
+
+// .env 를 가장 먼저 읽는다 — 아래 모듈들이 로드 시점에 process.env 를 참조하기 때문이다
+require('./load-env');
 
 const http = require('http');
 const fs = require('fs');
