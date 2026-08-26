@@ -6,6 +6,7 @@ import type {
   Product,
   ChatMessage,
   ClientQuote,
+  Hotspot,
   MallId,
   MoodboardItem,
   PlanId,
@@ -42,6 +43,8 @@ interface StudioState {
   render: RenderResult | null
   isRendering: boolean
   renderError: string | null
+  /** 렌더 이미지 위의 쇼퍼블 태그 */
+  hotspots: Hotspot[]
 
   // ── 상거래 ──────────────────────────────────────────────────
   moodboard: MoodboardItem[]
@@ -76,6 +79,10 @@ interface StudioState {
   setSource: (dataUrl: string, name: string) => void
   setProjectName: (name: string) => void
   generate: () => Promise<void>
+
+  addHotspot: (sku: string, x?: number, y?: number) => void
+  moveHotspot: (id: string, x: number, y: number) => void
+  removeHotspot: (id: string) => void
   sendChat: (message: string) => Promise<void>
 
   addToMoodboard: (sku: string) => void
@@ -104,6 +111,24 @@ interface StudioState {
   showToast: (msg: string) => void
 }
 
+const clamp01 = (v: number) => Math.min(0.97, Math.max(0.03, v))
+
+/**
+ * 태그 초기 위치.
+ *
+ * 렌더마다 가구 배치가 달라 정확한 좌표를 알 수 없으므로 겹치지 않게 펼쳐 놓고
+ * 사용자가 드래그로 맞추게 합니다.
+ *
+ * 가로는 비교 슬라이더 기본값(50%)보다 오른쪽에만 찍습니다. 태그는 After 이미지의
+ * 상품이라 Before 쪽에 가려지면 클릭할 수 없는데, 처음부터 절반이 숨어 있으면
+ * 태그가 없는 것처럼 보입니다.
+ */
+const spreadX = (i: number) => clamp01(0.57 + (i % 3) * 0.14)
+const spreadY = (i: number) => clamp01(0.4 + Math.floor(i / 3) * 0.18 + (i % 3) * 0.05)
+
+const seedHotspots = (skus: string[]): Hotspot[] =>
+  skus.slice(0, 6).map((sku, i) => ({ id: uid('hs'), sku, x: spreadX(i), y: spreadY(i) }))
+
 const greeting = (styleName: string, tagline: string): ChatMessage => ({
   id: uid('msg'),
   role: 'assistant',
@@ -125,6 +150,7 @@ export const useStudio = create<StudioState>()(
       render: null,
       isRendering: false,
       renderError: null,
+      hotspots: [],
 
       moodboard: [],
       affiliateIds: { ...EMPTY_AFFILIATE_IDS },
@@ -187,6 +213,8 @@ export const useStudio = create<StudioState>()(
             isRendering: false,
             // 서버 렌더는 서버가 이미 차감했습니다. 목 렌더만 로컬 잔액을 줄입니다.
             credits: result.provider === 'server' ? prev.credits : prev.credits - CREDIT_COST.render,
+            // 큐레이션 상품으로 태그를 미리 찍어둡니다. 위치는 드래그로 조정합니다.
+            hotspots: seedHotspots(style.curatedSkus),
             render: {
               id: uid('render'),
               styleId: style.id,
@@ -219,6 +247,28 @@ export const useStudio = create<StudioState>()(
           set({ isRendering: false, renderError: (err as Error).message })
         }
       },
+
+      addHotspot: (sku, x, y) =>
+        set((s) => {
+          if (!productBySku(sku)) return s
+          const index = s.hotspots.length
+          return {
+            hotspots: [
+              ...s.hotspots,
+              { id: uid('hs'), sku, x: x ?? spreadX(index), y: y ?? spreadY(index) },
+            ],
+            toast: '이미지에 태그를 추가했습니다. 드래그해서 위치를 맞추세요.',
+          }
+        }),
+
+      moveHotspot: (id, x, y) =>
+        set((s) => ({
+          hotspots: s.hotspots.map((h) =>
+            h.id === id ? { ...h, x: clamp01(x), y: clamp01(y) } : h,
+          ),
+        })),
+
+      removeHotspot: (id) => set((s) => ({ hotspots: s.hotspots.filter((h) => h.id !== id) })),
 
       sendChat: async (message) => {
         const s = get()

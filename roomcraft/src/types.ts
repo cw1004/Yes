@@ -125,6 +125,15 @@ export interface RenderResult {
   notes: string[]
 }
 
+/** 렌더 이미지 위에 찍는 쇼퍼블 태그 */
+export interface Hotspot {
+  id: string
+  sku: string
+  /** 이미지 기준 상대 좌표 (0~1) */
+  x: number
+  y: number
+}
+
 export interface ChatMessage {
   id: string
   role: 'assistant' | 'user'
