@@ -1,0 +1,107 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-ink-950: #08080a;
+  --color-ink-900: #0d0d10;
+  --color-ink-850: #131317;
+  --color-ink-800: #1a1a1f;
+  --color-ink-700: #26262d;
+  --color-ink-600: #3a3a44;
+  --color-ink-500: #55555f;
+  --color-mist-400: #8b8b96;
+  --color-mist-300: #b6b6be;
+  --color-mist-200: #d8d8dd;
+
+  --color-amber-brand: #f0a437;
+  --color-amber-deep: #b9791f;
+  --color-emerald-brand: #22c58a;
+  --color-emerald-deep: #128a5d;
+
+  --font-sans: 'Pretendard', 'Apple SD Gothic Neo', 'Noto Sans KR', system-ui, -apple-system, sans-serif;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background: var(--color-ink-950);
+  color: var(--color-mist-200);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 얇은 스크롤바 — 다크 패널 안에서 시각적 잡음을 줄입니다 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-ink-600) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--color-ink-600);
+  border-radius: 999px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@keyframes rc-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.rc-fade-up {
+  animation: rc-fade-up 0.28s ease-out both;
+}
+
+@keyframes rc-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+.rc-shimmer {
+  background: linear-gradient(90deg, #1a1a1f 25%, #26262d 50%, #1a1a1f 75%);
+  background-size: 200% 100%;
+  animation: rc-shimmer 1.4s linear infinite;
+}
+
+input[type='range'].rc-range {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--color-amber-deep), var(--color-amber-brand));
+  outline: none;
+}
+input[type='range'].rc-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: var(--color-amber-brand);
+  border: 3px solid var(--color-ink-900);
+  box-shadow: 0 0 0 1px var(--color-amber-brand);
+  cursor: pointer;
+}
+input[type='range'].rc-range::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: var(--color-amber-brand);
+  border: 3px solid var(--color-ink-900);
+  cursor: pointer;
+}

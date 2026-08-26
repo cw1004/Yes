@@ -1,0 +1,118 @@
+import { chromium } from 'playwright'
+
+const errors = []
+const browser = await chromium.launch(
+  // 별도 크로미움 경로를 쓰는 환경에서는 CHROMIUM_PATH 로 지정하세요.
+  process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {},
+)
+const page = await browser.newPage({ viewport: { width: 1600, height: 1000 } })
+page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()) })
+page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`))
+
+const step = async (label, fn) => {
+  try { await fn(); console.log(`✓ ${label}`) }
+  catch (e) { console.log(`✗ ${label} — ${e.message}`); errors.push(`${label}: ${e.message}`) }
+}
+
+await page.goto('http://localhost:5173/', { waitUntil: 'networkidle' })
+
+await step('헤더 렌더', async () => {
+  await page.getByText('RoomCraft').first().waitFor({ timeout: 5000 })
+})
+
+await step('샘플 이미지 업로드', async () => {
+  await page.getByRole('button', { name: '샘플 이미지 사용' }).first().click()
+  await page.waitForTimeout(400)
+})
+
+await step('스타일 변경 (재팬디)', async () => {
+  await page.getByRole('button', { name: /재팬디 세레니티/ }).first().click()
+})
+
+await step('강도 슬라이더 조절', async () => {
+  await page.locator('input[type=range]').first().fill('100')
+})
+
+await step('메이크오버 생성 (mock 렌더)', async () => {
+  await page.getByRole('button', { name: /스타일 적용하기/ }).first().click()
+  await page.getByText(/스타일 일치도/).first().waitFor({ timeout: 15000 })
+})
+
+await step('Before/After 슬라이더 존재', async () => {
+  await page.getByRole('slider', { name: '비교 슬라이더' }).waitFor({ timeout: 5000 })
+})
+
+await step('스펙시트 탭 + 무드보드 담기', async () => {
+  await page.getByRole('button', { name: /Spec Sheet/ }).click()
+  await page.getByRole('button', { name: /무드보드에 담기/ }).first().click()
+  await page.waitForTimeout(300)
+})
+
+await step('Sync 로 큐레이션 일괄 담기', async () => {
+  await page.getByRole('button', { name: /^Sync/ }).click()
+  await page.waitForTimeout(300)
+})
+
+await step('Earnings 탭 계산', async () => {
+  await page.getByRole('button', { name: /Earnings/ }).click()
+  await page.getByText('예상 제휴 판매 수수료').first().waitFor({ timeout: 5000 })
+})
+
+await step('수익 허브 모달 열기', async () => {
+  await page.getByRole('button', { name: /수익 허브/ }).first().click()
+  await page.getByText(/크리에이터 수익화/).first().waitFor({ timeout: 5000 })
+})
+
+await step('제휴 ID 입력 → 딥링크에 반영', async () => {
+  await page.getByPlaceholder('AF_ROOMCRAFT_01').fill('AF_TEST_99')
+  await page.waitForTimeout(300)
+  const body = await page.locator('table').first().innerText()
+  if (!body.includes('subId=AF_TEST_99')) throw new Error('딥링크에 SubID 미반영')
+})
+
+await step('실시간 딥링크 생성기', async () => {
+  await page.getByPlaceholder(/가구\/조명명 입력/).fill('부클레 라운드 소파')
+  await page.getByRole('button', { name: '딥링크 생성' }).click()
+  await page.getByText(/aliexpress\.com/).first().waitFor({ timeout: 5000 })
+})
+
+await step('견적서 탭 계산', async () => {
+  await page.getByRole('button', { name: /클라이언트 납품 견적서/ }).click()
+  await page.getByText('디자이너 순이익').first().waitFor({ timeout: 5000 })
+})
+
+await step('플랜 탭 → 크레딧 충전', async () => {
+  await page.getByRole('button', { name: /구독 플랜 관리/ }).click()
+  await page.getByRole('button', { name: '충전하기' }).first().click()
+  await page.waitForTimeout(300)
+})
+
+await step('템플릿 마켓 등록', async () => {
+  await page.getByRole('button', { name: /템플릿 마켓 판매/ }).click()
+  await page.getByRole('button', { name: '마켓에 등록' }).click()
+  await page.getByText(/판매 0건/).first().waitFor({ timeout: 5000 })
+})
+
+await page.screenshot({ path: process.argv[2] || 'shot-monetization.png' })
+await page.keyboard.press('Escape')
+await page.waitForTimeout(400)
+
+await step('AI 디자이너 챗 응답', async () => {
+  await page.getByRole('button', { name: /AI Designer/ }).click()
+  await page.getByPlaceholder(/인테리어 디자이너 아치에게/).fill('러그를 네이비 울로 바꿔줘')
+  await page.getByRole('button', { name: /전송/ }).click()
+  await page.getByText(/요청을 반영했습니다/).first().waitFor({ timeout: 10000 })
+})
+
+await step('2D 스테이징 배치', async () => {
+  await page.getByRole('button', { name: /2D\/3D Furniture Staging/ }).click()
+  await page.getByRole('button', { name: '배치', exact: true }).first().click()
+  await page.waitForTimeout(300)
+})
+
+await page.screenshot({ path: process.argv[3] || 'shot-studio.png', fullPage: false })
+
+console.log('\n--- 콘솔 에러 ---')
+console.log(errors.length ? errors.join('\n') : '없음')
+await browser.close()
+process.exit(errors.length ? 1 : 0)
