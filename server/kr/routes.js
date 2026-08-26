@@ -13,6 +13,7 @@ const { MockKisClient, MockRealtime, searchUniverse, UNIVERSE } = require('../pr
 const { KrHub } = require('./hub');
 const { Trader } = require('./trader');
 const C = require('./config');
+const { allowSensitive } = require('../access');
 
 let hub = null;
 let trader = null;
@@ -47,17 +48,6 @@ function init() {
 
 const CODE_RE = /^[0-9A-Z]{5,6}$/;
 
-/** 상태를 바꾸는 요청은 루프백이 아니면 토큰을 요구한다 */
-function authorized(req) {
-  const host = String(req.headers.host || '');
-  const isLoopback = /^(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/i.test(host);
-  const required = process.env.KIS_UI_TOKEN;
-  if (isLoopback && !required) return true;
-  if (!required) return false;
-  const given = req.headers['x-ui-token'] || new URL(req.url, 'http://x').searchParams.get('token');
-  return given === required;
-}
-
 async function handle(req, res, url, sendJSON) {
   const p = url.pathname;
   const params = url.searchParams;
@@ -67,9 +57,12 @@ async function handle(req, res, url, sendJSON) {
   const code = String(params.get('code') || '').toUpperCase();
   const mutating = req.method === 'POST';
 
-  if (mutating && !authorized(req)) {
-    sendJSON(res, 403, { error: '외부 접속에서는 KIS_UI_TOKEN 이 필요합니다. (기본은 127.0.0.1 전용)' });
-    return true;
+  if (mutating) {
+    const gate = allowSensitive(req);
+    if (!gate.ok) {
+      sendJSON(res, 403, { error: gate.reason });
+      return true;
+    }
   }
 
   try {

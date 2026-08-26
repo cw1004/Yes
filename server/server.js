@@ -13,6 +13,7 @@ require('./load-env');
 
 const http = require('http');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const { URL } = require('url');
 
@@ -188,14 +189,39 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
+/** 같은 와이파이의 다른 기기가 쓸 수 있는 주소들 */
+function lanAddresses() {
+  const out = [];
+  for (const list of Object.values(os.networkInterfaces())) {
+    for (const net of list || []) {
+      if (net.family === 'IPv4' && !net.internal) out.push(net.address);
+    }
+  }
+  return out;
+}
+
 server.listen(PORT, HOST, () => {
-  console.log(`\n  📈  ScalpDesk  http://${HOST}:${PORT}`);
+  const openToLan = HOST === '0.0.0.0' || HOST === '::';
+
+  console.log(`\n  📈  ScalpDesk  http://127.0.0.1:${PORT}`);
   console.log(`      미국: ${FORCE_MOCK ? '데모(오프라인)' : '실시간(Yahoo Finance) · 실패 시 데모 자동 전환'}`);
   console.log(`      한국: ${process.env.KIS_APP_KEY ? (process.env.KIS_PAPER === '0' ? '한국투자증권 실전' : '한국투자증권 모의투자') : '데모(KIS 키 없음)'}`);
-  const loopback = HOST === '127.0.0.1' || HOST === 'localhost' || HOST === '::1';
-  if (!loopback && !process.env.KIS_UI_TOKEN) {
-    console.warn('\n  ⚠️  루프백이 아닌 주소에 열려 있는데 KIS_UI_TOKEN 이 없습니다.');
-    console.warn('      주문 계열 요청은 모두 거부됩니다. 외부 접속이 필요하면 KIS_UI_TOKEN 을 설정하세요.');
+
+  if (openToLan) {
+    const addrs = lanAddresses();
+    if (addrs.length) {
+      console.log('\n  📱  휴대폰에서 보려면 (같은 와이파이에 연결한 뒤 아래 주소로 접속)');
+      addrs.forEach((ip) => console.log(`      http://${ip}:${PORT}`));
+    } else {
+      console.log('\n  📱  네트워크 주소를 찾지 못했습니다. 와이파이 연결을 확인하세요.');
+    }
+    if (!process.env.KIS_UI_TOKEN) {
+      console.warn('\n  ⚠️  외부 기기에 열려 있는데 KIS_UI_TOKEN 이 없습니다.');
+      console.warn('      차트는 볼 수 있지만 주문·AI 분석 요청은 거부됩니다.');
+      console.warn('      필요하면 .env 에 KIS_UI_TOKEN=원하는_암호 를 넣고 다시 실행하세요.');
+    }
+  } else {
+    console.log(`\n  ⓘ  휴대폰에서도 보려면: HOST=0.0.0.0 으로 실행하세요 (같은 와이파이 필요)`);
   }
   console.log('');
 });

@@ -12,6 +12,7 @@ const providers = require('./providers');
 const tracker = require('./tracker');
 const news = require('./news');
 const marketdata = require('../marketdata');
+const { allowSensitive } = require('../access');
 
 const inFlight = new Map();
 
@@ -79,6 +80,12 @@ async function handle(req, res, url, sendJSON) {
       }
 
       case '/api/ai/recommend': {
+        // 모델 호출은 요금이 발생하므로 외부 기기에서는 토큰을 요구한다
+        const gate = allowSensitive(req);
+        if (!gate.ok) {
+          sendJSON(res, 403, { error: gate.reason });
+          return true;
+        }
         const market = pick(String(params.get('market') || 'US').toUpperCase(), MARKETS, 'US');
         const horizon = pick(params.get('horizon'), HORIZONS, '당일~2일 단타');
         const risk = pick(params.get('risk'), RISKS, '중립');
