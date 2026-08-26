@@ -1,4 +1,4 @@
-import { useMoodboardTotals, useStudio } from '../store/useStudio'
+import { useActivePlanId, useMoodboardTotals, useStudio } from '../store/useStudio'
 import { estimateCommission, isMallLinked, mallById } from '../lib/affiliate'
 import { planById } from '../data/plans'
 import { computeQuote } from '../lib/quote'
@@ -6,7 +6,8 @@ import { krw, pct, usd } from '../lib/format'
 import { Badge, Button, Stat } from './ui/primitives'
 
 export function EarningsPanel() {
-  const { planId, templates, quote, affiliateIds, enabledMalls, conversionRate, openModal } = useStudio()
+  const { templates, quote, affiliateIds, enabledMalls, conversionRate, openModal } = useStudio()
+  const planId = useActivePlanId()
   const { rows, total, count } = useMoodboardTotals()
 
   const plan = planById(planId)

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useStudio } from '../../store/useStudio'
+import { useActivePlanId, useStudio } from '../../store/useStudio'
 import { styleById } from '../../data/styles'
 import { spaceById } from '../../data/spaces'
 import { planById } from '../../data/plans'
@@ -11,14 +11,13 @@ export function TemplateMarketTab() {
     templates,
     styleId,
     spaceId,
-    planId,
     publishTemplate,
     removeTemplate,
     recordTemplateSale,
   } = useStudio()
   const style = styleById(styleId)
   const space = spaceById(spaceId)
-  const plan = planById(planId)
+  const plan = planById(useActivePlanId())
 
   const [title, setTitle] = useState('')
   const [price, setPrice] = useState(29)

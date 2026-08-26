@@ -14,6 +14,8 @@ export interface RenderResponse {
   provider: 'mock' | 'server'
   matchScore: number
   notes: string[]
+  /** 서버가 차감 후 알려준 잔액 (서버 렌더일 때만) */
+  credits?: number
 }
 
 export interface ChatRequest {
@@ -31,4 +33,14 @@ export interface ChatResponse {
   provider: 'mock' | 'server'
   /** 렌더를 다시 돌려야 하는 요청이면 true */
   requestsRerender: boolean
+  credits?: number
+}
+
+/** 서버가 크레딧 부족으로 거절했을 때 */
+export class OutOfCredits extends Error {
+  balance: number
+  constructor(message: string, balance: number) {
+    super(message)
+    this.balance = balance
+  }
 }

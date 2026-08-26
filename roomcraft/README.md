@@ -12,21 +12,31 @@
 ```bash
 cd roomcraft
 npm install
-npm run dev          # http://localhost:5173
+
+npm run server   # 터미널 1 — API 서버 (8787)
+npm run dev      # 터미널 2 — 웹 (5173)
 ```
 
-API 키가 없어도 **전체 흐름이 그대로 동작합니다.** 렌더는 원본 사진에 스타일 팔레트를 입히는
-로컬 목(mock) 프리뷰로 대체되고, 화면 상단에 목 모드임이 표시됩니다.
+API 키가 없어도, 서버를 안 띄워도 **전체 흐름이 그대로 동작합니다.**
 
-실제 AI 렌더를 켜려면:
+| 상황 | 동작 |
+|---|---|
+| 서버 없음 | 목(mock) 렌더 + 로컬 크레딧. 화면 상단에 안내가 뜹니다. |
+| 서버만 실행 | 계정·결제·크레딧 원장 동작. 렌더는 여전히 목. |
+| 서버 + API 키 | 실제 AI 렌더/챗. 크레딧은 서버가 차감. |
+| 서버 + Stripe 키 | 실제 Stripe Checkout. 없으면 dev 결제 시뮬레이터. |
 
 ```bash
-cp .env.example .env   # GEMINI_API_KEY / ANTHROPIC_API_KEY 입력
-npm run server         # 별도 터미널 (포트 8787)
-npm run dev
+cp .env.example .env   # 필요한 키만 채우면 됩니다
 ```
 
-프론트엔드는 시작 시 `/api/health` 를 확인해 서버가 준비되면 실제 모델을, 아니면 목을 씁니다.
+### 테스트
+
+```bash
+npm run test:api    # API 통합 + 크레딧 원장 (30개)
+node smoke.mjs      # 스튜디오 UI (20단계)
+node e2e-auth.mjs   # 계정·결제·크레딧 브라우저 E2E (12단계)
+```
 
 ---
 
@@ -80,7 +90,60 @@ npm run dev
 
 ### 4. 구독 & 크레딧
 Free / Creator($19) / Pro Creator($49) / Studio($149) 4개 플랜 + 크레딧 팩.
-렌더 1회 = 5크레딧, 챗 1턴 = 1크레딧으로 차감됩니다.
+렌더 1회 = 5크레딧, 챗 1턴 = 1크레딧.
+
+**크레딧은 서버 권한입니다.** 로그인하면 잔액의 진실은 서버에 있고 클라이언트는 표시만 합니다.
+
+---
+
+## 계정 · 결제 · 크레딧 (서버)
+
+### 크레딧을 원장(ledger)으로 둔 이유
+잔액을 컬럼 하나로 들고 있으면 동시 요청에서 값이 덮이고, 이중 지급을 사후에 추적할 수 없습니다.
+`credit_ledger` 에 모든 변동을 append 하고 **잔액 = SUM(delta)** 로 계산합니다.
+
+- 차감은 잔액 확인과 같은 트랜잭션 안에서 → 동시 요청이 잔액을 음수로 만들 수 없음
+- `(reason, ref)` 유니크 인덱스 → 같은 결제/요청으로 두 번 지급 불가
+- 렌더 실패 시 자동 환불 기록이 남음 (`render:refund`)
+- 계정 모달에서 전체 원장을 확인 가능
+
+### 결제 흐름
+```
+클라이언트 → POST /api/payments/checkout   payments 행 생성 (pending)
+                    ↓
+      Stripe Checkout  또는  dev 시뮬레이터
+                    ↓
+Stripe 웹훅 → fulfillPayment(paymentId)
+              UPDATE ... WHERE status='pending'  ← 0행이면 이미 처리됨
+              플랜 반영 + 원장에 크레딧 적립
+```
+
+지급은 두 프로바이더가 **같은 `fulfillPayment` 함수**를 씁니다. 토스페이먼츠 등을 추가할 때는
+체크아웃 생성과 웹훅 검증만 붙이면 됩니다.
+
+- 웹훅 서명 검증 실패는 **반드시 400 으로 거절**합니다. 여기를 통과시키면 누구나 크레딧을 받습니다.
+- `/api/payments/dev/complete` 는 Stripe 키가 설정되면 **자동으로 비활성화**됩니다.
+
+### 계정
+- 비밀번호: `scrypt` (사용자별 salt, node:crypto — 외부 의존성 없음)
+- 세션: DB 저장 토큰 + httpOnly 쿠키. JWT 와 달리 즉시 폐기 가능
+- 로그인 실패 메시지는 계정 존재 여부를 흘리지 않도록 통일
+
+### API
+
+| 메서드 | 경로 | 설명 |
+|---|---|---|
+| GET | `/api/health` | 서버·AI·결제 프로바이더 상태 |
+| POST | `/api/auth/signup` `/login` `/logout` | 계정 |
+| GET | `/api/auth/me` | 현재 사용자 + 잔액 |
+| POST | `/api/payments/checkout` | 결제 세션 생성 |
+| POST | `/api/payments/webhook` | Stripe 웹훅 (raw body, 서명 검증) |
+| POST | `/api/payments/dev/complete` | dev 전용 결제 완료 |
+| GET | `/api/payments/history` | 결제 내역 |
+| GET | `/api/credits/ledger` | 크레딧 원장 |
+| POST | `/api/render` `/api/chat` | AI 프록시 (크레딧 차감) |
+| GET/PUT | `/api/sync/state` | 스튜디오 상태 동기화 |
+| GET/POST/DELETE | `/api/sync/templates` | 템플릿 마켓 |
 
 ---
 
@@ -98,7 +161,18 @@ src/
     ai/            서버 프로바이더 ↔ 목 프로바이더 폴백
   store/useStudio.ts   전역 상태 (zustand + localStorage 영속화)
   components/    헤더 · 캔버스 · 사이드패널 · 수익화 모달 4탭 · 무드보드 모달
-server/index.js  API 키를 브라우저에 노출하지 않기 위한 렌더/챗 프록시
+  lib/api.ts     서버 API 클라이언트 (쿠키 세션)
+  store/useAuth.ts     계정·결제 상태
+
+server/
+  index.js       라우터 조립
+  db.js          SQLite 스키마 + 마이그레이션
+  auth.js        계정·세션 (scrypt + httpOnly 쿠키)
+  credits.js     크레딧 원장 — 잔액의 유일한 권한
+  payments.js    Stripe Checkout + dev 시뮬레이터 + 웹훅
+  ai.js          렌더/챗 프록시 (크레딧 차감 + 실패 시 환불)
+  sync.js        스튜디오 상태·템플릿 저장
+  api.test.mjs   API 통합 테스트
 ```
 
 **영속화 정책:** 렌더 결과와 원본 사진은 data URL이라 용량이 커서 localStorage 쿼터를 넘길 수
@@ -112,8 +186,10 @@ server/index.js  API 키를 브라우저에 노출하지 않기 위한 렌더/�
 
 | 항목 | 현재 상태 | 필요한 작업 |
 |---|---|---|
-| 결제 | 버튼만 존재 (크레딧 즉시 지급) | Stripe / 토스페이먼츠 결제 세션 + 웹훅에서 크레딧 지급 |
-| 계정 | 없음 (브라우저 로컬 저장) | 인증 + 서버 DB (크레딧 잔액은 반드시 서버 권한) |
+| 결제 | Stripe Checkout + 웹훅 구현 완료 | 프로덕션 키 발급, 구독 취소/갱신 웹훅(`customer.subscription.*`) 처리, 토스페이먼츠 추가 |
+| 계정 | 이메일+비밀번호, 서버 크레딧 원장 | 이메일 인증, 비밀번호 재설정, 소셜 로그인, 요청 rate limit |
+| DB | SQLite 파일 1개 | Postgres 이전 (쿼리가 server/*.js 밖으로 새지 않게 유지해 뒀습니다) |
+| 월간 크레딧 갱신 | 결제 시점에만 지급 | 구독 갱신 웹훅 또는 크론으로 매월 지급 |
 | 제휴 링크 | 검색 URL + 프로그램 추적 파라미터 | 각 파트너 API로 정식 추적 링크 발급 (`lib/affiliate.ts` 의 `buildDeeplink` 만 교체) |
 | 검색 URL | 몰별 하드코딩 | 몰이 검색 경로를 개편하면 `MALLS` 의 해당 `searchUrl` 한 줄만 수정 |
 | 커미션 요율 | 참고용 구간 | 프로그램 콘솔 승인 후 실제 요율로 교체 |

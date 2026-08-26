@@ -20,12 +20,13 @@ import { CREDIT_COST, planById } from '../data/plans'
 import { DEFAULT_ENABLED_MALLS, EMPTY_AFFILIATE_IDS } from '../lib/affiliate'
 import { DEFAULT_QUOTE } from '../lib/quote'
 import { buildRenderPrompt } from '../lib/prompt'
-import { askDesigner, renderMakeover } from '../lib/ai'
+import { OutOfCredits, askDesigner, renderMakeover } from '../lib/ai'
+import { useAuth } from './useAuth'
 import { uid } from '../lib/id'
 
 export type PanelTab = 'designer' | 'spec' | 'earnings'
 export type WorkspaceTab = 'makeover' | 'staging' | 'spaces'
-export type ModalKind = 'none' | 'monetization' | 'moodboard' | 'plans'
+export type ModalKind = 'none' | 'monetization' | 'moodboard' | 'plans' | 'auth' | 'account'
 
 interface StudioState {
   // ── 디자인 입력 ─────────────────────────────────────────────
@@ -158,7 +159,11 @@ export const useStudio = create<StudioState>()(
           set({ renderError: '먼저 공간 사진을 업로드해 주세요.' })
           return
         }
-        if (s.credits < CREDIT_COST.render) {
+
+        // 로그인 상태면 크레딧의 권한은 서버에 있습니다. 여기서 미리 막지 않고,
+        // 서버가 402 로 거절하면 그 메시지를 그대로 보여줍니다.
+        const signedIn = Boolean(useAuth.getState().user)
+        if (!signedIn && s.credits < CREDIT_COST.render) {
           set({ renderError: '크레딧이 부족합니다. 플랜을 업그레이드하거나 크레딧을 충전해 주세요.', modal: 'plans' })
           return
         }
@@ -176,9 +181,12 @@ export const useStudio = create<StudioState>()(
             space,
             intensity: s.intensity,
           })
+          if (result.credits !== undefined) useAuth.getState().setCredits(result.credits)
+
           set((prev) => ({
             isRendering: false,
-            credits: prev.credits - CREDIT_COST.render,
+            // 서버 렌더는 서버가 이미 차감했습니다. 목 렌더만 로컬 잔액을 줄입니다.
+            credits: result.provider === 'server' ? prev.credits : prev.credits - CREDIT_COST.render,
             render: {
               id: uid('render'),
               styleId: style.id,
@@ -203,6 +211,11 @@ export const useStudio = create<StudioState>()(
             ],
           }))
         } catch (err) {
+          if (err instanceof OutOfCredits) {
+            set({ isRendering: false, renderError: err.message, modal: 'plans' })
+            useAuth.getState().setCredits(err.balance)
+            return
+          }
           set({ isRendering: false, renderError: (err as Error).message })
         }
       },
@@ -220,19 +233,38 @@ export const useStudio = create<StudioState>()(
         }
         set({ chat: [...s.chat, userMsg], isChatting: true, extras: [...s.extras, trimmed].slice(-8) })
 
-        const reply = await askDesigner({
-          history: s.chat,
-          message: trimmed,
-          style: styleById(s.styleId),
-          space: spaceById(s.spaceId),
-          moodboard: s.moodboard
-            .map((m) => productBySku(m.sku)?.name)
-            .filter((n): n is string => Boolean(n)),
-        })
+        let reply
+        try {
+          reply = await askDesigner({
+            history: s.chat,
+            message: trimmed,
+            style: styleById(s.styleId),
+            space: spaceById(s.spaceId),
+            moodboard: s.moodboard
+              .map((m) => productBySku(m.sku)?.name)
+              .filter((n): n is string => Boolean(n)),
+          })
+        } catch (err) {
+          const message =
+            err instanceof OutOfCredits ? err.message : `디자이너 응답을 받지 못했습니다: ${(err as Error).message}`
+          if (err instanceof OutOfCredits) useAuth.getState().setCredits(err.balance)
+          set((prev) => ({
+            isChatting: false,
+            modal: err instanceof OutOfCredits ? 'plans' : prev.modal,
+            chat: [
+              ...prev.chat,
+              { id: uid('msg'), role: 'assistant' as const, content: `⚠ ${message}`, createdAt: Date.now() },
+            ],
+          }))
+          return
+        }
+
+        if (reply.credits !== undefined) useAuth.getState().setCredits(reply.credits)
 
         set((prev) => ({
           isChatting: false,
-          credits: Math.max(0, prev.credits - CREDIT_COST.chatTurn),
+          credits:
+            reply.provider === 'server' ? prev.credits : Math.max(0, prev.credits - CREDIT_COST.chatTurn),
           chat: [
             ...prev.chat,
             {
@@ -385,6 +417,29 @@ export const useStudio = create<StudioState>()(
     },
   ),
 )
+
+/**
+ * 화면에 표시할 플랜.
+ *
+ * 로그인 상태에서는 결제로 부여된 서버 플랜이 진실입니다.
+ * 비로그인 데모에서만 로컬 선택값을 씁니다.
+ */
+export function useActivePlanId(): string {
+  const serverUser = useAuth((s) => s.user)
+  const local = useStudio((s) => s.planId)
+  return serverUser?.planId ?? local
+}
+
+/**
+ * 화면에 표시할 크레딧.
+ *
+ * 로그인 상태에서는 서버 잔액이 진실입니다. 비로그인 데모에서는 로컬 잔액을 씁니다.
+ */
+export function useCredits(): { credits: number; isServer: boolean } {
+  const serverUser = useAuth((s) => s.user)
+  const local = useStudio((s) => s.credits)
+  return serverUser ? { credits: serverUser.credits, isServer: true } : { credits: local, isServer: false }
+}
 
 /**
  * 무드보드 합계 (파생 상태).

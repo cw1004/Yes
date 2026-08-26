@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useStudio } from '../../store/useStudio'
+import { useActivePlanId, useCredits, useStudio } from '../../store/useStudio'
 import { planById } from '../../data/plans'
 import { Modal, Tabs } from '../ui/Modal'
 import { Badge, Button } from '../ui/primitives'
@@ -11,9 +11,10 @@ import { PlanTab } from './PlanTab'
 type TabId = 'affiliate' | 'templates' | 'quote' | 'plan'
 
 export function MonetizationModal() {
-  const { modal, closeModal, planId, credits, openModal } = useStudio()
+  const { modal, closeModal, openModal } = useStudio()
   const [tab, setTab] = useState<TabId>('affiliate')
-  const plan = planById(planId)
+  const { credits } = useCredits()
+  const plan = planById(useActivePlanId())
 
   const open = modal === 'monetization' || modal === 'plans'
   const activeTab: TabId = modal === 'plans' ? 'plan' : tab

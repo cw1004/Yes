@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useStudio } from '../store/useStudio'
+import { useCredits, useStudio } from '../store/useStudio'
 import { STYLES, STYLE_FAMILIES, styleById, type StyleFamilyFilter } from '../data/styles'
 import { CREDIT_COST } from '../data/plans'
 import { intensityLabel, intensityDirective } from '../lib/prompt'
@@ -13,8 +13,8 @@ const PRESETS = [
 ]
 
 export function StyleSelector() {
-  const { styleId, intensity, isRendering, sourceImage, credits, setStyle, setIntensity, addExtra, generate } =
-    useStudio()
+  const { styleId, intensity, isRendering, sourceImage, setStyle, setIntensity, addExtra, generate } = useStudio()
+  const { credits } = useCredits()
   const [family, setFamily] = useState<StyleFamilyFilter>('all')
   const [customOpen, setCustomOpen] = useState(false)
   const [custom, setCustom] = useState('')

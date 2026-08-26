@@ -1,4 +1,5 @@
-import { useMoodboardTotals, useStudio } from '../store/useStudio'
+import { useCredits, useMoodboardTotals, useStudio } from '../store/useStudio'
+import { useAuth } from '../store/useAuth'
 import { SPACES, spaceById } from '../data/spaces'
 import { styleById } from '../data/styles'
 import { planById } from '../data/plans'
@@ -37,7 +38,6 @@ export function Header() {
   const {
     spaceId,
     styleId,
-    credits,
     planId,
     fullscreen,
     setSpace,
@@ -46,10 +46,14 @@ export function Header() {
     showToast,
   } = useStudio()
   const { count, total } = useMoodboardTotals()
+  const { credits, isServer } = useCredits()
+  const user = useAuth((s) => s.user)
+  const serverAvailable = useAuth((s) => s.serverAvailable)
 
   const space = spaceById(spaceId)
   const style = styleById(styleId)
-  const plan = planById(planId)
+  // 로그인 상태에서는 서버가 알려준 플랜이 진실입니다.
+  const plan = planById(user?.planId ?? planId)
 
   return (
     <header className="sticky top-0 z-40 flex flex-wrap items-center gap-2 border-b border-ink-700 bg-ink-900/95 px-4 py-3 backdrop-blur">
@@ -99,11 +103,15 @@ export function Header() {
           ☁ 클라우드 저장
         </HeaderCell>
 
-        <HeaderCell onClick={() => openModal('plans')} title="크레딧 및 플랜 관리">
+        <HeaderCell
+          onClick={() => openModal('plans')}
+          title={isServer ? '서버에 저장된 크레딧 잔액' : '로컬 데모 크레딧 (로그인하면 서버에 저장됩니다)'}
+        >
           <span className="text-amber-brand">♛</span>
           <span className="font-bold tabular-nums text-mist-200">{credits}</span>
           <span className="text-mist-500">크레딧</span>
           <Badge tone="amber">{plan.name.toUpperCase()}</Badge>
+          {!isServer ? <Badge>로컬</Badge> : null}
         </HeaderCell>
       </div>
 
@@ -120,12 +128,23 @@ export function Header() {
           <span className="font-semibold tabular-nums">{usd(total)}</span>
         </HeaderCell>
         <HeaderCell onClick={() => openModal('moodboard')}>⤓ 내보내기</HeaderCell>
-        <span
-          className="grid h-9 w-9 place-items-center rounded-full bg-gradient-to-br from-ink-600 to-ink-800 text-sm"
-          title="내 계정"
-        >
-          🧑‍🎨
-        </span>
+        {user ? (
+          <HeaderCell onClick={() => openModal('account')} title={`${user.email} · 클릭하여 계정 관리`}>
+            <span className="grid h-6 w-6 place-items-center rounded-full bg-gradient-to-br from-amber-brand to-amber-deep text-[11px] text-ink-950">
+              {user.displayName.slice(0, 1).toUpperCase()}
+            </span>
+            <span className="max-w-[120px] truncate font-semibold text-mist-200">{user.displayName}</span>
+          </HeaderCell>
+        ) : (
+          <Button
+            size="sm"
+            variant={serverAvailable ? 'outline' : 'ghost'}
+            onClick={() => openModal('auth')}
+            title={serverAvailable ? '로그인 / 회원가입' : '서버가 연결되지 않아 로컬 데모로 동작합니다'}
+          >
+            🔐 로그인
+          </Button>
+        )}
       </div>
     </header>
   )
