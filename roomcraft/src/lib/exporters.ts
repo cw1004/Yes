@@ -1,5 +1,5 @@
 import type { AffiliateIds, MallId, Product } from '../types'
-import { MALLS, buildDeeplink, mallById } from './affiliate'
+import { buildDeeplink, mallById } from './affiliate'
 import { usd } from './format'
 
 export interface ExportRow {
@@ -12,8 +12,9 @@ const csvCell = (v: string | number): string => {
   return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
 }
 
-/** 스프레드시트/정산용 CSV */
-export function toCsv(rows: ExportRow[], ids: AffiliateIds): string {
+/** 스프레드시트/정산용 CSV — 활성화된 채널만 열로 만듭니다. */
+export function toCsv(rows: ExportRow[], ids: AffiliateIds, mallIds: MallId[]): string {
+  const malls = mallIds.map(mallById)
   const header = [
     'SKU',
     'Product',
@@ -22,7 +23,7 @@ export function toCsv(rows: ExportRow[], ids: AffiliateIds): string {
     'Qty',
     'Unit Price (USD)',
     'Line Total (USD)',
-    ...MALLS.map((m) => `${m.label} Link`),
+    ...malls.map((m) => `${m.label} Link`),
   ]
   const body = rows.map(({ product, qty }) => [
     product.sku,
@@ -32,7 +33,7 @@ export function toCsv(rows: ExportRow[], ids: AffiliateIds): string {
     qty,
     product.price,
     product.price * qty,
-    ...MALLS.map((m) => buildDeeplink(m.id, product.searchTerm, ids)),
+    ...malls.map((m) => buildDeeplink(m.id, product.searchTerm, ids)),
   ])
   return [header, ...body].map((r) => r.map(csvCell).join(',')).join('\n')
 }

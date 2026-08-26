@@ -47,13 +47,29 @@ npm run dev
 ## 4가지 수익 모델
 
 ### 1. 제휴 커머스 (핵심)
-쿠팡 파트너스 · 오늘의집 · Amazon Associates · AliExpress Portals 4개 채널에 대해
-파트너 ID를 넣으면 무드보드의 모든 가구에 추적 파라미터가 붙은 딥링크가 생성됩니다.
+**5개 권역 37개 쇼핑몰 / 22개 제휴 프로그램**을 지원합니다.
+
+| 권역 | 쇼핑몰 | 제휴 프로그램 |
+|---|---|---|
+| 🇰🇷 국내 | 쿠팡, 오늘의집, 네이버쇼핑, 11번가, G마켓, 옥션, SSG닷컴, 롯데온, 한샘몰, 현대리바트 | 쿠팡 파트너스, 오늘의집 파트너스, 링크프라이스, 애드픽 |
+| 🇺🇸 미국·글로벌 | Amazon.com, Wayfair, West Elm, Crate & Barrel, Article, Houzz, Lumens, Etsy, eBay | Amazon Associates, Impact, CJ Affiliate, Awin, Rakuten Advertising, eBay Partner Network |
+| 🇯🇵 일본 | 楽天市場, Amazon.co.jp, Yahoo!ショッピング, LOWYA, ニトリ, 無印良品 | 楽天アフィリエイト, Amazon アソシエイト, バリューコマース, A8.net |
+| 🇨🇳 중국 | 淘宝/天猫, 京东, AliExpress, Temu, 1688 | 淘宝联盟, 京东联盟, AliExpress Portals, Temu Affiliate |
+| 🇪🇺 유럽 | Amazon.de, IKEA, Nordic Nest, Connox, Made in Design, Westwing, Maisons du Monde | Amazon PartnerNet, Awin, Impact, Tradedoubler |
+
+**모델이 2계층인 이유:** 국내 종합몰 다수가 링크프라이스 한 계정으로 묶이고, 유럽 브랜드
+다수가 Tradedoubler로 묶입니다. 몰마다 ID를 받는 구조로는 확장되지 않아
+`AffiliateProgram`(가입 주체)과 `Mall`(링크 대상)을 분리했습니다. 가입한 프로그램의 ID만
+넣으면 그 프로그램에 속한 모든 몰 링크에 자동 삽입됩니다.
+
+채널은 개별로 켜고 끌 수 있고, 켠 채널만 CSV 열·기대 정산액·딥링크 생성에 반영됩니다.
 
 - **블로그 포스팅용 HTML** — 티스토리/네이버 에디터에 그대로 붙여넣기 (대가성 문구 자동 포함)
 - **카톡 공유용 텍스트** — 인스타 프로필·유튜브 설명란용 단문
 - **CSV** — 정산·스프레드시트 관리용
-- **실시간 딥링크 생성기** — 카탈로그에 없는 제품도 이름만 넣으면 전 채널 링크 생성
+- **실시간 딥링크 생성기** — 카탈로그에 없는 제품도 이름만 넣으면 활성 채널 전체 링크 생성
+- **전환율 가정 슬라이더** — 기대 정산액 = 상한 × 전환율(기본 2%). 상한을 수익으로 착각하지
+  않도록 두 값을 분리해 보여줍니다.
 
 ### 2. 템플릿 마켓 판매
 현재 스타일·강도·큐레이션 구성을 하나의 프리셋으로 묶어 판매 등록. 플랜에 따라 70~90% 정산.
@@ -98,7 +114,9 @@ server/index.js  API 키를 브라우저에 노출하지 않기 위한 렌더/�
 |---|---|---|
 | 결제 | 버튼만 존재 (크레딧 즉시 지급) | Stripe / 토스페이먼츠 결제 세션 + 웹훅에서 크레딧 지급 |
 | 계정 | 없음 (브라우저 로컬 저장) | 인증 + 서버 DB (크레딧 잔액은 반드시 서버 권한) |
-| 제휴 링크 | 검색 URL + 파트너 파라미터 | 각 파트너 API로 정식 추적 링크 발급 (`lib/affiliate.ts` 의 `buildDeeplink` 만 교체) |
+| 제휴 링크 | 검색 URL + 프로그램 추적 파라미터 | 각 파트너 API로 정식 추적 링크 발급 (`lib/affiliate.ts` 의 `buildDeeplink` 만 교체) |
+| 검색 URL | 몰별 하드코딩 | 몰이 검색 경로를 개편하면 `MALLS` 의 해당 `searchUrl` 한 줄만 수정 |
+| 커미션 요율 | 참고용 구간 | 프로그램 콘솔 승인 후 실제 요율로 교체 |
 | 가격 데이터 | 정적 카탈로그(참고용 정가) | 파트너 상품 API 연동 및 주기적 갱신 |
 | 렌더 저장 | 브라우저 메모리 | 오브젝트 스토리지 + 히스토리 |
 

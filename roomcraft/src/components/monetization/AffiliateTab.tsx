@@ -1,33 +1,49 @@
 import { useMemo, useState } from 'react'
 import { useMoodboardTotals, useStudio } from '../../store/useStudio'
-import { MALLS, buildDeeplink, estimateCommission } from '../../lib/affiliate'
+import {
+  MALLS,
+  PROGRAMS,
+  REGIONS,
+  buildDeeplink,
+  estimateCommission,
+  isMallLinked,
+  mallById,
+  programById,
+} from '../../lib/affiliate'
 import { copyToClipboard, downloadText, toBlogHtml, toCsv, toKakaoText } from '../../lib/exporters'
 import { styleById } from '../../data/styles'
 import { spaceById } from '../../data/spaces'
 import { pct, usd } from '../../lib/format'
-import { Button, Field, SectionTitle, Stat, inputClass } from '../ui/primitives'
+import { Badge, Button, SectionTitle, Stat, inputClass } from '../ui/primitives'
 import type { MallId } from '../../types'
 
 export function AffiliateTab() {
-  const { affiliateIds, styleId, spaceId, setAffiliateIds, showToast } = useStudio()
+  const {
+    affiliateIds,
+    enabledMalls,
+    conversionRate,
+    styleId,
+    spaceId,
+    setAffiliateIds,
+    toggleMall,
+    setEnabledMalls,
+    setConversionRate,
+    showToast,
+  } = useStudio()
   const { rows, total, count } = useMoodboardTotals()
   const [primaryMall, setPrimaryMall] = useState<MallId>('coupang')
   const [term, setTerm] = useState('')
   const [saved, setSaved] = useState(false)
 
-  const est = useMemo(() => estimateCommission(total), [total])
+  const est = useMemo(
+    () => estimateCommission(total, enabledMalls, conversionRate),
+    [total, enabledMalls, conversionRate],
+  )
   const style = styleById(styleId)
   const space = spaceById(spaceId)
 
-  const linkedMalls = MALLS.filter((m) => {
-    const v = {
-      coupang: affiliateIds.coupangSubId,
-      ohouse: affiliateIds.ohousePartnerId,
-      amazon: affiliateIds.amazonTag,
-      aliexpress: affiliateIds.aliexpressKey,
-    }[m.id]
-    return Boolean(v.trim())
-  })
+  const linkedPrograms = PROGRAMS.filter((p) => (affiliateIds[p.id] ?? '').trim())
+  const linkedMallCount = enabledMalls.filter((id) => isMallLinked(mallById(id), affiliateIds)).length
 
   const copy = async (text: string, label: string) => {
     const ok = await copyToClipboard(text)
@@ -39,31 +55,98 @@ export function AffiliateTab() {
       <div className="grid gap-3 sm:grid-cols-3">
         <Stat label="배치된 총 가구 견적" value={usd(total)} sub={`총 ${count}개 가구/소품 스타일링됨`} />
         <Stat
-          label="예상 제휴 판매 수수료"
+          label="기대 제휴 정산액"
           value={`+${usd(est.expected, { cents: true })}`}
-          sub={`쇼핑몰별 평균 ${pct(est.avgRate, 1)} 커미션 적립`}
+          sub={`상한 ${usd(est.gross, { cents: true })} × 전환율 ${pct(conversionRate, 1)}`}
           tone="emerald"
         />
         <Stat
-          label="연동된 파트너 커머스"
-          value={linkedMalls.length ? linkedMalls.map((m) => m.label).join(' · ') : '미연동'}
-          sub={linkedMalls.length ? '✓ 자동 딥링크 및 SubID 추적 활성화' : '아래에서 파트너 ID를 입력하세요'}
-          tone={linkedMalls.length ? 'emerald' : 'neutral'}
+          label="활성 채널 / 연동 완료"
+          value={`${enabledMalls.length} / ${linkedMallCount}`}
+          sub={
+            linkedPrograms.length
+              ? `${linkedPrograms.map((p) => p.label).join(' · ')} 연동됨`
+              : '아래에서 프로그램 ID를 입력하세요'
+          }
+          tone={linkedMallCount ? 'emerald' : 'neutral'}
         />
       </div>
 
       <section className="rounded-xl border border-ink-700 bg-ink-850 p-4">
         <SectionTitle
+          icon="🛍"
+          title={`제휴 채널 선택 (${enabledMalls.length}/${MALLS.length})`}
+          desc="링크를 생성할 쇼핑몰을 고르세요. 국내 종합몰은 대부분 하나의 CPS 네트워크로 묶여 있어 ID는 프로그램 단위로 관리됩니다."
+          right={
+            <div className="flex gap-1">
+              <Button size="sm" variant="chip" onClick={() => setEnabledMalls(MALLS.map((m) => m.id))}>
+                전체 켜기
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setEnabledMalls([])}>
+                전체 끄기
+              </Button>
+            </div>
+          }
+        />
+
+        {REGIONS.map((region) => (
+          <div key={region.id} className="mt-4">
+            <p className="mb-2 text-[11px] font-bold tracking-wide text-mist-400">
+              {region.flag} {region.label} ({MALLS.filter((m) => m.region === region.id).length})
+            </p>
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {MALLS.filter((m) => m.region === region.id).map((mall) => {
+                const on = enabledMalls.includes(mall.id)
+                const linked = isMallLinked(mall, affiliateIds)
+                return (
+                  <button
+                    key={mall.id}
+                    onClick={() => toggleMall(mall.id)}
+                    className={`rounded-lg border p-2.5 text-left transition ${
+                      on ? 'border-emerald-brand/50 bg-emerald-brand/8' : 'border-ink-700 bg-ink-900 hover:border-ink-500'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[12px] font-semibold text-mist-200">
+                        {mall.icon} {mall.label}
+                      </span>
+                      <span
+                        className={`grid h-4 w-4 shrink-0 place-items-center rounded text-[9px] ${
+                          on ? 'bg-emerald-brand text-ink-950' : 'border border-ink-600 text-transparent'
+                        }`}
+                      >
+                        ✓
+                      </span>
+                    </div>
+                    <p className="mt-1 text-[10px] text-mist-500">
+                      {pct(mall.commissionMin)}~{pct(mall.commissionMax)} · {mall.strength}
+                    </p>
+                    <p className="mt-1 text-[10px]">
+                      <span className={linked ? 'text-emerald-brand' : 'text-mist-500'}>
+                        {linked ? '✓ ' : '○ '}
+                        {programById(mall.programId).label}
+                      </span>
+                    </p>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        ))}
+      </section>
+
+      <section className="rounded-xl border border-ink-700 bg-ink-850 p-4">
+        <SectionTitle
           icon="🛡"
-          title="내 제휴 파트너스 ID 설정 (MY AFFILIATE PARTNER IDS)"
-          desc="각 제휴 프로그램 콘솔에서 발급받은 추적 ID를 입력하면 모든 링크에 자동으로 삽입됩니다."
+          title="제휴 프로그램 ID 설정 (AFFILIATE PROGRAM IDS)"
+          desc="가입한 프로그램의 추적 ID만 입력하면 됩니다. 해당 프로그램에 속한 모든 몰의 링크에 자동 삽입됩니다."
           right={
             <Button
               variant="primary"
               size="sm"
               onClick={() => {
                 setSaved(true)
-                showToast('제휴 설정을 저장했습니다. (브라우저에 로컬 저장)')
+                showToast('제휴 설정을 저장했습니다.')
                 setTimeout(() => setSaved(false), 1800)
               }}
             >
@@ -71,45 +154,84 @@ export function AffiliateTab() {
             </Button>
           }
         />
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <Field label="🛒 쿠팡 파트너스 SubID">
-            <input
-              className={inputClass}
-              value={affiliateIds.coupangSubId}
-              placeholder="AF_ROOMCRAFT_01"
-              onChange={(e) => setAffiliateIds({ coupangSubId: e.target.value })}
-            />
-          </Field>
-          <Field label="🏠 오늘의집 파트너 ID">
-            <input
-              className={inputClass}
-              value={affiliateIds.ohousePartnerId}
-              placeholder="OH_ROOMCRAFT_77"
-              onChange={(e) => setAffiliateIds({ ohousePartnerId: e.target.value })}
-            />
-          </Field>
-          <Field label="📦 Amazon Associates Tag">
-            <input
-              className={inputClass}
-              value={affiliateIds.amazonTag}
-              placeholder="roomcraft-20"
-              onChange={(e) => setAffiliateIds({ amazonTag: e.target.value })}
-            />
-          </Field>
-          <Field label="⚡ AliExpress Portals Key">
-            <input
-              className={inputClass}
-              value={affiliateIds.aliexpressKey}
-              placeholder="roomcraft_global"
-              onChange={(e) => setAffiliateIds({ aliexpressKey: e.target.value })}
-            />
-          </Field>
-        </div>
+        {REGIONS.map((region) => (
+          <div key={region.id} className="mt-4">
+            <p className="mb-2 text-[11px] font-bold tracking-wide text-mist-400">
+              {region.flag} {region.label}
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {PROGRAMS.filter((p) => p.region === region.id).map((program) => {
+            const covered = MALLS.filter((m) => m.programId === program.id)
+            const activeCovered = covered.filter((m) => enabledMalls.includes(m.id))
+                return (
+                  <div key={program.id} className="rounded-lg border border-ink-700 bg-ink-900 p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <span className="text-[12px] font-semibold text-mist-200">{program.label}</span>
+                  <Badge tone={activeCovered.length ? 'amber' : 'neutral'}>
+                    {activeCovered.length}/{covered.length} 몰
+                  </Badge>
+                </div>
+                <input
+                  className={`${inputClass} mt-2`}
+                  value={affiliateIds[program.id] ?? ''}
+                  placeholder={program.idPlaceholder}
+                  onChange={(e) => setAffiliateIds({ [program.id]: e.target.value })}
+                  aria-label={program.idLabel}
+                />
+                <p className="mt-1.5 text-[10px] text-mist-500">
+                  파라미터 <code className="rounded bg-ink-800 px-1">{program.paramKey}</code> ·{' '}
+                  {covered.map((m) => m.label).join(', ')}
+                </p>
+                <p className="mt-1 text-[10px] leading-relaxed text-mist-500">{program.note}</p>
+                {program.consoleUrl ? (
+                  <a
+                    href={program.consoleUrl}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="mt-1.5 inline-block text-[10px] text-amber-brand hover:underline"
+                  >
+                    가입/콘솔 열기 ↗
+                  </a>
+                ) : null}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        ))}
         <p className="mt-3 text-[11px] leading-relaxed text-mist-500">
           ⚠ 제휴 링크가 포함된 콘텐츠에는 각 프로그램 약관과 공정거래위원회 「추천·보증 등에 관한 표시·광고 심사지침」에
           따라 <strong className="text-mist-300">대가성 문구를 반드시 표기</strong>해야 합니다. 아래 내보내기 결과에는
-          문구가 자동으로 포함됩니다.
+          문구가 자동으로 포함됩니다. 표시된 커미션 구간은 참고용이며, 확정 요율은 각 프로그램 콘솔에서 확인하세요.
         </p>
+      </section>
+
+      <section className="rounded-xl border border-ink-700 bg-ink-850 p-4">
+        <SectionTitle
+          icon="📈"
+          title="전환율 가정"
+          desc="링크 클릭 대비 실제 구매 비율입니다. 기대 정산액은 이 값에 좌우되므로 낙관적으로 잡지 마세요."
+          right={
+            <span className="rounded-md bg-amber-brand/15 px-2 py-0.5 text-xs font-bold tabular-nums text-amber-brand">
+              {pct(conversionRate, 1)}
+            </span>
+          }
+        />
+        <input
+          type="range"
+          min={0.5}
+          max={8}
+          step={0.1}
+          value={conversionRate * 100}
+          onChange={(e) => setConversionRate(Number(e.target.value) / 100)}
+          className="rc-range mt-4 w-full"
+          aria-label="전환율"
+        />
+        <div className="mt-1.5 flex justify-between text-[10px] text-mist-500">
+          <span>0.5% 콜드 트래픽</span>
+          <span>2% 일반적인 블로그/SNS</span>
+          <span>8% 고관여 검색 유입</span>
+        </div>
       </section>
 
       <section className="rounded-xl border border-ink-700 bg-ink-850 p-4">
@@ -123,10 +245,15 @@ export function AffiliateTab() {
               onChange={(e) => setPrimaryMall(e.target.value as MallId)}
               className="rounded-lg border border-ink-700 bg-ink-900 px-2 py-1.5 text-xs text-mist-200 outline-none"
             >
-              {MALLS.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.icon} {m.label}
-                </option>
+              {REGIONS.map((r) => (
+                <optgroup key={r.id} label={`${r.flag} ${r.label}`}>
+                  {MALLS.filter((m) => m.region === r.id).map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.icon} {m.label}
+                      {enabledMalls.includes(m.id) ? '' : ' (비활성)'}
+                    </option>
+                  ))}
+                </optgroup>
               ))}
             </select>
           }
@@ -159,13 +286,17 @@ export function AffiliateTab() {
           </Button>
           <Button
             variant="outline"
-            disabled={!rows.length}
+            disabled={!rows.length || !enabledMalls.length}
             onClick={() => {
-              downloadText(`roomcraft-affiliate-${Date.now()}.csv`, toCsv(rows, affiliateIds), 'text/csv')
-              showToast('CSV 파일을 다운로드했습니다.')
+              downloadText(
+                `roomcraft-affiliate-${Date.now()}.csv`,
+                toCsv(rows, affiliateIds, enabledMalls),
+                'text/csv',
+              )
+              showToast(`활성 채널 ${enabledMalls.length}개 기준 CSV를 다운로드했습니다.`)
             }}
           >
-            ⤓ CSV 다운로드
+            ⤓ CSV 다운로드 ({enabledMalls.length}채널)
           </Button>
         </div>
         {!rows.length ? (
@@ -177,7 +308,7 @@ export function AffiliateTab() {
                 <tr>
                   <th className="px-3 py-2 font-semibold">제품</th>
                   <th className="px-3 py-2 font-semibold">단가</th>
-                  <th className="px-3 py-2 font-semibold">딥링크</th>
+                  <th className="px-3 py-2 font-semibold">{mallById(primaryMall).label} 딥링크</th>
                 </tr>
               </thead>
               <tbody>
@@ -212,7 +343,7 @@ export function AffiliateTab() {
         <SectionTitle
           icon="⚡"
           title="실시간 딥링크 즉시 생성기 (INSTANT MULTI-MALL SEARCH LINKER)"
-          desc="카탈로그에 없는 제품도 이름만 입력하면 전 채널 검색 링크를 즉시 만들어 줍니다."
+          desc="카탈로그에 없는 제품도 이름만 입력하면 활성화된 전 채널 링크를 즉시 만들어 줍니다."
         />
         <div className="mt-4 flex gap-2">
           <input
@@ -227,7 +358,7 @@ export function AffiliateTab() {
         </div>
         {term.trim() ? (
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
-            {MALLS.map((m) => {
+            {enabledMalls.map(mallById).map((m) => {
               const link = buildDeeplink(m.id, term.trim(), affiliateIds)
               return (
                 <div
@@ -237,6 +368,9 @@ export function AffiliateTab() {
                   <div className="min-w-0">
                     <p className="text-[11px] font-semibold text-mist-200">
                       {m.icon} {m.label}
+                      {isMallLinked(m, affiliateIds) ? null : (
+                        <span className="ml-1 font-normal text-amber-brand">· 추적 ID 없음</span>
+                      )}
                     </p>
                     <p className="truncate text-[10px] text-mist-500" title={link}>
                       {link}
@@ -258,6 +392,9 @@ export function AffiliateTab() {
                 </div>
               )
             })}
+            {!enabledMalls.length ? (
+              <p className="col-span-full text-xs text-mist-500">활성화된 채널이 없습니다.</p>
+            ) : null}
           </div>
         ) : null}
       </section>

@@ -6,6 +6,7 @@ import type {
   Product,
   ChatMessage,
   ClientQuote,
+  MallId,
   MoodboardItem,
   PlanId,
   RenderResult,
@@ -16,7 +17,7 @@ import { productBySku } from '../data/catalog'
 import { styleById } from '../data/styles'
 import { spaceById } from '../data/spaces'
 import { CREDIT_COST, planById } from '../data/plans'
-import { EMPTY_AFFILIATE_IDS } from '../lib/affiliate'
+import { DEFAULT_ENABLED_MALLS, EMPTY_AFFILIATE_IDS } from '../lib/affiliate'
 import { DEFAULT_QUOTE } from '../lib/quote'
 import { buildRenderPrompt } from '../lib/prompt'
 import { askDesigner, renderMakeover } from '../lib/ai'
@@ -44,6 +45,10 @@ interface StudioState {
   // ── 상거래 ──────────────────────────────────────────────────
   moodboard: MoodboardItem[]
   affiliateIds: AffiliateIds
+  /** 링크를 생성할 제휴 채널 */
+  enabledMalls: MallId[]
+  /** 클릭 대비 구매 전환율 — 기대 정산액 계산에 사용 */
+  conversionRate: number
   quote: ClientQuote
   templates: TemplateListing[]
 
@@ -79,6 +84,9 @@ interface StudioState {
   clearMoodboard: () => void
 
   setAffiliateIds: (ids: Partial<AffiliateIds>) => void
+  toggleMall: (id: MallId) => void
+  setEnabledMalls: (ids: MallId[]) => void
+  setConversionRate: (rate: number) => void
   setQuote: (patch: Partial<ClientQuote>) => void
   publishTemplate: (title: string, priceUsd: number) => void
   removeTemplate: (id: string) => void
@@ -119,6 +127,8 @@ export const useStudio = create<StudioState>()(
 
       moodboard: [],
       affiliateIds: { ...EMPTY_AFFILIATE_IDS },
+      enabledMalls: [...DEFAULT_ENABLED_MALLS],
+      conversionRate: 0.02,
       quote: { ...DEFAULT_QUOTE },
       templates: [],
 
@@ -279,6 +289,17 @@ export const useStudio = create<StudioState>()(
       clearMoodboard: () => set({ moodboard: [], toast: '무드보드를 비웠습니다.' }),
 
       setAffiliateIds: (ids) => set((s) => ({ affiliateIds: { ...s.affiliateIds, ...ids } })),
+
+      toggleMall: (id) =>
+        set((s) => ({
+          enabledMalls: s.enabledMalls.includes(id)
+            ? s.enabledMalls.filter((m) => m !== id)
+            : [...s.enabledMalls, id],
+        })),
+
+      setEnabledMalls: (ids) => set({ enabledMalls: ids }),
+
+      setConversionRate: (rate) => set({ conversionRate: Math.min(0.2, Math.max(0.001, rate)) }),
       setQuote: (patch) => set((s) => ({ quote: { ...s.quote, ...patch } })),
 
       publishTemplate: (title, priceUsd) =>
@@ -323,7 +344,26 @@ export const useStudio = create<StudioState>()(
     }),
     {
       name: 'roomcraft-studio',
-      version: 1,
+      version: 2,
+      /**
+       * v1 은 몰마다 ID를 따로 저장했습니다(coupangSubId 등). v2 부터는
+       * 프로그램 단위 레코드라, 기존에 입력해 둔 ID를 대응되는 프로그램으로 옮깁니다.
+       */
+      migrate: (persisted, version) => {
+        const state = (persisted ?? {}) as Record<string, unknown>
+        if (version >= 2) return state
+        const legacy = (state.affiliateIds ?? {}) as Record<string, string>
+        state.affiliateIds = {
+          ...EMPTY_AFFILIATE_IDS,
+          'coupang-partners': legacy.coupangSubId ?? '',
+          'ohouse-partners': legacy.ohousePartnerId ?? '',
+          'amazon-associates': legacy.amazonTag ?? '',
+          'aliexpress-portals': legacy.aliexpressKey ?? '',
+        }
+        state.enabledMalls = [...DEFAULT_ENABLED_MALLS]
+        state.conversionRate = 0.02
+        return state
+      },
       /**
        * 렌더 결과와 원본 사진은 data URL 이라 용량이 커서 localStorage 쿼터를 넘길 수 있습니다.
        * 세션 간 유지가 필요한 상거래/계정 상태만 영속화합니다.
@@ -335,6 +375,8 @@ export const useStudio = create<StudioState>()(
         projectName: s.projectName,
         moodboard: s.moodboard,
         affiliateIds: s.affiliateIds,
+        enabledMalls: s.enabledMalls,
+        conversionRate: s.conversionRate,
         quote: s.quote,
         templates: s.templates,
         planId: s.planId,

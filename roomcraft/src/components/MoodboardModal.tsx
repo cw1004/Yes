@@ -27,6 +27,8 @@ export function MoodboardModal() {
     closeModal,
     styleId,
     affiliateIds,
+    enabledMalls,
+    conversionRate,
     addToMoodboard,
     removeFromMoodboard,
     setQty,
@@ -39,7 +41,7 @@ export function MoodboardModal() {
   const [cat, setCat] = useState<(typeof CATEGORIES)[number]>('All')
 
   const style = styleById(styleId)
-  const est = estimateCommission(total)
+  const est = estimateCommission(total, enabledMalls, conversionRate)
 
   const results = useMemo(() => {
     const needle = q.trim().toLowerCase()
@@ -60,7 +62,7 @@ export function MoodboardModal() {
       onClose={closeModal}
       icon="🗂"
       title="무드보드 & 글로벌 제품 카탈로그"
-      subtitle={`${count}개 항목 · 총 ${usd(total)} · 예상 제휴 수수료 ${usd(est.expected, { cents: true })}`}
+      subtitle={`${count}개 항목 · 총 ${usd(total)} · 기대 제휴 정산액 ${usd(est.expected, { cents: true })}`}
       headerRight={
         <div className="flex gap-2">
           <Button
@@ -68,7 +70,7 @@ export function MoodboardModal() {
             variant="outline"
             disabled={!rows.length}
             onClick={() => {
-              downloadText(`moodboard-${Date.now()}.csv`, toCsv(rows, affiliateIds), 'text/csv')
+              downloadText(`moodboard-${Date.now()}.csv`, toCsv(rows, affiliateIds, enabledMalls), 'text/csv')
               showToast('무드보드를 CSV로 내보냈습니다.')
             }}
           >
@@ -198,7 +200,7 @@ export function MoodboardModal() {
               <span className="font-bold text-mist-200">{usd(total)}</span>
             </div>
             <div className="mt-1 flex items-center justify-between text-[11px]">
-              <span className="text-mist-500">예상 제휴 수수료</span>
+              <span className="text-mist-500">기대 제휴 정산액</span>
               <span className="font-semibold text-emerald-brand">{usd(est.expected, { cents: true })}</span>
             </div>
             <Button variant="success" className="mt-3 w-full" onClick={() => openModal('monetization')}>

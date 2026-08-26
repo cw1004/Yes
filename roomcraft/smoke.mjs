@@ -55,7 +55,7 @@ await step('Sync 로 큐레이션 일괄 담기', async () => {
 
 await step('Earnings 탭 계산', async () => {
   await page.getByRole('button', { name: /Earnings/ }).click()
-  await page.getByText('예상 제휴 판매 수수료').first().waitFor({ timeout: 5000 })
+  await page.getByText('기대 제휴 정산액').first().waitFor({ timeout: 5000 })
 })
 
 await step('수익 허브 모달 열기', async () => {
@@ -70,10 +70,35 @@ await step('제휴 ID 입력 → 딥링크에 반영', async () => {
   if (!body.includes('subId=AF_TEST_99')) throw new Error('딥링크에 SubID 미반영')
 })
 
+await step('권역별 채널 토글 (일본 라쿠텐)', async () => {
+  const before = await page.getByText(/제휴 채널 선택 \(/).first().innerText()
+  await page.getByRole('button', { name: /楽天市場/ }).first().click()
+  await page.waitForTimeout(300)
+  const after = await page.getByText(/제휴 채널 선택 \(/).first().innerText()
+  if (before === after) throw new Error('채널 토글이 반영되지 않음')
+})
+
+await step('전 채널 켜기 → 37개', async () => {
+  await page.getByRole('button', { name: '전체 켜기' }).click()
+  await page.waitForTimeout(300)
+  const label = await page.getByText(/제휴 채널 선택 \(/).first().innerText()
+  if (!label.includes('37/37')) throw new Error(`채널 수 불일치: ${label}`)
+})
+
+await step('전환율 슬라이더 → 기대 정산액 변화', async () => {
+  const read = async () =>
+    (await page.getByText('기대 제휴 정산액').first().locator('..').innerText()).replace(/\s+/g, ' ')
+  const before = await read()
+  await page.locator('input[aria-label="전환율"]').fill('6')
+  await page.waitForTimeout(400)
+  if ((await read()) === before) throw new Error('전환율이 기대 정산액에 반영되지 않음')
+})
+
 await step('실시간 딥링크 생성기', async () => {
   await page.getByPlaceholder(/가구\/조명명 입력/).fill('부클레 라운드 소파')
   await page.getByRole('button', { name: '딥링크 생성' }).click()
-  await page.getByText(/aliexpress\.com/).first().waitFor({ timeout: 5000 })
+  await page.getByText(/rakuten\.co\.jp/).first().waitFor({ timeout: 8000 })
+  await page.getByText(/taobao\.com/).first().waitFor({ timeout: 8000 })
 })
 
 await step('견적서 탭 계산', async () => {

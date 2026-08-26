@@ -47,8 +47,36 @@ export type ProductCategory =
   | 'Appliance'
   | 'Bed'
 
-/** 제휴 커머스 채널 */
-export type MallId = 'coupang' | 'ohouse' | 'amazon' | 'aliexpress'
+/** 제휴 커머스 채널 (링크를 거는 쇼핑몰) */
+export type MallId =
+  // 국내
+  | 'coupang' | 'ohouse' | 'naver' | '11st' | 'gmarket' | 'auction'
+  | 'ssg' | 'lotteon' | 'hanssem' | 'livart'
+  // 미국
+  | 'amazon' | 'wayfair' | 'westelm' | 'crateandbarrel' | 'article'
+  | 'houzz' | 'lumens' | 'etsy' | 'ebay'
+  // 일본
+  | 'rakuten-ichiba' | 'amazon-jp' | 'yahoo-shopping' | 'lowya' | 'nitori' | 'muji'
+  // 중국
+  | 'taobao' | 'jd' | 'aliexpress' | 'temu' | '1688'
+  // 유럽
+  | 'amazon-de' | 'ikea' | 'nordicnest' | 'connox' | 'madeindesign'
+  | 'westwing' | 'maisonsdumonde'
+
+/** 제휴 프로그램 (추적 ID를 발급받는 주체). 여러 몰이 하나의 프로그램을 공유합니다. */
+export type ProgramId =
+  // 국내
+  | 'coupang-partners' | 'ohouse-partners' | 'linkprice' | 'adpick'
+  // 미국 / 글로벌 네트워크
+  | 'amazon-associates' | 'impact' | 'cj-affiliate' | 'awin'
+  | 'rakuten-advertising' | 'ebay-epn'
+  // 일본
+  | 'amazon-jp' | 'rakuten-affiliate' | 'valuecommerce' | 'a8net'
+  // 중국
+  | 'taobao-alliance' | 'jd-union' | 'aliexpress-portals' | 'temu-affiliate'
+  // 유럽
+  | 'amazon-eu' | 'tradedoubler'
+  | 'direct'
 
 export interface Product {
   sku: string
@@ -78,12 +106,8 @@ export interface MoodboardItem {
   fromStyleId: string
 }
 
-export interface AffiliateIds {
-  coupangSubId: string
-  ohousePartnerId: string
-  amazonTag: string
-  aliexpressKey: string
-}
+/** 프로그램별 추적 ID */
+export type AffiliateIds = Record<ProgramId, string>
 
 export interface RenderResult {
   id: string
