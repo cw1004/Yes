@@ -1,11 +1,14 @@
 import { chromium } from 'playwright'
+
+// 배포된 주소를 향해서도 그대로 돌릴 수 있게 합니다.
+const BASE_URL = process.env.BASE_URL || BASE_URL
 const errors = []
 const b = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {})
 const page = await b.newPage({ viewport: { width: 1680, height: 1050 } })
 page.on('pageerror', (e) => errors.push(e.message))
 const step = async (l, fn) => { try { await fn(); console.log(`✓ ${l}`) } catch (e) { console.log(`✗ ${l} — ${e.message.split('\n')[0]}`); errors.push(l) } }
 
-await page.goto('http://localhost:5173/', { waitUntil: 'networkidle' })
+await page.goto(BASE_URL + '/', { waitUntil: 'networkidle' })
 await page.getByRole('button', { name: '샘플 이미지 사용' }).first().click()
 await page.getByRole('button', { name: /스타일 적용하기/ }).first().click()
 await page.getByText(/스타일 일치도/).first().waitFor({ timeout: 20000 })

@@ -1,5 +1,8 @@
 import { chromium } from 'playwright'
 
+// 배포된 주소를 향해서도 그대로 돌릴 수 있게 합니다.
+const BASE_URL = process.env.BASE_URL || BASE_URL
+
 const errors = []
 const browser = await chromium.launch(
   // 별도 크로미움 경로를 쓰는 환경에서는 CHROMIUM_PATH 로 지정하세요.
@@ -14,7 +17,7 @@ const step = async (label, fn) => {
   catch (e) { console.log(`✗ ${label} — ${e.message}`); errors.push(`${label}: ${e.message}`) }
 }
 
-await page.goto('http://localhost:5173/', { waitUntil: 'networkidle' })
+await page.goto(BASE_URL + '/', { waitUntil: 'networkidle' })
 
 await step('헤더 렌더', async () => {
   await page.getByText('RoomCraft').first().waitFor({ timeout: 5000 })

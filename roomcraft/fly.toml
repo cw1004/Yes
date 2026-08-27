@@ -1,0 +1,47 @@
+# Fly.io 배포 설정.
+#
+#   fly launch --no-deploy          # 앱 생성
+#   fly volumes create roomcraft_data --size 1
+#   fly secrets set STRIPE_SECRET_KEY=... STRIPE_WEBHOOK_SECRET=... \
+#                   SMTP_URL=... GEMINI_API_KEY=... ANTHROPIC_API_KEY=... \
+#                   CLICK_SALT="$(openssl rand -hex 16)"
+#   fly deploy
+#
+# 배포 후 Stripe 대시보드에서 웹훅 엔드포인트를 등록하세요:
+#   https://<앱주소>/api/payments/webhook
+#   이벤트: checkout.session.completed, invoice.payment_succeeded,
+#           invoice.payment_failed, customer.subscription.deleted
+
+app = "roomcraft"
+primary_region = "nrt"
+
+[build]
+
+[env]
+  NODE_ENV = "production"
+  PORT = "8787"
+  # 실제 도메인으로 바꾸세요. https 가 아니면 기동 시 중단됩니다.
+  APP_URL = "https://roomcraft.fly.dev"
+  DATABASE_PATH = "/data/roomcraft.db"
+  # Fly 는 프록시 한 단을 거칩니다.
+  TRUST_PROXY = "1"
+
+[[mounts]]
+  source = "roomcraft_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 8787
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  # SQLite 파일 하나를 공유하므로 인스턴스를 늘리면 안 됩니다.
+  # 확장이 필요해지면 Postgres 로 옮기고 레이트 리밋 저장소도 공유해야 합니다.
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "10s"
+    method = "GET"
+    path = "/api/health"

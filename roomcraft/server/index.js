@@ -33,6 +33,7 @@ const { linksRouter, redirectHandler } = await import('./links.js')
 const { listLedger } = await import('./credits.js')
 const { LIMITS, globalLimiter, TRUST_PROXY_HOPS } = await import('./limits.js')
 const { mailerReady } = await import('./mailer.js')
+const { IS_PRODUCTION, mountStatic, preflight, securityHeaders } = await import('./production.js')
 const { requireAuth } = await import('./auth.js')
 
 const PORT = Number(process.env.PORT || 8787)
@@ -47,8 +48,24 @@ const app = express()
  */
 app.set('trust proxy', TRUST_PROXY_HOPS)
 
-// 쿠키 세션을 쓰므로 와일드카드 CORS 는 쓸 수 없습니다. 출처를 명시하고 credentials 를 허용합니다.
-app.use(cors({ origin: APP_URL, credentials: true }))
+// 배포 사고의 대부분은 코드가 아니라 설정에서 납니다. 뜨기 전에 확인합니다.
+const checks = preflight({ paymentProvider, mailerReady, aiReady, trustProxyHops: TRUST_PROXY_HOPS })
+for (const w of checks.warn) console.warn(`⚠  ${w}`)
+if (checks.fatal.length) {
+  console.error('\n기동을 중단합니다. 다음 설정을 먼저 해결하세요:\n')
+  for (const f of checks.fatal) console.error(`  ✗ ${f}`)
+  console.error('')
+  process.exit(1)
+}
+
+app.use(securityHeaders)
+
+/*
+ * 프로덕션에서는 웹과 API 가 같은 오리진이라 CORS 자체가 필요 없습니다.
+ * 개발에서만 Vite(5173) ↔ API(8787) 분리 구성을 위해 켭니다.
+ * 쿠키 세션이라 와일드카드 출처는 쓸 수 없습니다.
+ */
+if (!IS_PRODUCTION) app.use(cors({ origin: APP_URL, credentials: true }))
 app.use(cookieParser())
 
 // Stripe 웹훅은 서명 검증을 위해 raw body 가 필요하므로 express.json 보다 먼저 마운트합니다.
@@ -88,6 +105,9 @@ app.get('/api/credits/ledger', requireAuth, (req, res) => {
   res.json({ entries: listLedger(req.user.id) })
 })
 
+// 빌드된 SPA 서빙. API·리디렉트 라우트 뒤에 두어야 폴백이 그것들을 삼키지 않습니다.
+const staticInfo = mountStatic(app)
+
 // 라우터에서 던진 예외를 JSON 으로 통일합니다.
 app.use((err, _req, res, _next) => {
   console.error(err)
@@ -102,4 +122,6 @@ app.listen(PORT, () => {
   console.log(`  결제         : ${paymentProvider}${paymentProvider === 'dev' ? ' (시뮬레이터)' : ''}`)
   console.log(`  메일         : ${mailerReady ? 'SMTP 설정됨' : '미설정 — 인증 링크를 콘솔에 출력합니다'}`)
   console.log(`  trust proxy  : ${TRUST_PROXY_HOPS} 홉`)
+  console.log(`  정적 파일    : ${staticInfo.mounted ? staticInfo.dist : '없음 (npm run build 필요 · 개발은 Vite 사용)'}`)
+  console.log(`  모드         : ${IS_PRODUCTION ? 'production' : 'development'}`)
 })

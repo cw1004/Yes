@@ -7,6 +7,9 @@
  */
 import { chromium } from 'playwright'
 
+// 배포된 주소를 향해서도 그대로 돌릴 수 있게 합니다.
+const BASE_URL = process.env.BASE_URL || BASE_URL
+
 const errors = []
 const browser = await chromium.launch(
   process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {},
@@ -20,7 +23,7 @@ const step = async (label, fn) => {
 }
 
 const email = `e2e${Date.now()}@example.com`
-await page.goto('http://localhost:5173/', { waitUntil: 'networkidle' })
+await page.goto(BASE_URL + '/', { waitUntil: 'networkidle' })
 
 await step('비로그인: 로컬 크레딧 배지 표시', async () => {
   await page.getByText('로컬', { exact: true }).first().waitFor({ timeout: 5000 })

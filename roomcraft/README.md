@@ -357,6 +357,92 @@ Tailwind 의 `text-xs/sm/base` 는 rem 기반이므로, 루트 폰트 크기 하
 - 버튼 클릭 영역이 24px 이상인지 (문장 속 인라인 링크는 WCAG 2.2 예외)
 - 글자 크기 조절이 실제로 반영되고 새로고침 후에도 유지되는지
 
+## 배포
+
+### 구조
+
+프로덕션에서는 **웹과 API 가 같은 오리진**입니다. API 서버가 빌드된 SPA 를 직접 서빙합니다.
+
+```
+브라우저 → [Fly/Render 프록시] → Express (8787)
+                                   ├─ /api/*  API
+                                   ├─ /r/:id  제휴 추적 리디렉트
+                                   └─ /*      dist/ (SPA)
+```
+
+이렇게 한 이유:
+- CORS 가 사라지고 쿠키 설정이 단순해집니다
+- 제휴 추적 링크 `/r/:id` 가 웹 도메인에서 그대로 동작합니다 (분리하면 웹 쪽에 그 경로가 없습니다)
+- 배포 단위가 하나입니다
+
+개발에서는 Vite(5173) ↔ API(8787) 로 나뉘고, 그때만 CORS 와 `/api`·`/r` 프록시가 켜집니다.
+
+### 기동 전 설정 점검
+
+운영 사고는 대개 코드가 아니라 설정에서 납니다. `NODE_ENV=production` 이면 서버가
+뜨기 전에 확인하고, 다음 중 하나라도 걸리면 **기동을 중단합니다**.
+
+| 검사 | 걸리면 생기는 일 |
+|---|---|
+| `APP_URL` 없음 | CORS·결제 리디렉트·추적 링크가 모두 잘못된 주소를 가리킴 |
+| `APP_URL` 이 http | 세션 쿠키가 secure 로 발급되어 전달되지 않음 → 로그인 불가 |
+| `STRIPE_SECRET_KEY` 없음 | dev 결제 시뮬레이터가 켜져 **무료 지급 경로가 열림** |
+| `STRIPE_WEBHOOK_SECRET` 없음 | 웹훅 검증 불가 → 결제해도 크레딧이 지급되지 않음 |
+| `SMTP_URL` 없음 | 인증 메일 발송 불가 → 신규 가입자가 크레딧을 못 받음 |
+
+경고만 하는 항목: `CLICK_SALT`(재시작 시 방문자 판정 끊김), `TRUST_PROXY`(프록시 뒤에서
+전원이 한 IP 로 묶임), AI 키(목 모드로 동작), `DATABASE_PATH`(재배포 시 데이터 소실).
+
+### Fly.io
+
+```bash
+fly launch --no-deploy
+fly volumes create roomcraft_data --size 1      # SQLite 영속 볼륨
+fly secrets set STRIPE_SECRET_KEY=... STRIPE_WEBHOOK_SECRET=... \
+                SMTP_URL=... GEMINI_API_KEY=... ANTHROPIC_API_KEY=... \
+                CLICK_SALT="$(openssl rand -hex 16)"
+fly deploy
+```
+
+`fly.toml` 의 `APP_URL` 을 실제 도메인으로 바꾸세요. 볼륨을 마운트하지 않으면
+**재배포마다 계정·크레딧·클릭 기록이 사라집니다.**
+
+배포 후 Stripe 대시보드에서 웹훅을 등록합니다.
+
+```
+https://<도메인>/api/payments/webhook
+이벤트: checkout.session.completed, invoice.payment_succeeded,
+        invoice.payment_failed, customer.subscription.deleted
+```
+
+### 확장에 대한 주의
+
+지금 구조는 **인스턴스 1대 전용**입니다.
+
+- SQLite 파일 하나를 씁니다 → 여러 인스턴스가 같은 파일을 쓸 수 없습니다
+- 레이트 리밋 저장소가 메모리입니다 → 인스턴스마다 카운터가 따로 셉니다
+
+트래픽이 늘어 확장이 필요하면 Postgres 와 공유 저장소(Redis)로 옮겨야 합니다.
+SQL 을 `server/*.js` 밖으로 새지 않게 유지해 둬서, 이전 시 그 파일들만 바뀝니다.
+
+### 보안 헤더
+
+CSP 를 좁게 잡았습니다(외부 스크립트·스타일을 쓰지 않으므로). 렌더 결과가 data URL 이라
+`img-src` 에만 `data:` 를 허용합니다. 그 밖에 `X-Content-Type-Options`, `Referrer-Policy`,
+`X-Frame-Options: DENY`, `Permissions-Policy`, 그리고 운영에서는 HSTS 를 붙입니다.
+
+`/assets` 아래 파일은 Vite 가 콘텐츠 해시를 붙이므로 1년 immutable 로 캐시하고,
+`index.html` 은 `no-cache` 로 항상 최신을 받게 합니다.
+
+### 배포본 검증
+
+E2E 는 `BASE_URL` 로 어느 주소든 겨냥할 수 있습니다. 배포 후 실제 도메인에 대고 돌리세요.
+
+```bash
+BASE_URL=https://<도메인> node smoke.mjs a.png b.png
+BASE_URL=https://<도메인> node e2e-a11y.mjs
+```
+
 ## 단위 경제성
 
 렌더 API 단가는 공급자 정책에 따라 바뀌므로 코드에 상수로 박지 않았습니다.

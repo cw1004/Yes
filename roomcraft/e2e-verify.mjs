@@ -7,6 +7,9 @@
  */
 import { chromium } from 'playwright'
 
+// 배포된 주소를 향해서도 그대로 돌릴 수 있게 합니다.
+const BASE_URL = process.env.BASE_URL || BASE_URL
+
 const errors = []
 const b = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {})
 const page = await b.newPage({ viewport: { width: 1680, height: 1050 } })
@@ -18,7 +21,7 @@ const step = async (l, fn) => {
 }
 
 const email = `vfy${Date.now()}@example.com`
-await page.goto('http://localhost:5173/', { waitUntil: 'networkidle' })
+await page.goto(BASE_URL + '/', { waitUntil: 'networkidle' })
 
 await step('가입 후 크레딧 0 · 인증 배너 노출', async () => {
   await page.getByRole('button', { name: /로그인/ }).first().click()
