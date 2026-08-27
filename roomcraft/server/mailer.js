@@ -65,6 +65,30 @@ export function verificationEmail({ displayName, url }) {
   return { subject: '[RoomCraft] 이메일을 인증해 주세요', text, html }
 }
 
+export function passwordResetEmail({ displayName, url }) {
+  const text = [
+    `${displayName}님, 비밀번호를 재설정하려면 아래 주소를 열어 주세요.`,
+    '',
+    url,
+    '',
+    '링크는 1시간 후 만료됩니다.',
+    '본인이 요청하지 않았다면 이 메일을 무시하세요. 비밀번호는 변경되지 않습니다.',
+  ].join('\n')
+
+  const html = [
+    '<div style="font-family:system-ui,-apple-system,sans-serif;max-width:520px;line-height:1.6;">',
+    `  <h2 style="margin:0 0 16px;">${escapeHtml(displayName)}님, 비밀번호를 재설정하세요</h2>`,
+    `  <p style="margin:24px 0;"><a href="${url}" style="display:inline-block;background:#f0a437;color:#0d0d10;`,
+    '     padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:600;">비밀번호 재설정하기</a></p>',
+    `  <p style="color:#888;font-size:13px;">버튼이 열리지 않으면 이 주소를 복사해 주세요:<br />${escapeHtml(url)}</p>`,
+    '  <p style="color:#888;font-size:13px;">링크는 1시간 후 만료됩니다. 본인이 요청하지 않았다면 무시하세요 —',
+    '     비밀번호는 변경되지 않습니다.</p>',
+    '</div>',
+  ].join('\n')
+
+  return { subject: '[RoomCraft] 비밀번호 재설정', text, html }
+}
+
 function escapeHtml(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }

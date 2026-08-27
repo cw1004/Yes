@@ -19,10 +19,14 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 export function Button({ variant = 'outline', size = 'md', className = '', ...rest }: ButtonProps) {
+  /*
+   * 최소 높이를 함께 지정합니다. 글자 크기만으로 높이가 정해지면
+   * 좁은 버튼이 생겨 터치·클릭이 빗나갑니다 (권장 최소 타깃 약 36~44px).
+   */
   const sizes = {
-    sm: 'text-xs px-2.5 py-1.5 gap-1.5',
-    md: 'text-sm px-3.5 py-2 gap-2',
-    lg: 'text-base px-5 py-3 gap-2',
+    sm: 'text-xs px-3 py-2 gap-1.5 min-h-[34px]',
+    md: 'text-sm px-4 py-2.5 gap-2 min-h-[40px]',
+    lg: 'text-base px-5 py-3.5 gap-2 min-h-[48px]',
   }[size]
   return (
     <button
@@ -46,7 +50,7 @@ export function Badge({
     violet: 'bg-violet-500/15 text-violet-300 border border-violet-500/30',
   }[tone]
   return (
-    <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-semibold ${tones}`}>
+    <span className={`inline-flex items-center rounded-md px-2.5 py-2 text-xs font-semibold ${tones}`}>
       {children}
     </span>
   )
@@ -75,7 +79,7 @@ export function SectionTitle({
         {icon ? <span className="mt-0.5 text-lg leading-none">{icon}</span> : null}
         <div>
           <h3 className="text-sm font-bold text-mist-200">{title}</h3>
-          {desc ? <p className="mt-1 text-xs text-mist-400">{desc}</p> : null}
+          {desc ? <p className="mt-1 text-xs leading-relaxed text-mist-400">{desc}</p> : null}
         </div>
       </div>
       {right}
@@ -94,15 +98,17 @@ export function Field({
 }) {
   return (
     <label className="block">
-      <span className="mb-1.5 block text-[11px] font-semibold tracking-wide text-mist-400">{label}</span>
+      <span className="mb-1.5 block text-xs font-semibold tracking-wide text-mist-300">{label}</span>
       {children}
-      {hint ? <span className="mt-1 block text-[11px] text-mist-500">{hint}</span> : null}
+      {hint ? <span className="mt-1 block text-xs text-mist-400">{hint}</span> : null}
     </label>
   )
 }
 
 export const inputClass =
-  'w-full rounded-lg border border-ink-700 bg-ink-900 px-3 py-2 text-sm text-mist-200 outline-none transition placeholder:text-ink-500 focus:border-amber-brand/60'
+  'w-full min-h-[42px] rounded-lg border border-ink-700 bg-ink-900 px-3.5 py-2.5 text-sm text-mist-200 ' +
+  'transition placeholder:text-mist-500 focus:border-amber-brand focus:outline-none ' +
+  'focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-brand'
 
 export function Stat({
   label,
@@ -127,9 +133,9 @@ export function Stat({
   }[tone]
   return (
     <div className={`rounded-xl border p-4 ${ring}`}>
-      <div className="text-[11px] font-medium text-mist-400">{label}</div>
+      <div className="text-xs font-medium text-mist-300">{label}</div>
       <div className={`mt-1.5 text-xl font-bold tabular-nums ${valueTone}`}>{value}</div>
-      {sub ? <div className="mt-1 text-[11px] text-mist-500">{sub}</div> : null}
+      {sub ? <div className="mt-1 text-xs leading-relaxed text-mist-400">{sub}</div> : null}
     </div>
   )
 }

@@ -93,12 +93,12 @@ export function AccountModal() {
 
         <section className="rounded-xl border border-ink-700 bg-ink-850 p-4">
           <h4 className="text-xs font-bold text-mist-200">크레딧 원장</h4>
-          <p className="mt-1 text-[11px] text-mist-500">
+          <p className="mt-1 text-xs text-mist-500">
             모든 적립과 차감이 한 줄씩 기록됩니다. 잔액은 이 합계이므로 사후 감사가 가능합니다.
           </p>
           <div className="mt-3 max-h-56 overflow-y-auto">
             {ledger.length ? (
-              <table className="w-full text-left text-[11px]">
+              <table className="w-full text-left text-xs">
                 <tbody>
                   {ledger.map((e, i) => (
                     <tr key={`${e.ref ?? i}-${e.createdAt}`} className="border-b border-ink-800 last:border-0">
@@ -117,7 +117,7 @@ export function AccountModal() {
                 </tbody>
               </table>
             ) : (
-              <p className="py-4 text-center text-[11px] text-mist-500">기록이 없습니다.</p>
+              <p className="py-4 text-center text-xs text-mist-500">기록이 없습니다.</p>
             )}
           </div>
         </section>
@@ -132,10 +132,10 @@ export function AccountModal() {
                   className="flex items-center justify-between gap-2 rounded-lg border border-ink-700 bg-ink-900 px-3 py-2"
                 >
                   <div className="min-w-0">
-                    <p className="truncate text-[12px] font-semibold text-mist-200">
+                    <p className="truncate text-sm font-semibold text-mist-200">
                       {p.kind === 'plan' ? `${planById(p.itemId).name} 플랜` : `크레딧 팩 ${p.itemId}`}
                     </p>
-                    <p className="text-[10px] text-mist-500">{relativeTime(p.createdAt)}</p>
+                    <p className="text-xs text-mist-500">{relativeTime(p.createdAt)}</p>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-bold text-mist-200">{usd(p.amountCents / 100, { cents: true })}</span>
@@ -146,7 +146,7 @@ export function AccountModal() {
                 </div>
               ))
             ) : (
-              <p className="py-2 text-center text-[11px] text-mist-500">결제 내역이 없습니다.</p>
+              <p className="py-2 text-center text-xs text-mist-500">결제 내역이 없습니다.</p>
             )}
           </div>
         </section>

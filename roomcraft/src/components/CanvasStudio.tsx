@@ -48,7 +48,7 @@ export function CanvasStudio() {
                 <button
                   key={s.id}
                   onClick={() => setStyle(s.id)}
-                  className={`rounded-lg border px-2.5 py-1 text-[11px] font-semibold transition ${
+                  className={`rounded-lg border px-3 py-2 text-xs font-semibold transition ${
                     s.id === styleId
                       ? 'border-amber-brand bg-amber-brand/10 text-amber-brand'
                       : 'border-ink-700 text-mist-400 hover:text-mist-200'
@@ -57,7 +57,7 @@ export function CanvasStudio() {
                   ✦ {s.name}
                 </button>
               ))}
-              <span className="rounded-lg border border-ink-700 px-2.5 py-1 text-[11px] text-mist-400">
+              <span className="rounded-lg border border-ink-700 px-2.5 py-1 text-xs text-mist-400">
                 {STYLES.length} Styles ⊞
               </span>
             </div>
@@ -91,7 +91,7 @@ export function CanvasStudio() {
               </button>
             ))}
           </div>
-          <span className="pr-2 text-[11px] text-mist-500">
+          <span className="pr-2 text-xs text-mist-500">
             {fullscreen ? 'Expanded Canvas Mode' : 'Standard Canvas'}
           </span>
         </div>
@@ -199,7 +199,7 @@ function MakeoverView() {
             palette={style.palette}
           />
           <TagManager />
-          <div className="flex flex-wrap items-center gap-2 text-[11px] text-mist-400">
+          <div className="flex flex-wrap items-center gap-2 text-xs text-mist-400">
             <Badge tone={render.provider === 'server' ? 'emerald' : 'neutral'}>
               {render.provider === 'server' ? 'AI 렌더' : 'MOCK 프리뷰'}
             </Badge>

@@ -5,6 +5,7 @@ import { styleById } from '../data/styles'
 import { planById } from '../data/plans'
 import { usd } from '../lib/format'
 import { Badge, Button } from './ui/primitives'
+import { TextSizeControl } from './TextSizeControl'
 import type { SpaceKind } from '../types'
 
 function HeaderCell({
@@ -66,7 +67,7 @@ export function Header() {
             <span className="text-base font-extrabold tracking-tight text-mist-200">RoomCraft</span>
             <Badge tone="amber">AI</Badge>
           </div>
-          <p className="text-[10px] text-mist-500">AI 인테리어 리모델링 &amp; 쇼퍼블 공간 디자인 스튜디오</p>
+          <p className="text-xs text-mist-500">AI 인테리어 리모델링 &amp; 쇼퍼블 공간 디자인 스튜디오</p>
         </div>
       </div>
 
@@ -116,6 +117,7 @@ export function Header() {
       </div>
 
       <div className="flex items-center gap-2">
+        <TextSizeControl />
         <Button variant="success" size="sm" onClick={() => openModal('monetization')}>
           💲 수익 허브 &amp; 출금
         </Button>
@@ -130,7 +132,7 @@ export function Header() {
         <HeaderCell onClick={() => openModal('moodboard')}>⤓ 내보내기</HeaderCell>
         {user ? (
           <HeaderCell onClick={() => openModal('account')} title={`${user.email} · 클릭하여 계정 관리`}>
-            <span className="grid h-6 w-6 place-items-center rounded-full bg-gradient-to-br from-amber-brand to-amber-deep text-[11px] text-ink-950">
+            <span className="grid h-6 w-6 place-items-center rounded-full bg-gradient-to-br from-amber-brand to-amber-deep text-xs text-ink-950">
               {user.displayName.slice(0, 1).toUpperCase()}
             </span>
             <span className="max-w-[120px] truncate font-semibold text-mist-200">{user.displayName}</span>

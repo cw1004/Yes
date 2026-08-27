@@ -47,7 +47,7 @@ export function EarningsPanel() {
             const linked = isMallLinked(mall, affiliateIds)
             return (
               <div key={mall.id}>
-                <div className="flex items-center justify-between text-[11px]">
+                <div className="flex items-center justify-between text-xs">
                   <span className={linked ? 'text-mist-300' : 'text-mist-500'}>
                     {mall.icon} {mall.label}
                     {!linked ? <span className="ml-1 text-amber-brand">· ID 미입력</span> : null}
@@ -66,14 +66,14 @@ export function EarningsPanel() {
                     style={{ width: `${maxGross > 0 ? (gross / maxGross) * 100 : 0}%` }}
                   />
                 </div>
-                <p className="mt-0.5 text-[10px] text-mist-500">
+                <p className="mt-0.5 text-xs text-mist-500">
                   요율 {pct(rate, 1)} · {mall.strength} · {mall.currency}
                 </p>
               </div>
             )
           })}
           {!top.length ? (
-            <p className="rounded-lg border border-dashed border-ink-600 p-4 text-center text-[11px] text-mist-500">
+            <p className="rounded-lg border border-dashed border-ink-600 p-4 text-center text-xs text-mist-500">
               활성화된 제휴 채널이 없습니다. 수익 허브에서 채널을 켜주세요.
             </p>
           ) : null}
@@ -81,19 +81,19 @@ export function EarningsPanel() {
 
         <div className="mt-3 grid grid-cols-3 gap-2 border-t border-ink-700 pt-3 text-center">
           <div>
-            <p className="text-[10px] text-mist-500">보수적</p>
+            <p className="text-xs text-mist-500">보수적</p>
             <p className="text-xs font-bold text-mist-300">{usd(est.conservative, { cents: true })}</p>
           </div>
           <div>
-            <p className="text-[10px] text-mist-500">기대값</p>
+            <p className="text-xs text-mist-500">기대값</p>
             <p className="text-xs font-bold text-emerald-brand">{usd(est.expected, { cents: true })}</p>
           </div>
           <div>
-            <p className="text-[10px] text-mist-500">낙관적</p>
+            <p className="text-xs text-mist-500">낙관적</p>
             <p className="text-xs font-bold text-mist-300">{usd(est.optimistic, { cents: true })}</p>
           </div>
         </div>
-        <p className="mt-2 text-[10px] leading-relaxed text-mist-500">
+        <p className="mt-2 text-xs leading-relaxed text-mist-500">
           ※ <strong className="text-mist-400">전부 가정값입니다.</strong> 상한 {usd(est.gross, { cents: true })}
           {' '}(배치 가구 전액 구매 가정)에 전환율 {pct(conversionRate, 1)}를 곱한 값이며, 요율도 참고 구간입니다.
           실제 근거는 아래 실측 클릭과 각 제휴 콘솔의 정산 내역입니다.
@@ -104,7 +104,7 @@ export function EarningsPanel() {
 
       <div className="rounded-xl border border-ink-700 bg-ink-850 p-4">
         <h4 className="text-xs font-bold text-mist-200">수익원 요약 (이번 달)</h4>
-        <dl className="mt-3 space-y-2 text-[12px]">
+        <dl className="mt-3 space-y-2 text-sm">
           <Row label="제휴 커머스 (기대값)" value={usd(est.expected, { cents: true })} tone="emerald" />
           <Row
             label={`템플릿 마켓 (${templates.length}개 등록 · 정산 ${pct(plan.payoutRate)})`}
@@ -117,7 +117,7 @@ export function EarningsPanel() {
             <Row label="합계 (견적 제외)" value={usd(net, { cents: true })} tone="strong" />
           </div>
         </dl>
-        <p className="mt-2 text-[10px] text-mist-500">≈ {krw(net)} (환율 1,380원 기준)</p>
+        <p className="mt-2 text-xs text-mist-500">≈ {krw(net)} (환율 1,380원 기준)</p>
       </div>
 
       <Button variant="success" className="w-full" onClick={() => openModal('monetization')}>

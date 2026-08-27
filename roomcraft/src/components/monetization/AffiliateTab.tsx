@@ -127,7 +127,7 @@ export function AffiliateTab() {
 
         {REGIONS.map((region) => (
           <div key={region.id} className="mt-4">
-            <p className="mb-2 text-[11px] font-bold tracking-wide text-mist-400">
+            <p className="mb-2 text-xs font-bold tracking-wide text-mist-400">
               {region.flag} {region.label} ({MALLS.filter((m) => m.region === region.id).length})
             </p>
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
@@ -143,21 +143,21 @@ export function AffiliateTab() {
                     }`}
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-[12px] font-semibold text-mist-200">
+                      <span className="text-sm font-semibold text-mist-200">
                         {mall.icon} {mall.label}
                       </span>
                       <span
-                        className={`grid h-4 w-4 shrink-0 place-items-center rounded text-[9px] ${
+                        className={`grid h-4 w-4 shrink-0 place-items-center rounded text-xs ${
                           on ? 'bg-emerald-brand text-ink-950' : 'border border-ink-600 text-transparent'
                         }`}
                       >
                         ✓
                       </span>
                     </div>
-                    <p className="mt-1 text-[10px] text-mist-500">
+                    <p className="mt-1 text-xs text-mist-500">
                       {pct(mall.commissionMin)}~{pct(mall.commissionMax)} · {mall.strength}
                     </p>
-                    <p className="mt-1 text-[10px]">
+                    <p className="mt-1 text-xs">
                       <span className={linked ? 'text-emerald-brand' : 'text-mist-500'}>
                         {linked ? '✓ ' : '○ '}
                         {programById(mall.programId).label}
@@ -192,7 +192,7 @@ export function AffiliateTab() {
         />
         {REGIONS.map((region) => (
           <div key={region.id} className="mt-4">
-            <p className="mb-2 text-[11px] font-bold tracking-wide text-mist-400">
+            <p className="mb-2 text-xs font-bold tracking-wide text-mist-400">
               {region.flag} {region.label}
             </p>
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -202,7 +202,7 @@ export function AffiliateTab() {
                 return (
                   <div key={program.id} className="rounded-lg border border-ink-700 bg-ink-900 p-3">
                 <div className="flex items-start justify-between gap-2">
-                  <span className="text-[12px] font-semibold text-mist-200">{program.label}</span>
+                  <span className="text-sm font-semibold text-mist-200">{program.label}</span>
                   <Badge tone={activeCovered.length ? 'amber' : 'neutral'}>
                     {activeCovered.length}/{covered.length} 몰
                   </Badge>
@@ -214,17 +214,17 @@ export function AffiliateTab() {
                   onChange={(e) => setAffiliateIds({ [program.id]: e.target.value })}
                   aria-label={program.idLabel}
                 />
-                <p className="mt-1.5 text-[10px] text-mist-500">
+                <p className="mt-1.5 text-xs text-mist-500">
                   파라미터 <code className="rounded bg-ink-800 px-1">{program.paramKey}</code> ·{' '}
                   {covered.map((m) => m.label).join(', ')}
                 </p>
-                <p className="mt-1 text-[10px] leading-relaxed text-mist-500">{program.note}</p>
+                <p className="mt-1 text-xs leading-relaxed text-mist-500">{program.note}</p>
                 {program.consoleUrl ? (
                   <a
                     href={program.consoleUrl}
                     target="_blank"
                     rel="noreferrer noopener"
-                    className="mt-1.5 inline-block text-[10px] text-amber-brand hover:underline"
+                    className="mt-1.5 inline-block text-xs text-amber-brand hover:underline"
                   >
                     가입/콘솔 열기 ↗
                   </a>
@@ -235,7 +235,7 @@ export function AffiliateTab() {
             </div>
           </div>
         ))}
-        <p className="mt-3 text-[11px] leading-relaxed text-mist-500">
+        <p className="mt-3 text-xs leading-relaxed text-mist-500">
           ⚠ 제휴 링크가 포함된 콘텐츠에는 각 프로그램 약관과 공정거래위원회 「추천·보증 등에 관한 표시·광고 심사지침」에
           따라 <strong className="text-mist-300">대가성 문구를 반드시 표기</strong>해야 합니다. 아래 내보내기 결과에는
           문구가 자동으로 포함됩니다. 표시된 커미션 구간은 참고용이며, 확정 요율은 각 프로그램 콘솔에서 확인하세요.
@@ -263,7 +263,7 @@ export function AffiliateTab() {
           className="rc-range mt-4 w-full"
           aria-label="전환율"
         />
-        <div className="mt-1.5 flex justify-between text-[10px] text-mist-500">
+        <div className="mt-1.5 flex justify-between text-xs text-mist-500">
           <span>0.5% 콜드 트래픽</span>
           <span>2% 일반적인 블로그/SNS</span>
           <span>8% 고관여 검색 유입</span>
@@ -349,7 +349,7 @@ export function AffiliateTab() {
             ⤓ CSV 다운로드 ({enabledMalls.length}채널)
           </Button>
         </div>
-        <p className="mt-2 text-[11px] leading-relaxed text-mist-500">
+        <p className="mt-2 text-xs leading-relaxed text-mist-500">
           {signedIn
             ? '내보내는 링크는 클릭 추적 링크(/r/…)로 발급되어, 아래 수익 대시보드에 클릭 수가 집계됩니다.'
             : '⚠ 비로그인 상태에서는 원본 딥링크로 내보내집니다. 클릭 수가 집계되지 않아 어떤 채널이 돈이 되는지 알 수 없습니다.'}
@@ -358,7 +358,7 @@ export function AffiliateTab() {
           <p className="mt-3 text-xs text-mist-500">무드보드에 가구를 먼저 담아주세요.</p>
         ) : (
           <div className="mt-4 max-h-56 overflow-y-auto rounded-lg border border-ink-700">
-            <table className="w-full text-left text-[11px]">
+            <table className="w-full text-left text-xs">
               <thead className="sticky top-0 bg-ink-900 text-mist-400">
                 <tr>
                   <th className="px-3 py-2 font-semibold">제품</th>
@@ -421,13 +421,13 @@ export function AffiliateTab() {
                   className="flex items-center justify-between gap-2 rounded-lg border border-ink-700 bg-ink-900 px-3 py-2"
                 >
                   <div className="min-w-0">
-                    <p className="text-[11px] font-semibold text-mist-200">
+                    <p className="text-xs font-semibold text-mist-200">
                       {m.icon} {m.label}
                       {isMallLinked(m, affiliateIds) ? null : (
                         <span className="ml-1 font-normal text-amber-brand">· 추적 ID 없음</span>
                       )}
                     </p>
-                    <p className="truncate text-[10px] text-mist-500" title={link}>
+                    <p className="truncate text-xs text-mist-500" title={link}>
                       {link}
                     </p>
                   </div>
@@ -439,7 +439,7 @@ export function AffiliateTab() {
                       href={link}
                       target="_blank"
                       rel="noreferrer noopener"
-                      className="grid h-7 w-7 place-items-center rounded-md border border-ink-700 text-[11px] text-mist-400 hover:text-amber-brand"
+                      className="grid h-7 w-7 place-items-center rounded-md border border-ink-700 text-xs text-mist-400 hover:text-amber-brand"
                     >
                       ↗
                     </a>

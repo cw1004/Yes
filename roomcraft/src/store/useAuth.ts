@@ -13,8 +13,11 @@ interface AuthState {
   paymentProvider: 'stripe' | 'dev' | null
   loading: boolean
   error: string | null
-  /** 메일 서버가 없는 개발 환경에서만 채워지는 인증 링크 */
+  /** 메일 서버가 없는 개발 환경에서만 채워지는 링크 */
   devVerifyUrl: string | null
+  devResetUrl: string | null
+  /** URL 에서 읽은 비밀번호 재설정 토큰 */
+  resetToken: string | null
   notice: string | null
   /** dev 결제 확인 모달에 표시할 정보 */
   pendingPayment: { paymentId: string; name: string; amountCents: number } | null
@@ -22,6 +25,9 @@ interface AuthState {
   init: () => Promise<void>
   signup: (email: string, password: string) => Promise<boolean>
   verifyEmail: (token: string) => Promise<boolean>
+  requestPasswordReset: (email: string) => Promise<boolean>
+  resetPassword: (token: string, password: string) => Promise<boolean>
+  setResetToken: (token: string | null) => void
   resendVerification: () => Promise<void>
   clearNotice: () => void
   login: (email: string, password: string) => Promise<boolean>
@@ -44,6 +50,8 @@ export const useAuth = create<AuthState>()((set, get) => ({
   loading: false,
   error: null,
   devVerifyUrl: null,
+  devResetUrl: null,
+  resetToken: null,
   notice: null,
   pendingPayment: null,
 
@@ -88,6 +96,43 @@ export const useAuth = create<AuthState>()((set, get) => ({
       return false
     }
   },
+
+  requestPasswordReset: async (email) => {
+    set({ loading: true, error: null })
+    try {
+      const { devResetUrl } = await api.requestPasswordReset(email)
+      // 서버는 계정 존재 여부와 무관하게 같은 응답을 줍니다. 안내 문구도 동일해야 합니다.
+      set({
+        loading: false,
+        devResetUrl: devResetUrl ?? null,
+        notice: '가입된 이메일이라면 재설정 링크를 보냈습니다. 메일함을 확인해 주세요.',
+      })
+      return true
+    } catch (err) {
+      set({ loading: false, error: err instanceof ApiError ? err.message : '요청에 실패했습니다.' })
+      return false
+    }
+  },
+
+  resetPassword: async (token, password) => {
+    set({ loading: true, error: null })
+    try {
+      const { user } = await api.resetPassword(token, password)
+      set({
+        user,
+        loading: false,
+        resetToken: null,
+        devResetUrl: null,
+        notice: '비밀번호가 변경되었습니다. 다른 기기의 로그인은 모두 해제되었습니다.',
+      })
+      return true
+    } catch (err) {
+      set({ loading: false, error: err instanceof ApiError ? err.message : '재설정에 실패했습니다.' })
+      return false
+    }
+  },
+
+  setResetToken: (resetToken) => set({ resetToken }),
 
   resendVerification: async () => {
     set({ loading: true, error: null })

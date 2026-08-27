@@ -110,7 +110,7 @@ export function SpaceUploader() {
 
         <div className="space-y-3">
           <label className="block">
-            <span className="mb-1.5 block text-[11px] font-semibold text-mist-400">프로젝트 이름</span>
+            <span className="mb-1.5 block text-xs font-semibold text-mist-400">프로젝트 이름</span>
             <input
               className={inputClass}
               value={projectName}
@@ -118,7 +118,7 @@ export function SpaceUploader() {
               placeholder="예: 성수동 32평 아파트 거실"
             />
           </label>
-          <ul className="space-y-1.5 text-[11px] text-mist-400">
+          <ul className="space-y-1.5 text-xs text-mist-400">
             <li>· 가구가 적고 벽이 보이는 사진일수록 리모델링 폭이 큽니다.</li>
             <li>· 광각 왜곡이 심하면 원근이 어긋날 수 있습니다.</li>
             <li>· 인물이 포함된 사진은 자동으로 제외 처리됩니다.</li>

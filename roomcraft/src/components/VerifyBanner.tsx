@@ -31,7 +31,7 @@ export function VerifyBanner() {
   return (
     <div className="border-b border-amber-brand/25 bg-amber-brand/8 px-4 py-2.5">
       <div className="mx-auto flex max-w-[1720px] flex-wrap items-center justify-between gap-3">
-        <p className="text-[12px] leading-relaxed text-amber-brand">
+        <p className="text-sm leading-relaxed text-amber-brand">
           ✉ <strong>{user.email}</strong> 로 보낸 인증 메일을 확인해 주세요. 인증을 마치면 Free 크레딧 20개가
           지급되고 렌더를 시작할 수 있습니다.
         </p>

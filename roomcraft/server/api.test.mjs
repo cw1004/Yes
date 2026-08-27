@@ -208,6 +208,46 @@ check('해지해도 기존 크레딧은 유지', r.body?.credits === beforeRenew
 r = await call('/payments/dev/renew', { method: 'POST' })
 check('해지 후 갱신 시도 거부', r.status === 400)
 
+// ── 비밀번호 재설정 ───────────────────────────────────────────────────
+r = await call('/auth/request-password-reset', { method: 'POST', body: JSON.stringify({ email: 'nobody@example.com' }) })
+check('존재하지 않는 계정도 동일 응답 (계정 열거 방지)', r.status === 200 && r.body?.ok === true && !r.body?.devResetUrl,
+  JSON.stringify(r.body))
+
+r = await call('/auth/request-password-reset', { method: 'POST', body: JSON.stringify({ email }) })
+const resetUrl = r.body?.devResetUrl
+check('재설정 링크 발급', Boolean(resetUrl), JSON.stringify(r.body))
+const resetToken = resetUrl?.split('reset=')[1]
+
+r = await call('/auth/reset-password', { method: 'POST', body: JSON.stringify({ token: resetToken, password: 'short' }) })
+check('짧은 새 비밀번호 거부', r.status === 400)
+
+r = await call('/auth/reset-password', { method: 'POST', body: JSON.stringify({ token: 'bogus', password: 'newpassword123' }) })
+check('잘못된 재설정 토큰 거부', r.status === 400 && r.body?.code === 'invalid')
+
+// 재설정 전 세션이 살아 있는지 먼저 확인합니다.
+const sessionBefore = cookie
+r = await call('/auth/me')
+check('재설정 전 세션 유효', Boolean(r.body?.user))
+
+r = await call('/auth/reset-password', { method: 'POST', body: JSON.stringify({ token: resetToken, password: 'newpassword123' }) })
+check('재설정 성공 후 자동 로그인', r.body?.user?.email === email, JSON.stringify(r.body))
+
+// 재설정으로 발급된 새 세션은 살아 있고, 기존 세션은 폐기되어야 합니다.
+const sessionAfter = cookie
+cookie = sessionBefore
+r = await call('/auth/me')
+check('기존 세션은 폐기됨 (탈취 대비)', r.body?.user === null, JSON.stringify(r.body))
+cookie = sessionAfter
+
+r = await call('/auth/reset-password', { method: 'POST', body: JSON.stringify({ token: resetToken, password: 'another123' }) })
+check('같은 재설정 토큰 재사용 거부', r.status === 400 && r.body?.code === 'used')
+
+r = await call('/auth/login', { method: 'POST', body: JSON.stringify({ email, password: 'password123' }) })
+check('옛 비밀번호로는 로그인 불가', r.status === 401)
+
+r = await call('/auth/login', { method: 'POST', body: JSON.stringify({ email, password: 'newpassword123' }) })
+check('새 비밀번호로 로그인 성공', r.status === 200, JSON.stringify(r.body))
+
 // ── 레이트 리밋 ───────────────────────────────────────────────────────
 // 자동 가입으로 무료 크레딧을 찍어내는 경로를 막는지 확인합니다.
 // 상한은 서버 설정에서 읽습니다 — 하드코딩하면 환경마다 테스트가 깨집니다.
@@ -239,7 +279,7 @@ if (signupLimit > 20) {
 }
 
 // 위 루프에서 마지막 가입 세션으로 바뀌었을 수 있으므로 원래 계정으로 되돌립니다.
-r = await call('/auth/login', { method: 'POST', body: JSON.stringify({ email, password: 'password123' }) })
+r = await call('/auth/login', { method: 'POST', body: JSON.stringify({ email, password: 'newpassword123' }) })
 check('레이트 리밋 후에도 정상 로그인 가능', r.status === 200, JSON.stringify(r.body))
 
 // 로그아웃

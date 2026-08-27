@@ -54,8 +54,8 @@ export function ShoppableCard({
       <div className="flex items-start gap-2.5 border-b border-ink-700 p-3">
         <span className="mt-0.5 h-11 w-11 shrink-0 rounded-lg" style={{ background: product.swatch }} />
         <div className="min-w-0 flex-1">
-          <p className="text-[12px] font-bold leading-snug text-mist-200">{product.name}</p>
-          <p className="mt-0.5 text-[11px]">
+          <p className="text-sm font-bold leading-snug text-mist-200">{product.name}</p>
+          <p className="mt-0.5 text-xs">
             <span className="font-bold text-amber-brand">{usd(product.price)}</span>
             <span className="text-mist-500"> · {product.brand}</span>
           </p>
@@ -63,14 +63,14 @@ export function ShoppableCard({
         <button
           onClick={onClose}
           aria-label="닫기"
-          className="grid h-5 w-5 shrink-0 place-items-center rounded text-[11px] text-mist-500 hover:bg-ink-800 hover:text-mist-200"
+          className="grid h-5 w-5 shrink-0 place-items-center rounded text-xs text-mist-500 hover:bg-ink-800 hover:text-mist-200"
         >
           ✕
         </button>
       </div>
 
       <div className="max-h-[168px] overflow-y-auto p-2">
-        <p className="px-1 pb-1.5 text-[10px] font-semibold text-mist-400">
+        <p className="px-1 pb-1.5 text-xs font-semibold text-mist-400">
           추천 제품 구매 링크 ({links.length}개 채널)
         </p>
         <div className="space-y-1">
@@ -80,7 +80,7 @@ export function ShoppableCard({
                 href={url}
                 target="_blank"
                 rel="noreferrer noopener sponsored"
-                className="flex flex-1 items-center justify-between gap-2 rounded-md border border-ink-700 bg-ink-850 px-2 py-1.5 text-[11px] text-mist-300 transition hover:border-amber-brand/50 hover:text-amber-brand"
+                className="flex flex-1 items-center justify-between gap-2 rounded-md border border-ink-700 bg-ink-850 px-2 py-1.5 text-xs text-mist-300 transition hover:border-amber-brand/50 hover:text-amber-brand"
               >
                 <span className="truncate">
                   {mall.icon} {mall.label}
@@ -95,7 +95,7 @@ export function ShoppableCard({
                   showToast(ok ? `${mall.label} 링크를 복사했습니다.` : '복사에 실패했습니다.')
                 }}
                 title="링크 복사"
-                className="grid h-7 w-7 shrink-0 place-items-center rounded-md border border-ink-700 text-[10px] text-mist-400 hover:text-amber-brand"
+                className="grid h-7 w-7 shrink-0 place-items-center rounded-md border border-ink-700 text-xs text-mist-400 hover:text-amber-brand"
               >
                 ⧉
               </button>
@@ -104,14 +104,14 @@ export function ShoppableCard({
         </div>
       </div>
 
-      <p className="border-t border-ink-700 px-3 py-1.5 text-[10px] leading-relaxed text-mist-500">
+      <p className="border-t border-ink-700 px-3 py-1.5 text-xs leading-relaxed text-mist-500">
         이미지는 AI 시안입니다. 이 제품은 스타일에 맞춰 고른 추천 상품으로, 이미지 속 가구와 동일한 제품이 아닐 수 있습니다.
       </p>
 
       <div className="flex gap-1.5 border-t border-ink-700 p-2">
         <button
           onClick={() => addToMoodboard(product.sku)}
-          className={`flex-1 rounded-md px-2 py-1.5 text-[11px] font-semibold transition ${
+          className={`flex-1 rounded-md px-2.5 py-2 text-xs font-semibold transition ${
             inBoard
               ? 'border border-ink-600 text-mist-400 hover:text-mist-200'
               : 'border border-emerald-brand/40 bg-emerald-brand/10 text-emerald-brand hover:bg-emerald-brand/20'
@@ -124,7 +124,7 @@ export function ShoppableCard({
           target="_blank"
           rel="noreferrer noopener"
           title="브랜드 공식몰"
-          className="grid h-7 w-7 place-items-center rounded-md border border-ink-600 text-[11px] text-mist-400 hover:text-amber-brand"
+          className="grid h-7 w-7 place-items-center rounded-md border border-ink-600 text-xs text-mist-400 hover:text-amber-brand"
         >
           ↗
         </a>
@@ -134,7 +134,7 @@ export function ShoppableCard({
             onClose()
           }}
           title="이미지에서 태그 제거"
-          className="grid h-7 w-7 place-items-center rounded-md border border-ink-600 text-[11px] text-mist-400 hover:border-red-500/50 hover:text-red-400"
+          className="grid h-7 w-7 place-items-center rounded-md border border-ink-600 text-xs text-mist-400 hover:border-red-500/50 hover:text-red-400"
         >
           🗑
         </button>

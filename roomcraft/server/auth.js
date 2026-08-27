@@ -8,11 +8,13 @@ import { Router } from 'express'
 import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto'
 import { db, now } from './db.js'
 import { grantMonthlyCredits, getBalance } from './credits.js'
-import { exposesLinks, sendMail, verificationEmail } from './mailer.js'
-import { signupLimiter, loginLimiter, verifyMailLimiter } from './limits.js'
+import { exposesLinks, passwordResetEmail, sendMail, verificationEmail } from './mailer.js'
+import { signupLimiter, loginLimiter, passwordResetLimiter, verifyMailLimiter } from './limits.js'
 
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000
 const VERIFY_TTL_MS = 24 * 60 * 60 * 1000
+// 재설정 링크는 인증 링크보다 짧게 둡니다 — 탈취 시 계정을 통째로 넘겨주는 링크입니다.
+const RESET_TTL_MS = 60 * 60 * 1000
 const COOKIE = 'rc_session'
 const APP_URL = (process.env.APP_URL || 'http://localhost:5173').replace(/\/+$/, '')
 
@@ -213,6 +215,87 @@ authRouter.post('/login', loginLimiter, (req, res) => {
   }
 
   setSessionCookie(res, createSession(user.id))
+  res.json({ user: publicUser(user) })
+})
+
+/**
+ * 비밀번호 재설정 요청.
+ *
+ * 계정 존재 여부와 무관하게 항상 같은 응답을 돌려줍니다.
+ * 응답이 갈리면 이메일 목록으로 가입 여부를 훑을 수 있습니다.
+ */
+authRouter.post('/request-password-reset', passwordResetLimiter, async (req, res) => {
+  const email = String(req.body?.email ?? '').trim().toLowerCase()
+  const user = EMAIL_RE.test(email) ? db.prepare('SELECT * FROM users WHERE email = ?').get(email) : null
+
+  let devUrl
+  if (user) {
+    db.prepare("UPDATE email_tokens SET used_at = ? WHERE user_id = ? AND purpose = 'reset' AND used_at IS NULL").run(
+      now(),
+      user.id,
+    )
+
+    const token = randomBytes(32).toString('base64url')
+    db.prepare(
+      `INSERT INTO email_tokens (token, user_id, purpose, expires_at, used_at, created_at)
+       VALUES (?, ?, 'reset', ?, NULL, ?)`,
+    ).run(token, user.id, now() + RESET_TTL_MS, now())
+
+    const url = `${APP_URL}/?reset=${token}`
+    await sendMail({ to: user.email, ...passwordResetEmail({ displayName: user.display_name, url }) })
+    if (exposesLinks) devUrl = url
+  }
+
+  res.json({ ok: true, devResetUrl: devUrl })
+})
+
+/**
+ * 비밀번호 재설정 실행.
+ *
+ * 비밀번호를 바꾸면 기존 세션을 전부 폐기합니다.
+ * 계정을 탈취당해 재설정하는 경우, 공격자의 세션이 살아 있으면 재설정이 무의미합니다.
+ */
+export const applyPasswordReset = db.transaction((token, password) => {
+  const row = db.prepare("SELECT * FROM email_tokens WHERE token = ? AND purpose = 'reset'").get(token)
+  if (!row) return { ok: false, reason: 'invalid' }
+  if (row.used_at) return { ok: false, reason: 'used' }
+  if (row.expires_at < now()) return { ok: false, reason: 'expired' }
+
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(row.user_id)
+  if (!user) return { ok: false, reason: 'invalid' }
+
+  const { hash, salt } = hashPassword(password)
+  db.prepare('UPDATE users SET password_hash = ?, salt = ? WHERE id = ?').run(hash, salt, user.id)
+  db.prepare('UPDATE email_tokens SET used_at = ? WHERE token = ?').run(now(), token)
+  db.prepare('DELETE FROM sessions WHERE user_id = ?').run(user.id)
+
+  // 재설정 링크를 열 수 있었다는 것은 메일함을 소유했다는 뜻이므로 인증도 함께 처리합니다.
+  if (!user.email_verified_at) {
+    db.prepare('UPDATE users SET email_verified_at = ? WHERE id = ?').run(now(), user.id)
+    grantMonthlyCredits(user.id, 'free', `verify:${user.id}`)
+  }
+
+  return { ok: true, userId: user.id }
+})
+
+authRouter.post('/reset-password', passwordResetLimiter, (req, res) => {
+  const token = String(req.body?.token ?? '')
+  const password = String(req.body?.password ?? '')
+  if (password.length < 8) return res.status(400).json({ error: '비밀번호는 8자 이상이어야 합니다.' })
+
+  const result = applyPasswordReset(token, password)
+  if (!result.ok) {
+    const reason = {
+      invalid: '유효하지 않은 재설정 링크입니다.',
+      used: '이미 사용된 재설정 링크입니다.',
+      expired: '재설정 링크가 만료되었습니다. 다시 요청해 주세요.',
+    }[result.reason]
+    return res.status(400).json({ error: reason, code: result.reason })
+  }
+
+  // 새 비밀번호로 곧바로 로그인시킵니다 (기존 세션은 위에서 모두 폐기됨).
+  setSessionCookie(res, createSession(result.userId))
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(result.userId)
   res.json({ user: publicUser(user) })
 })
 

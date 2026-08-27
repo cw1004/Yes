@@ -70,6 +70,10 @@ export const api = {
       displayName,
     }),
   verifyEmail: (token: string) => post<{ user: ServerUser }>('/auth/verify', { token }),
+  requestPasswordReset: (email: string) =>
+    post<{ ok: boolean; devResetUrl?: string }>('/auth/request-password-reset', { email }),
+  resetPassword: (token: string, password: string) =>
+    post<{ user: ServerUser }>('/auth/reset-password', { token, password }),
   resendVerification: () =>
     post<{ verificationSent: boolean; devVerifyUrl?: string }>('/auth/resend-verification'),
   login: (email: string, password: string) => post<{ user: ServerUser }>('/auth/login', { email, password }),

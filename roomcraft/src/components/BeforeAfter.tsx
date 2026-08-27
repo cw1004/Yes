@@ -71,10 +71,10 @@ export function BeforeAfter({
           <img src={before} alt="원본" className="block h-full w-full object-cover" draggable={false} />
         </div>
 
-        <span className="pointer-events-none absolute left-3 top-3 rounded-md bg-black/65 px-2.5 py-1 text-[11px] font-semibold text-mist-200">
+        <span className="pointer-events-none absolute left-3 top-3 rounded-md bg-black/65 px-2.5 py-1 text-xs font-semibold text-mist-200">
           Before (Original)
         </span>
-        <span className="pointer-events-none absolute right-3 top-3 rounded-md bg-amber-brand/90 px-2.5 py-1 text-[11px] font-bold text-ink-950">
+        <span className="pointer-events-none absolute right-3 top-3 rounded-md bg-amber-brand/90 px-2.5 py-1 text-xs font-bold text-ink-950">
           ✦ After ({styleName})
         </span>
 
@@ -127,7 +127,7 @@ export function BeforeAfter({
       </div>
 
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-ink-700 bg-ink-850 px-3 py-2">
-        <p className="text-[11px] text-mist-400">
+        <p className="text-xs text-mist-400">
           <span className="text-amber-brand">ⓘ</span> Active Style:{' '}
           <span className="font-semibold text-mist-200">{styleName}</span>
           <span className="mx-1.5 text-ink-600">•</span>
@@ -135,7 +135,7 @@ export function BeforeAfter({
           <span className="text-mist-200">드래그</span>하면 위치를 옮깁니다
         </p>
         <div className="flex items-center gap-2">
-          <span className="text-[11px] text-mist-500">Palette:</span>
+          <span className="text-xs text-mist-500">Palette:</span>
           <div className="flex gap-1">
             {palette.map((c) => (
               <span
@@ -211,12 +211,12 @@ function Tag({
       } ${dragging ? 'scale-110 cursor-grabbing' : 'cursor-grab'}`}
     >
       <span
-        className="grid h-5 w-5 place-items-center rounded-full text-[10px]"
+        className="grid h-5 w-5 place-items-center rounded-full text-xs"
         style={{ background: product.swatch }}
       >
         🏷
       </span>
-      <span className="max-w-[92px] truncate text-[10px] font-semibold">{product.brand}</span>
+      <span className="max-w-[92px] truncate text-xs font-semibold">{product.brand}</span>
     </button>
   )
 }

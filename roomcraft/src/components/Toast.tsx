@@ -3,7 +3,7 @@ import { useStudio } from '../store/useStudio'
 import { useAuth } from '../store/useAuth'
 
 export function Toast() {
-  const { toast, showToast } = useStudio()
+  const { toast, showToast, modal } = useStudio()
   const authNotice = useAuth((s) => s.notice)
 
   useEffect(() => {
@@ -12,8 +12,11 @@ export function Toast() {
     return () => clearTimeout(t)
   }, [toast, showToast])
 
-  // 계정 관련 안내는 별도 상태라 배너가 사라진 뒤에도 한 번은 보이게 합니다.
-  const message = toast || authNotice
+  /*
+   * 계정 안내는 인증 모달 안에도 표시됩니다.
+   * 모달이 열려 있는 동안 토스트까지 띄우면 같은 문장이 화면에 두 번 나옵니다.
+   */
+  const message = toast || (modal === 'auth' ? null : authNotice)
   if (!message) return null
 
   return (

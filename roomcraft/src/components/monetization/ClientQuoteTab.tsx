@@ -133,7 +133,7 @@ export function ClientQuoteTab() {
 
         {rows.length ? (
           <div className="mt-4 overflow-x-auto rounded-lg border border-ink-700">
-            <table className="w-full min-w-[560px] text-left text-[11px]">
+            <table className="w-full min-w-[560px] text-left text-xs">
               <thead className="bg-ink-900 text-mist-400">
                 <tr>
                   <th className="px-3 py-2 font-semibold">품목</th>

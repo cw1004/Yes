@@ -63,7 +63,7 @@ export function ClickStats() {
     return (
       <div className="rounded-xl border border-amber-brand/30 bg-amber-brand/8 p-4">
         <h4 className="text-xs font-bold text-amber-brand">실측 클릭 데이터 없음</h4>
-        <p className="mt-1.5 text-[11px] leading-relaxed text-mist-400">
+        <p className="mt-1.5 text-xs leading-relaxed text-mist-400">
           지금 보이는 정산액은 전부 <strong className="text-mist-300">가정값</strong>입니다. 로그인하면 내보내는 링크가
           추적 링크로 발급되어, 어떤 채널·제품이 실제로 클릭되는지 여기서 확인할 수 있습니다.
         </p>
@@ -86,7 +86,7 @@ export function ClickStats() {
           <button
             onClick={() => void load()}
             disabled={loading}
-            className="text-[11px] text-mist-400 transition hover:text-amber-brand disabled:opacity-50"
+            className="text-xs text-mist-400 transition hover:text-amber-brand disabled:opacity-50"
           >
             {loading ? '불러오는 중…' : '새로고침'}
           </button>
@@ -101,7 +101,7 @@ export function ClickStats() {
               const mall = mallById(l.mallId as never)
               return (
                 <div key={l.id}>
-                  <div className="flex items-center justify-between gap-2 text-[11px]">
+                  <div className="flex items-center justify-between gap-2 text-xs">
                     <span className="min-w-0 truncate text-mist-300">
                       {mall.icon} {product?.name ?? l.label}
                     </span>
@@ -113,7 +113,7 @@ export function ClickStats() {
                       style={{ width: `${maxClicks ? (l.clicks / maxClicks) * 100 : 0}%` }}
                     />
                   </div>
-                  <p className="mt-0.5 text-[10px] text-mist-500">
+                  <p className="mt-0.5 text-xs text-mist-500">
                     {mall.label} · {SOURCE_LABEL[l.source] ?? l.source} · 방문자 {l.visitors}명
                     {product ? ` · ${usd(product.price)}` : ''}
                     {l.lastClick ? ` · 마지막 ${relativeTime(l.lastClick)}` : ''}
@@ -122,13 +122,13 @@ export function ClickStats() {
               )
             })}
           </div>
-          <p className="mt-3 border-t border-ink-700 pt-2 text-[10px] leading-relaxed text-mist-500">
+          <p className="mt-3 border-t border-ink-700 pt-2 text-xs leading-relaxed text-mist-500">
             클릭은 실측치지만 <strong className="text-mist-400">구매 전환은 각 제휴 콘솔에서만 확인</strong>됩니다.
             클릭 대비 실제 정산액을 비교해 위 전환율 가정을 보정하세요.
           </p>
         </>
       ) : (
-        <p className="mt-3 rounded-lg border border-dashed border-ink-600 p-4 text-center text-[11px] leading-relaxed text-mist-500">
+        <p className="mt-3 rounded-lg border border-dashed border-ink-600 p-4 text-center text-xs leading-relaxed text-mist-500">
           아직 클릭이 없습니다.
           <br />
           수익 허브에서 블로그·카톡·쇼퍼블 HTML을 내보내면 그 링크의 클릭이 여기 집계됩니다.

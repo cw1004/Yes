@@ -115,14 +115,14 @@ export function MoodboardModal() {
                     <span className="h-12 w-12 shrink-0 rounded-md" style={{ background: p.swatch }} />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-start justify-between gap-2">
-                        <p className="text-[12px] font-semibold leading-snug text-mist-200">{p.name}</p>
+                        <p className="text-sm font-semibold leading-snug text-mist-200">{p.name}</p>
                         {recommended ? <Badge tone="amber">추천</Badge> : null}
                       </div>
-                      <p className="mt-1 text-[11px]">
+                      <p className="mt-1 text-xs">
                         <span className="font-bold text-amber-brand">{usd(p.price)}</span>
                         <span className="text-mist-500"> · {p.brand}</span>
                       </p>
-                      <p className="mt-1 line-clamp-2 text-[10px] text-mist-500">{p.reason}</p>
+                      <p className="mt-1 line-clamp-2 text-xs text-mist-500">{p.reason}</p>
                       <div className="mt-2 flex gap-1.5">
                         <Button size="sm" variant={inBoard ? 'chip' : 'primary'} onClick={() => addToMoodboard(p.sku)}>
                           {inBoard ? '＋ 수량 추가' : '＋ 담기'}
@@ -131,7 +131,7 @@ export function MoodboardModal() {
                           href={p.officialUrl}
                           target="_blank"
                           rel="noreferrer noopener"
-                          className="grid h-7 w-7 place-items-center rounded-md border border-ink-700 text-[11px] text-mist-400 hover:text-amber-brand"
+                          className="grid h-7 w-7 place-items-center rounded-md border border-ink-700 text-xs text-mist-400 hover:text-amber-brand"
                         >
                           ↗
                         </a>
@@ -161,8 +161,8 @@ export function MoodboardModal() {
                   <div className="flex items-start gap-2.5">
                     <span className="h-9 w-9 shrink-0 rounded-md" style={{ background: product.swatch }} />
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-[12px] font-semibold text-mist-200">{product.name}</p>
-                      <p className="text-[11px] text-amber-brand">{usd(product.price * qty)}</p>
+                      <p className="truncate text-sm font-semibold text-mist-200">{product.name}</p>
+                      <p className="text-xs text-amber-brand">{usd(product.price * qty)}</p>
                     </div>
                     <div className="flex items-center gap-1">
                       <button
@@ -199,7 +199,7 @@ export function MoodboardModal() {
               <span className="text-mist-400">합계</span>
               <span className="font-bold text-mist-200">{usd(total)}</span>
             </div>
-            <div className="mt-1 flex items-center justify-between text-[11px]">
+            <div className="mt-1 flex items-center justify-between text-xs">
               <span className="text-mist-500">기대 제휴 정산액</span>
               <span className="font-semibold text-emerald-brand">{usd(est.expected, { cents: true })}</span>
             </div>

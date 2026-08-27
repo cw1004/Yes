@@ -87,7 +87,7 @@ export function TagManager() {
     <div className="rounded-xl border border-ink-700 bg-ink-850 p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-[11px] font-bold text-mist-200">🏷 이미지 태그</span>
+          <span className="text-xs font-bold text-mist-200">🏷 이미지 태그</span>
           <Badge tone={hotspots.length ? 'amber' : 'neutral'}>{hotspots.length}개</Badge>
           {hotspots.map((h) => {
             const p = productBySku(h.sku)
@@ -95,7 +95,7 @@ export function TagManager() {
             return (
               <span
                 key={h.id}
-                className="group flex items-center gap-1 rounded-md border border-ink-700 bg-ink-900 py-1 pl-1.5 pr-1 text-[10px] text-mist-300"
+                className="group flex items-center gap-1 rounded-md border border-ink-700 bg-ink-900 py-1 pl-1.5 pr-1 text-xs text-mist-300"
               >
                 <span className="h-2.5 w-2.5 rounded-full" style={{ background: p.swatch }} />
                 <span className="max-w-[110px] truncate">{p.name}</span>
@@ -169,15 +169,15 @@ export function TagManager() {
               >
                 <span className="h-7 w-7 shrink-0 rounded-md" style={{ background: p.swatch }} />
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[11px] font-semibold text-mist-200">{p.name}</span>
-                  <span className="block text-[10px] text-mist-500">
+                  <span className="block truncate text-xs font-semibold text-mist-200">{p.name}</span>
+                  <span className="block text-xs text-mist-500">
                     {p.brand} · {usd(p.price)}
                   </span>
                 </span>
               </button>
             ))}
             {!candidates.length ? (
-              <p className="col-span-full py-2 text-center text-[11px] text-mist-500">
+              <p className="col-span-full py-2 text-center text-xs text-mist-500">
                 추가할 제품이 없습니다.
               </p>
             ) : null}
@@ -185,7 +185,7 @@ export function TagManager() {
         </div>
       ) : null}
 
-      <p className="mt-2 text-[10px] leading-relaxed text-mist-500">
+      <p className="mt-2 text-xs leading-relaxed text-mist-500">
         내보낸 HTML은 이미지와 태그 위치를 그대로 담고 있어 블로그에서도 클릭하면 제휴 링크로 이동합니다.
         일부 에디터는 인라인 스타일을 제한하므로, 붙여넣은 뒤 미리보기로 확인하세요.
         {signedIn ? ' 링크는 클릭 추적용으로 발급됩니다.' : ' 로그인하면 클릭 수가 집계됩니다.'}

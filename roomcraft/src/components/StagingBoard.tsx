@@ -61,7 +61,7 @@ export function StagingBoard() {
           }}
         >
           <div className="pointer-events-none absolute inset-6 rounded-lg border-2 border-dashed border-ink-600" />
-          <span className="pointer-events-none absolute left-8 top-8 text-[11px] text-mist-500">
+          <span className="pointer-events-none absolute left-8 top-8 text-xs text-mist-500">
             {space.label} · 34m²
           </span>
           {/* 창문 표시 */}
@@ -80,13 +80,13 @@ export function StagingBoard() {
                 onDoubleClick={() => setPlaced((prev) => prev.filter((x) => x.id !== p.id))}
                 title={`${product.name} — 더블클릭으로 제거`}
                 style={{ left: `${p.x}%`, top: `${p.y}%`, borderColor: product.swatch }}
-                className="absolute cursor-grab touch-none rounded-lg border-2 bg-ink-850/95 px-2 py-1.5 text-[10px] font-semibold text-mist-200 shadow-lg active:cursor-grabbing"
+                className="absolute cursor-grab touch-none rounded-lg border-2 bg-ink-850/95 px-2 py-1.5 text-xs font-semibold text-mist-200 shadow-lg active:cursor-grabbing"
               >
                 <span className="mr-1" style={{ color: product.swatch }}>
                   ▉
                 </span>
                 {product.category}
-                <div className="text-[9px] font-normal text-mist-500">{product.brand}</div>
+                <div className="text-xs font-normal text-mist-500">{product.brand}</div>
               </div>
             )
           })}
@@ -97,7 +97,7 @@ export function StagingBoard() {
             </div>
           ) : null}
         </div>
-        <p className="mt-2 text-[11px] text-mist-500">
+        <p className="mt-2 text-xs text-mist-500">
           배치된 가구 {placed.length}개 · 무드보드 합계 {usd(total)}
         </p>
       </Card>
@@ -114,7 +114,7 @@ export function StagingBoard() {
                 >
                   <div className="min-w-0">
                     <p className="truncate text-xs font-semibold text-mist-200">{product.name}</p>
-                    <p className="text-[10px] text-mist-500">
+                    <p className="text-xs text-mist-500">
                       {product.category} · {usd(product.price)} × {qty}
                     </p>
                   </div>
@@ -153,7 +153,7 @@ export function StagingBoard() {
               >
                 <div className="min-w-0">
                   <p className="truncate text-xs font-semibold text-mist-200">{p.name}</p>
-                  <p className="text-[10px] text-mist-500">
+                  <p className="text-xs text-mist-500">
                     {p.brand} · {usd(p.price)}
                   </p>
                 </div>

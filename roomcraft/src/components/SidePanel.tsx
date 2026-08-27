@@ -34,7 +34,7 @@ export function SidePanel() {
         </div>
         <button
           onClick={() => openModal('moodboard')}
-          className="pr-2 text-[11px] text-mist-400 transition hover:text-amber-brand"
+          className="mr-1 rounded-lg px-2.5 py-2 text-xs text-mist-300 transition hover:bg-ink-800 hover:text-amber-brand"
         >
           Full Cart →
         </button>

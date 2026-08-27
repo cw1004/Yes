@@ -68,7 +68,7 @@ export function DesignerChat() {
             </span>
             <div className={`min-w-0 max-w-[85%] ${m.role === 'user' ? 'text-right' : ''}`}>
               <div
-                className={`rounded-xl px-3.5 py-2.5 text-[13px] leading-relaxed ${
+                className={`rounded-xl px-3.5 py-2.5 text-sm leading-relaxed ${
                   m.role === 'assistant'
                     ? 'border border-ink-700 bg-ink-850 text-mist-300'
                     : 'bg-amber-brand/90 text-ink-950'
@@ -80,7 +80,7 @@ export function DesignerChat() {
               {m.recommendations?.length ? (
                 <div className="mt-2 space-y-2">
                   <div className="flex items-center justify-between px-0.5">
-                    <span className="text-[11px] font-semibold text-mist-300">
+                    <span className="text-xs font-semibold text-mist-300">
                       🗂 추천 인테리어 가구 &amp; 조명 ({m.recommendations.length}개)
                     </span>
                     <Badge tone="emerald">98% 스타일 일치</Badge>
@@ -99,13 +99,13 @@ export function DesignerChat() {
                             style={{ background: p.swatch }}
                           />
                           <div className="min-w-0 flex-1">
-                            <p className="truncate text-[12px] font-semibold text-mist-200">{p.name}</p>
-                            <p className="mt-0.5 text-[11px]">
+                            <p className="truncate text-sm font-semibold text-mist-200">{p.name}</p>
+                            <p className="mt-0.5 text-xs">
                               <span className="font-bold text-amber-brand">{usd(p.price)}</span>
                               <span className="text-mist-500"> · {p.vendor}</span>
                               <span className="ml-1 text-amber-brand">{'★'.repeat(p.rating)}</span>
                             </p>
-                            <p className="mt-1 line-clamp-2 text-[11px] text-mist-400">
+                            <p className="mt-1 line-clamp-2 text-xs text-mist-400">
                               스타일 추천 이유: {p.reason}
                             </p>
                             <div className="mt-2 flex gap-1.5">
@@ -113,13 +113,13 @@ export function DesignerChat() {
                                 href={p.officialUrl}
                                 target="_blank"
                                 rel="noreferrer noopener"
-                                className="rounded-md border border-ink-600 px-2 py-1 text-[10px] text-mist-300 hover:border-amber-brand/50 hover:text-amber-brand"
+                                className="rounded-md border border-ink-600 px-2.5 py-2 text-xs text-mist-300 hover:border-amber-brand/50 hover:text-amber-brand"
                               >
                                 {p.brand} ↗
                               </a>
                               <button
                                 onClick={() => addToMoodboard(sku)}
-                                className="rounded-md border border-emerald-brand/40 bg-emerald-brand/10 px-2 py-1 text-[10px] font-semibold text-emerald-brand hover:bg-emerald-brand/20"
+                                className="rounded-md border border-emerald-brand/40 bg-emerald-brand/10 px-2.5 py-2 text-xs font-semibold text-emerald-brand hover:bg-emerald-brand/20"
                               >
                                 ✓ 무드보드에 담기
                               </button>
@@ -132,7 +132,7 @@ export function DesignerChat() {
                 </div>
               ) : null}
 
-              <p className="mt-1 px-1 text-[10px] text-mist-500">{relativeTime(m.createdAt)}</p>
+              <p className="mt-1 px-1 text-xs text-mist-500">{relativeTime(m.createdAt)}</p>
             </div>
           </div>
         ))}
@@ -156,13 +156,13 @@ export function DesignerChat() {
 
       <div className="border-t border-ink-700 p-3">
         <div className="flex items-center gap-1.5 overflow-x-auto pb-2">
-          <span className="shrink-0 text-[10px] text-mist-500">빠른 질문/요청:</span>
+          <span className="shrink-0 text-xs text-mist-500">빠른 질문/요청:</span>
           {QUICK.map((q) => (
             <button
               key={q}
               onClick={() => void sendChat(q)}
               disabled={isChatting}
-              className="shrink-0 rounded-lg border border-ink-700 bg-ink-850 px-2.5 py-1.5 text-[11px] text-mist-300 transition hover:border-amber-brand/50 hover:text-amber-brand disabled:opacity-50"
+              className="shrink-0 rounded-lg border border-ink-700 bg-ink-850 px-2.5 py-1.5 text-xs text-mist-300 transition hover:border-amber-brand/50 hover:text-amber-brand disabled:opacity-50"
             >
               {q}
             </button>
@@ -174,7 +174,7 @@ export function DesignerChat() {
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && submit()}
             placeholder={`인테리어 디자이너 아치에게 질문하세요 (예: "${style.signatureItems[0]} 추천해줘")`}
-            className="w-full rounded-lg border border-ink-700 bg-ink-900 px-3 py-2.5 text-[13px] text-mist-200 outline-none placeholder:text-ink-500 focus:border-amber-brand/60"
+            className="w-full rounded-lg border border-ink-700 bg-ink-900 px-3 py-2.5 text-sm text-mist-200 outline-none placeholder:text-ink-500 focus:border-amber-brand/60"
           />
           <Button variant="primary" onClick={submit} disabled={isChatting || !draft.trim()}>
             ➤ 전송

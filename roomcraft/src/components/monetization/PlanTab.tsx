@@ -86,8 +86,8 @@ export function PlanTab() {
                   <span className="text-2xl font-extrabold text-mist-200">{usd(p.priceUsd)}</span>
                   <span className="text-xs text-mist-500"> /월</span>
                 </p>
-                <p className="mt-1 text-[11px] text-amber-brand">월 {p.monthlyCredits} 크레딧</p>
-                <ul className="mt-3 flex-1 space-y-1.5 text-[11px] text-mist-400">
+                <p className="mt-1 text-xs text-amber-brand">월 {p.monthlyCredits} 크레딧</p>
+                <ul className="mt-3 flex-1 space-y-1.5 text-xs text-mist-400">
                   {p.perks.map((perk) => (
                     <li key={perk}>· {perk}</li>
                   ))}
@@ -121,7 +121,7 @@ export function PlanTab() {
                 {pack.credits}
                 {pack.bonus ? <span className="text-emerald-brand"> +{pack.bonus}</span> : null}
               </p>
-              <p className="text-[11px] text-mist-500">크레딧</p>
+              <p className="text-xs text-mist-500">크레딧</p>
               <p className="mt-2 text-sm font-bold text-amber-brand">{usd(pack.priceUsd)}</p>
               <Button
                 className="mt-3 w-full"
@@ -134,7 +134,7 @@ export function PlanTab() {
             </div>
           ))}
         </div>
-        <p className="mt-3 text-[11px] leading-relaxed text-mist-500">
+        <p className="mt-3 text-xs leading-relaxed text-mist-500">
           {paymentProvider === 'stripe'
             ? '※ 결제는 Stripe Checkout 으로 진행되며, 크레딧은 결제 완료 웹훅에서 지급됩니다. 같은 결제가 두 번 전달돼도 지급은 한 번만 일어납니다.'
             : '※ STRIPE_SECRET_KEY 가 없어 dev 시뮬레이터로 동작합니다. Stripe 웹훅과 동일한 지급 경로를 타지만 실제 청구는 없습니다.'}

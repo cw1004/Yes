@@ -74,7 +74,7 @@ export function TemplateMarketTab() {
           </Button>
         </div>
         {plan.id === 'free' || plan.id === 'creator' ? (
-          <p className="mt-3 text-[11px] text-amber-brand">
+          <p className="mt-3 text-xs text-amber-brand">
             템플릿 판매는 Pro Creator 플랜부터 가능합니다. 구독 플랜 탭에서 업그레이드하세요.
           </p>
         ) : null}
@@ -91,7 +91,7 @@ export function TemplateMarketTab() {
               >
                 <div className="min-w-0">
                   <p className="truncate text-xs font-semibold text-mist-200">{t.title}</p>
-                  <p className="mt-0.5 text-[11px] text-mist-500">
+                  <p className="mt-0.5 text-xs text-mist-500">
                     {styleById(t.styleId).name} · {spaceById(t.spaceId).label} · 등록 {relativeTime(t.createdAt)}
                   </p>
                 </div>

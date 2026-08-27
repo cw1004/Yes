@@ -35,7 +35,7 @@ export function StyleSelector() {
               <button
                 key={f.id}
                 onClick={() => setFamily(f.id)}
-                className={`rounded-md px-2.5 py-1 text-[11px] font-semibold transition ${
+                className={`rounded-md px-3 py-2 text-xs font-semibold transition ${
                   family === f.id ? 'bg-ink-700 text-mist-200' : 'text-mist-400 hover:text-mist-200'
                 }`}
               >
@@ -93,7 +93,7 @@ export function StyleSelector() {
               }`}
             >
               <div className="relative h-32" style={{ background: s.previewGradient }}>
-                <span className="absolute left-2 top-2 rounded-md bg-black/55 px-2 py-0.5 text-[10px] font-semibold capitalize text-mist-200">
+                <span className="absolute left-2 top-2 rounded-md bg-black/55 px-2 py-0.5 text-xs font-semibold capitalize text-mist-200">
                   {s.family}
                 </span>
                 {on ? (
@@ -112,11 +112,11 @@ export function StyleSelector() {
                 </div>
               </div>
               <div className="bg-ink-850 p-3">
-                <h4 className="text-[13px] font-bold leading-snug text-mist-200">{s.name}</h4>
-                <p className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-mist-400">{s.tagline}</p>
+                <h4 className="text-sm font-bold leading-snug text-mist-200">{s.name}</h4>
+                <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-mist-400">{s.tagline}</p>
                 <div className="mt-2 flex flex-wrap gap-1">
                   {s.signatureItems.map((i) => (
-                    <span key={i} className="rounded-md bg-ink-800 px-2 py-0.5 text-[10px] text-mist-400">
+                    <span key={i} className="rounded-md bg-ink-800 px-2 py-0.5 text-xs text-mist-400">
                       {i}
                     </span>
                   ))}
@@ -158,20 +158,20 @@ export function StyleSelector() {
           className="rc-range mt-4 w-full"
           aria-label="변환 강도"
         />
-        <div className="mt-1.5 flex justify-between text-[10px] text-mist-500">
+        <div className="mt-1.5 flex justify-between text-xs text-mist-500">
           <span>10% 은은한 조화</span>
           <span>50% 균형 잡힌 변화</span>
           <span>100% 완전 리모델링</span>
         </div>
 
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-          <p className="max-w-2xl text-[11px] italic text-mist-400">“{intensityDirective(intensity)}”</p>
+          <p className="max-w-2xl text-xs italic text-mist-400">“{intensityDirective(intensity)}”</p>
           <div className="flex gap-1">
             {PRESETS.map((p) => (
               <button
                 key={p.value}
                 onClick={() => setIntensity(p.value)}
-                className={`rounded-md px-2.5 py-1 text-[11px] font-semibold transition ${
+                className={`rounded-md px-3 py-2 text-xs font-semibold transition ${
                   intensity === p.value ? 'bg-amber-brand text-ink-950' : 'bg-ink-800 text-mist-300 hover:bg-ink-700'
                 }`}
               >
@@ -199,7 +199,7 @@ export function StyleSelector() {
           )}
         </Button>
       </div>
-      <p className="mt-2 text-right text-[11px] text-mist-500">
+      <p className="mt-2 text-right text-xs text-mist-500">
         렌더 1회 = {CREDIT_COST.render} 크레딧 · 잔여 {credits} 크레딧
         {!sourceImage ? ' · 사진을 먼저 업로드하세요' : ''}
       </p>

@@ -29,6 +29,7 @@ export const LIMITS = {
   signupPerHour: envInt('RATE_LIMIT_SIGNUP_PER_HOUR', 5),
   loginPer15Min: envInt('RATE_LIMIT_LOGIN_PER_15MIN', 10),
   verifyMailPerHour: envInt('RATE_LIMIT_VERIFY_MAIL_PER_HOUR', 3),
+  passwordResetPerHour: envInt('RATE_LIMIT_PASSWORD_RESET_PER_HOUR', 5),
   renderPerHour: envInt('RATE_LIMIT_RENDER_PER_HOUR', 40),
   chatPerHour: envInt('RATE_LIMIT_CHAT_PER_HOUR', 120),
   linkPerHour: envInt('RATE_LIMIT_LINK_PER_HOUR', 120),
@@ -96,6 +97,18 @@ export const verifyMailLimiter = rateLimit({
   limit: LIMITS.verifyMailPerHour,
   keyGenerator: byUserOrIp,
   message: message('인증 메일 재발송은 1시간에 3회까지 가능합니다.'),
+})
+
+/**
+ * 비밀번호 재설정 요청 — 메일 폭탄 및 계정 열거 방지.
+ * 존재 여부와 무관하게 같은 응답을 주더라도, 요청 자체를 제한해야 대량 탐색을 막습니다.
+ */
+export const passwordResetLimiter = rateLimit({
+  ...base,
+  windowMs: HOUR,
+  limit: LIMITS.passwordResetPerHour,
+  keyGenerator: ipKey,
+  message: message('비밀번호 재설정 요청이 너무 많습니다. 1시간 후 다시 시도해 주세요.'),
 })
 
 /** 렌더 — 가장 비싼 호출. 크레딧과 별개로 사용자 단위 상한을 둡니다. */
