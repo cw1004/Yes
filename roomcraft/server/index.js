@@ -31,12 +31,21 @@ const { aiRouter, aiReady, aiModels } = await import('./ai.js')
 const { syncRouter } = await import('./sync.js')
 const { linksRouter, redirectHandler } = await import('./links.js')
 const { listLedger } = await import('./credits.js')
+const { LIMITS, globalLimiter, TRUST_PROXY_HOPS } = await import('./limits.js')
+const { mailerReady } = await import('./mailer.js')
 const { requireAuth } = await import('./auth.js')
 
 const PORT = Number(process.env.PORT || 8787)
 const APP_URL = process.env.APP_URL || 'http://localhost:5173'
 
 const app = express()
+
+/**
+ * 프록시 뒤에 배포하면 req.ip 가 프록시 IP 가 되어 레이트 리밋이 전원을 한 덩어리로 묶습니다.
+ * 반대로 무조건 신뢰하면 X-Forwarded-For 위조로 리밋을 우회할 수 있으므로,
+ * 신뢰할 홉 수를 환경변수로 명시합니다 (직접 노출이면 0).
+ */
+app.set('trust proxy', TRUST_PROXY_HOPS)
 
 // 쿠키 세션을 쓰므로 와일드카드 CORS 는 쓸 수 없습니다. 출처를 명시하고 credentials 를 허용합니다.
 app.use(cors({ origin: APP_URL, credentials: true }))
@@ -48,6 +57,9 @@ app.post('/api/payments/webhook', ...stripeWebhook)
 app.use(express.json({ limit: '25mb' }))
 app.use(attachUser)
 
+// 사용자 식별 후에 걸어야 로그인 사용자를 계정 단위로 셀 수 있습니다.
+app.use('/api', globalLimiter)
+
 app.get('/api/health', (req, res) => {
   res.json({
     ok: true,
@@ -57,6 +69,8 @@ app.get('/api/health', (req, res) => {
     renderModel: aiModels.render,
     chatModel: aiModels.chat,
     paymentProvider,
+    mailerReady,
+    limits: LIMITS,
     authenticated: Boolean(req.user),
   })
 })
@@ -86,4 +100,6 @@ app.listen(PORT, () => {
   console.log(`  렌더(${aiModels.render}): ${aiReady.render ? '준비됨' : '키 없음 — 클라이언트가 목 모드'}`)
   console.log(`  챗(${aiModels.chat})   : ${aiReady.chat ? '준비됨' : '키 없음 — 클라이언트가 목 모드'}`)
   console.log(`  결제         : ${paymentProvider}${paymentProvider === 'dev' ? ' (시뮬레이터)' : ''}`)
+  console.log(`  메일         : ${mailerReady ? 'SMTP 설정됨' : '미설정 — 인증 링크를 콘솔에 출력합니다'}`)
+  console.log(`  trust proxy  : ${TRUST_PROXY_HOPS} 홉`)
 })

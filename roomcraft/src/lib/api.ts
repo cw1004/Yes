@@ -49,6 +49,7 @@ export interface ServerUser {
   planId: string
   credits: number
   createdAt: number
+  emailVerified: boolean
 }
 
 export interface HealthInfo {
@@ -63,7 +64,14 @@ export const api = {
   health: () => request<HealthInfo>('/health'),
 
   signup: (email: string, password: string, displayName?: string) =>
-    post<{ user: ServerUser }>('/auth/signup', { email, password, displayName }),
+    post<{ user: ServerUser; verificationSent: boolean; devVerifyUrl?: string }>('/auth/signup', {
+      email,
+      password,
+      displayName,
+    }),
+  verifyEmail: (token: string) => post<{ user: ServerUser }>('/auth/verify', { token }),
+  resendVerification: () =>
+    post<{ verificationSent: boolean; devVerifyUrl?: string }>('/auth/resend-verification'),
   login: (email: string, password: string) => post<{ user: ServerUser }>('/auth/login', { email, password }),
   logout: () => post<{ ok: boolean }>('/auth/logout'),
   me: () => request<{ user: ServerUser | null }>('/auth/me'),

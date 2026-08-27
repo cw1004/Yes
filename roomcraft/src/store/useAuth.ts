@@ -13,11 +13,17 @@ interface AuthState {
   paymentProvider: 'stripe' | 'dev' | null
   loading: boolean
   error: string | null
+  /** 메일 서버가 없는 개발 환경에서만 채워지는 인증 링크 */
+  devVerifyUrl: string | null
+  notice: string | null
   /** dev 결제 확인 모달에 표시할 정보 */
   pendingPayment: { paymentId: string; name: string; amountCents: number } | null
 
   init: () => Promise<void>
   signup: (email: string, password: string) => Promise<boolean>
+  verifyEmail: (token: string) => Promise<boolean>
+  resendVerification: () => Promise<void>
+  clearNotice: () => void
   login: (email: string, password: string) => Promise<boolean>
   logout: () => Promise<void>
   clearError: () => void
@@ -37,6 +43,8 @@ export const useAuth = create<AuthState>()((set, get) => ({
   paymentProvider: null,
   loading: false,
   error: null,
+  devVerifyUrl: null,
+  notice: null,
   pendingPayment: null,
 
   init: async () => {
@@ -54,14 +62,44 @@ export const useAuth = create<AuthState>()((set, get) => ({
   signup: async (email, password) => {
     set({ loading: true, error: null })
     try {
-      const { user } = await api.signup(email, password)
-      set({ user, loading: false })
+      const { user, devVerifyUrl } = await api.signup(email, password)
+      // 크레딧은 이메일 인증을 마쳐야 지급됩니다.
+      set({
+        user,
+        loading: false,
+        devVerifyUrl: devVerifyUrl ?? null,
+        notice: '가입되었습니다. 이메일 인증을 마치면 Free 크레딧이 지급됩니다.',
+      })
       return true
     } catch (err) {
       set({ loading: false, error: err instanceof ApiError ? err.message : '가입에 실패했습니다.' })
       return false
     }
   },
+
+  verifyEmail: async (token) => {
+    set({ loading: true, error: null })
+    try {
+      const { user } = await api.verifyEmail(token)
+      set({ user, loading: false, devVerifyUrl: null, notice: '이메일 인증이 완료되었습니다. 크레딧이 지급되었습니다.' })
+      return true
+    } catch (err) {
+      set({ loading: false, error: err instanceof ApiError ? err.message : '인증에 실패했습니다.' })
+      return false
+    }
+  },
+
+  resendVerification: async () => {
+    set({ loading: true, error: null })
+    try {
+      const { devVerifyUrl } = await api.resendVerification()
+      set({ loading: false, devVerifyUrl: devVerifyUrl ?? null, notice: '인증 메일을 다시 보냈습니다.' })
+    } catch (err) {
+      set({ loading: false, error: err instanceof ApiError ? err.message : '재발송에 실패했습니다.' })
+    }
+  },
+
+  clearNotice: () => set({ notice: null }),
 
   login: async (email, password) => {
     set({ loading: true, error: null })

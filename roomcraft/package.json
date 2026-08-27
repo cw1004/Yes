@@ -18,6 +18,8 @@
     "@anthropic-ai/sdk": "^0.120.0",
     "better-sqlite3": "^13.0.3",
     "cookie-parser": "^1.4.7",
+    "express-rate-limit": "^8.6.2",
+    "nodemailer": "^9.0.5",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "stripe": "^22.5.0",

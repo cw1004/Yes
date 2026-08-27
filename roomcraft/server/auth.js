@@ -8,9 +8,13 @@ import { Router } from 'express'
 import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto'
 import { db, now } from './db.js'
 import { grantMonthlyCredits, getBalance } from './credits.js'
+import { exposesLinks, sendMail, verificationEmail } from './mailer.js'
+import { signupLimiter, loginLimiter, verifyMailLimiter } from './limits.js'
 
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000
+const VERIFY_TTL_MS = 24 * 60 * 60 * 1000
 const COOKIE = 'rc_session'
+const APP_URL = (process.env.APP_URL || 'http://localhost:5173').replace(/\/+$/, '')
 
 const SCRYPT = { N: 16384, r: 8, p: 1, keylen: 64 }
 
@@ -72,8 +76,60 @@ export function publicUser(user) {
     planId: user.plan_id,
     credits: getBalance(user.id),
     createdAt: user.created_at,
+    emailVerified: Boolean(user.email_verified_at),
   }
 }
+
+/**
+ * 인증 메일 발송.
+ *
+ * 기존 미사용 토큰은 무효화합니다 — 유효한 링크가 여러 개 떠 있으면
+ * 유출 시 회수할 창구가 늘어납니다.
+ */
+async function issueVerification(user) {
+  db.prepare("UPDATE email_tokens SET used_at = ? WHERE user_id = ? AND purpose = 'verify' AND used_at IS NULL").run(
+    now(),
+    user.id,
+  )
+
+  const token = randomBytes(32).toString('base64url')
+  db.prepare(
+    `INSERT INTO email_tokens (token, user_id, purpose, expires_at, used_at, created_at)
+     VALUES (?, ?, 'verify', ?, NULL, ?)`,
+  ).run(token, user.id, now() + VERIFY_TTL_MS, now())
+
+  const url = `${APP_URL}/?verify=${token}`
+  const mail = verificationEmail({ displayName: user.display_name, url })
+  const result = await sendMail({ to: user.email, ...mail })
+
+  // 메일 서버가 없는 개발 환경에서만 링크를 응답에 실어 흐름을 확인할 수 있게 합니다.
+  return { delivered: result.delivered, devUrl: exposesLinks ? url : undefined }
+}
+
+/**
+ * 이메일 인증 완료 → 이 시점에 Free 플랜 크레딧을 지급합니다.
+ *
+ * 가입 시점에 지급하면 이메일 확인 없이 계정을 찍어내 무료 렌더를 무한히 쓸 수 있습니다.
+ * 지급 ref 를 사용자 ID 로 고정해 두어, 재인증해도 두 번 지급되지 않습니다.
+ */
+export const completeVerification = db.transaction((token) => {
+  const row = db.prepare("SELECT * FROM email_tokens WHERE token = ? AND purpose = 'verify'").get(token)
+  if (!row) return { ok: false, reason: 'invalid' }
+  if (row.used_at) return { ok: false, reason: 'used' }
+  if (row.expires_at < now()) return { ok: false, reason: 'expired' }
+
+  db.prepare('UPDATE email_tokens SET used_at = ? WHERE token = ?').run(now(), token)
+
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(row.user_id)
+  if (!user) return { ok: false, reason: 'invalid' }
+
+  if (!user.email_verified_at) {
+    db.prepare('UPDATE users SET email_verified_at = ? WHERE id = ?').run(now(), user.id)
+    grantMonthlyCredits(user.id, 'free', `verify:${user.id}`)
+  }
+
+  return { ok: true, userId: user.id }
+})
 
 function setSessionCookie(res, token) {
   res.cookie(COOKIE, token, {
@@ -89,7 +145,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export const authRouter = Router()
 
-authRouter.post('/signup', (req, res) => {
+authRouter.post('/signup', signupLimiter, async (req, res) => {
   const email = String(req.body?.email ?? '').trim().toLowerCase()
   const password = String(req.body?.password ?? '')
   const displayName = String(req.body?.displayName ?? '').trim()
@@ -104,21 +160,49 @@ authRouter.post('/signup', (req, res) => {
   const { hash, salt } = hashPassword(password)
   const id = randomUUID()
 
-  db.transaction(() => {
-    db.prepare(
-      `INSERT INTO users (id, email, password_hash, salt, display_name, plan_id, created_at)
-       VALUES (?, ?, ?, ?, ?, 'free', ?)`,
-    ).run(id, email, hash, salt, displayName || email.split('@')[0], now())
-    // 가입 즉시 Free 플랜 크레딧을 지급합니다.
-    grantMonthlyCredits(id, 'free', `signup:${id}`)
-  })()
+  // 크레딧은 여기서 주지 않습니다. 이메일 인증을 마쳐야 지급됩니다.
+  db.prepare(
+    `INSERT INTO users (id, email, password_hash, salt, display_name, plan_id, created_at)
+     VALUES (?, ?, ?, ?, ?, 'free', ?)`,
+  ).run(id, email, hash, salt, displayName || email.split('@')[0], now())
 
   setSessionCookie(res, createSession(id))
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(id)
-  res.status(201).json({ user: publicUser(user) })
+  const verification = await issueVerification(user)
+
+  res.status(201).json({
+    user: publicUser(user),
+    verificationSent: verification.delivered,
+    devVerifyUrl: verification.devUrl,
+  })
 })
 
-authRouter.post('/login', (req, res) => {
+authRouter.post('/verify', (req, res) => {
+  const token = String(req.body?.token ?? '')
+  const result = completeVerification(token)
+
+  if (!result.ok) {
+    const reason = {
+      invalid: '유효하지 않은 인증 링크입니다.',
+      used: '이미 사용된 인증 링크입니다.',
+      expired: '인증 링크가 만료되었습니다. 재발송해 주세요.',
+    }[result.reason]
+    return res.status(400).json({ error: reason, code: result.reason })
+  }
+
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(result.userId)
+  res.json({ user: publicUser(user) })
+})
+
+authRouter.post('/resend-verification', verifyMailLimiter, async (req, res) => {
+  if (!req.user) return res.status(401).json({ error: '로그인이 필요합니다.' })
+  if (req.user.email_verified_at) return res.status(400).json({ error: '이미 인증된 계정입니다.' })
+
+  const verification = await issueVerification(req.user)
+  res.json({ verificationSent: verification.delivered, devVerifyUrl: verification.devUrl })
+})
+
+authRouter.post('/login', loginLimiter, (req, res) => {
   const email = String(req.body?.email ?? '').trim().toLowerCase()
   const password = String(req.body?.password ?? '')
 

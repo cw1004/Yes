@@ -1,6 +1,9 @@
 /**
  * 계정 · 결제 · 크레딧 브라우저 E2E.
  * API 서버와 dev 서버가 모두 떠 있어야 합니다.
+ *
+ * 서버는 가입 상한을 올려 띄우세요 — 스위트 전체가 여러 번 가입합니다.
+ *   RATE_LIMIT_SIGNUP_PER_HOUR=200 npm run server
  */
 import { chromium } from 'playwright'
 
@@ -32,7 +35,13 @@ await step('회원가입', async () => {
   await page.getByText(email.split('@')[0]).first().waitFor({ timeout: 10000 })
 })
 
-await step('가입 직후 서버 크레딧 20 표시', async () => {
+await step('이메일 인증 완료', async () => {
+  // 크레딧은 가입이 아니라 인증 시점에 지급됩니다.
+  await page.getByRole('button', { name: /개발용 즉시 인증/ }).click()
+  await page.waitForTimeout(1500)
+})
+
+await step('인증 후 서버 크레딧 20 표시', async () => {
   const header = await page.locator('header').innerText()
   if (!header.includes('20')) throw new Error(`헤더에 20 없음: ${header.replace(/\s+/g, ' ').slice(0, 200)}`)
   if (header.includes('로컬')) throw new Error('여전히 로컬 모드로 표시됨')

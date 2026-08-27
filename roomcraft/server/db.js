@@ -119,6 +119,25 @@ const MIGRATIONS = [
   ALTER TABLE users ADD COLUMN stripe_customer_id TEXT;
   ALTER TABLE users ADD COLUMN stripe_subscription_id TEXT;
   `,
+
+  // 3: 이메일 인증
+  `
+  ALTER TABLE users ADD COLUMN email_verified_at INTEGER;
+
+  -- 이미 가입해 있던 계정은 인증된 것으로 승계합니다.
+  -- 그러지 않으면 기존 사용자의 크레딧 지급 근거가 소급해서 사라집니다.
+  UPDATE users SET email_verified_at = created_at WHERE email_verified_at IS NULL;
+
+  CREATE TABLE email_tokens (
+    token      TEXT PRIMARY KEY,
+    user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    purpose    TEXT NOT NULL,          -- 'verify'
+    expires_at INTEGER NOT NULL,
+    used_at    INTEGER,
+    created_at INTEGER NOT NULL
+  );
+  CREATE INDEX idx_email_tokens_user ON email_tokens(user_id, purpose, created_at);
+  `,
 ]
 
 function migrate() {

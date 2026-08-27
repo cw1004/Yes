@@ -8,6 +8,7 @@ import { SidePanel } from './components/SidePanel'
 import { MonetizationModal } from './components/monetization/MonetizationModal'
 import { MoodboardModal } from './components/MoodboardModal'
 import { AuthModal, DevPaymentModal } from './components/AuthModal'
+import { VerifyBanner } from './components/VerifyBanner'
 import { AccountModal } from './components/AccountModal'
 import { Toast } from './components/Toast'
 
@@ -48,6 +49,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-ink-950">
       <Header />
+      <VerifyBanner />
 
       {serverReady === false ? (
         <div className="border-b border-amber-brand/25 bg-amber-brand/8 px-4 py-2 text-center text-[11px] text-amber-brand">

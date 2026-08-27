@@ -1,6 +1,9 @@
 /**
  * 클릭 추적 E2E.
  * 내보낸 링크가 /r/:id 로 발급되고, 그 링크를 실제로 열었을 때 집계되는지 확인합니다.
+ *
+ * 서버는 가입 상한을 올려 띄우세요 — 스위트 전체가 여러 번 가입합니다.
+ *   RATE_LIMIT_SIGNUP_PER_HOUR=200 npm run server
  */
 import { chromium } from 'playwright'
 

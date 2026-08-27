@@ -7,6 +7,12 @@
  * 다른 포트/DB 를 쓴다면 API_BASE 와 DATABASE_PATH 를 맞춰서 넘기세요.
  * (원장 단위 검증이 같은 DB 파일을 직접 열기 때문에 둘이 일치해야 합니다.)
  *
+ * 주의: 레이트 리밋 저장소는 메모리라 창이 닫히기 전에는 초기화되지 않습니다.
+ * 연속 실행하려면 서버를 재시작하세요.
+ *
+ * 가입 상한 검증은 기본 상한(5/시간)으로 띄운 서버에서만 실행됩니다.
+ * 상한을 올려 띄운 서버(브라우저 E2E 용)에서는 예산을 소진하지 않도록 건너뜁니다.
+ *
  * 결제/크레딧처럼 "되면 안 되는 것"(이중 지급, 타인 결제 완료, 잔액 초과 차감)을
  * 중심으로 검증합니다.
  */
@@ -45,7 +51,29 @@ check('잘못된 이메일 거부', r.status === 400)
 
 r = await call('/auth/signup', { method: 'POST', body: JSON.stringify({ email, password: 'password123' }) })
 check('회원가입 성공', r.status === 201, JSON.stringify(r.body))
-check('가입 즉시 Free 크레딧 20 지급', r.body?.user?.credits === 20, `credits=${r.body?.user?.credits}`)
+check('가입 시점에는 크레딧 미지급 (남용 방지)', r.body?.user?.credits === 0, `credits=${r.body?.user?.credits}`)
+check('가입 응답에 인증 미완료 표시', r.body?.user?.emailVerified === false, JSON.stringify(r.body?.user))
+const verifyUrl = r.body?.devVerifyUrl
+check('메일 미설정 환경에서 인증 링크 노출', Boolean(verifyUrl), JSON.stringify(r.body))
+
+// ── 이메일 인증 ───────────────────────────────────────────────────────
+const verifyToken = verifyUrl?.split('verify=')[1]
+
+r = await call('/auth/verify', { method: 'POST', body: JSON.stringify({ token: 'bogus' }) })
+check('잘못된 인증 토큰 거부', r.status === 400 && r.body?.code === 'invalid')
+
+r = await call('/auth/verify', { method: 'POST', body: JSON.stringify({ token: verifyToken }) })
+check('인증 완료 → Free 크레딧 20 지급', r.body?.user?.credits === 20 && r.body?.user?.emailVerified === true,
+  JSON.stringify(r.body?.user))
+
+r = await call('/auth/verify', { method: 'POST', body: JSON.stringify({ token: verifyToken }) })
+check('같은 토큰 재사용 거부', r.status === 400 && r.body?.code === 'used', JSON.stringify(r.body))
+
+r = await call('/auth/me')
+check('재인증 시도해도 크레딧 중복 지급 없음', r.body?.user?.credits === 20, `credits=${r.body?.user?.credits}`)
+
+r = await call('/auth/resend-verification', { method: 'POST' })
+check('이미 인증된 계정은 재발송 거부', r.status === 400, JSON.stringify(r.body))
 
 r = await call('/auth/signup', { method: 'POST', body: JSON.stringify({ email, password: 'password123' }) })
 check('중복 이메일 거부', r.status === 409)
@@ -179,6 +207,40 @@ check('해지해도 기존 크레딧은 유지', r.body?.credits === beforeRenew
 
 r = await call('/payments/dev/renew', { method: 'POST' })
 check('해지 후 갱신 시도 거부', r.status === 400)
+
+// ── 레이트 리밋 ───────────────────────────────────────────────────────
+// 자동 가입으로 무료 크레딧을 찍어내는 경로를 막는지 확인합니다.
+// 상한은 서버 설정에서 읽습니다 — 하드코딩하면 환경마다 테스트가 깨집니다.
+const health = (await call('/health')).body
+const signupLimit = health?.limits?.signupPerHour ?? 5
+
+// 상한이 높게 설정된 서버에서는 이 검사를 건너뜁니다.
+// 끝까지 돌리면 가입 예산을 통째로 소진해, 같은 서버를 쓰는 브라우저 E2E 가 가입에 실패합니다.
+if (signupLimit > 20) {
+  console.log(`- 가입 상한 검증 건너뜀 (설정 ${signupLimit}/시간이 너무 높음)`)
+  console.log(`  검증하려면 기본 상한으로 서버를 띄우세요: npm run server`)
+} else {
+  let limited = 0
+  let created = 0
+  for (let i = 0; i < signupLimit + 4; i++) {
+    const res = await call('/auth/signup', {
+      method: 'POST',
+      body: JSON.stringify({ email: `flood${Date.now()}-${i}@example.com`, password: 'password123' }),
+    })
+    if (res.status === 429) limited++
+    if (res.status === 201) created++
+  }
+  check('가입 폭주가 429 로 차단됨', limited > 0, `생성 ${created}건, 차단 ${limited}건`)
+  check(
+    `가입 상한(${signupLimit}/시간)이 적용됨`,
+    created <= signupLimit,
+    `생성 ${created}건 (상한 ${signupLimit})`,
+  )
+}
+
+// 위 루프에서 마지막 가입 세션으로 바뀌었을 수 있으므로 원래 계정으로 되돌립니다.
+r = await call('/auth/login', { method: 'POST', body: JSON.stringify({ email, password: 'password123' }) })
+check('레이트 리밋 후에도 정상 로그인 가능', r.status === 200, JSON.stringify(r.body))
 
 // 로그아웃
 r = await call('/auth/logout', { method: 'POST' })

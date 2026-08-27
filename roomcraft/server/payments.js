@@ -14,6 +14,7 @@ import Stripe from 'stripe'
 import { db, now } from './db.js'
 import { CREDIT_PACKS, PLANS, addLedger, getBalance, grantMonthlyCredits } from './credits.js'
 import { requireAuth } from './auth.js'
+import { checkoutLimiter } from './limits.js'
 
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || ''
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || ''
@@ -97,7 +98,7 @@ paymentsRouter.get('/config', (_req, res) => {
 })
 
 /** 체크아웃 시작 */
-paymentsRouter.post('/checkout', requireAuth, async (req, res) => {
+paymentsRouter.post('/checkout', requireAuth, checkoutLimiter, async (req, res) => {
   const kind = String(req.body?.kind ?? '')
   const itemId = String(req.body?.itemId ?? '')
   const item = resolveItem(kind, itemId)
