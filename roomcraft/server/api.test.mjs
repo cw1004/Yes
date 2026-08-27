@@ -111,6 +111,75 @@ check('비정상 판매가 거부', r.status === 400)
 r = await call(`/sync/templates/${tplId}`, { method: 'DELETE' })
 check('템플릿 삭제', r.body?.ok === true)
 
+// ── 제휴 링크 클릭 추적 ───────────────────────────────────────────────
+r = await call('/links', { method: 'POST', body: JSON.stringify({
+  source: 'blog',
+  items: [
+    { sku: 'flos-arco', mallId: 'coupang', url: 'https://www.coupang.com/np/search?q=arco&subId=T1', label: 'Flos Arco' },
+    { sku: 'hm-eames-lounge', mallId: 'amazon', url: 'https://www.amazon.com/s?k=eames&tag=t-20', label: 'Eames' },
+  ],
+}) })
+// 서버는 완성된 추적 URL 을 돌려줍니다 (클라이언트가 주소를 조립하지 않도록).
+const linkUrl = r.body?.links?.['flos-arco:coupang']
+check('링크 발급', r.status === 200 && /\/r\/[A-Za-z0-9_-]+$/.test(linkUrl ?? ''), JSON.stringify(r.body))
+
+r = await call('/links', { method: 'POST', body: JSON.stringify({
+  source: 'blog',
+  items: [{ sku: 'flos-arco', mallId: 'coupang', url: 'https://www.coupang.com/np/search?q=arco&subId=T2', label: 'Flos Arco' }],
+}) })
+check('같은 조합 재발급 시 토큰 재사용', Boolean(linkUrl) && r.body?.links?.['flos-arco:coupang'] === linkUrl,
+  `${linkUrl} vs ${r.body?.links?.['flos-arco:coupang']}`)
+
+r = await call('/links', { method: 'POST', body: JSON.stringify({
+  source: 'blog',
+  items: [{ sku: 'x', mallId: 'coupang', url: 'https://evil.example.com/phish' }],
+}) })
+check('허용되지 않은 호스트 거부 (오픈 리디렉터 방지)',
+  r.body?.rejected?.length === 1 && !Object.keys(r.body?.links ?? {}).length, JSON.stringify(r.body))
+
+r = await call('/links', { method: 'POST', body: JSON.stringify({
+  source: 'blog',
+  items: [{ sku: 'x', mallId: 'coupang', url: 'http://www.coupang.com/np/search?q=a' }],
+}) })
+check('http 대상 거부', r.body?.rejected?.length === 1)
+
+// 리디렉트는 /api 밖 경로이고, 발급된 URL 을 그대로 호출합니다.
+const ORIGIN = BASE.replace(/\/api$/, '')
+const token = linkUrl.split('/r/')[1]
+let redirect = await fetch(`${ORIGIN}/r/${token}`, { redirect: 'manual', headers: { referer: 'https://blog.example.com/post' } })
+check('리디렉트 302', redirect.status === 302, String(redirect.status))
+check('리디렉트 대상이 최신 URL (제휴 ID 갱신 반영)',
+  redirect.headers.get('location')?.includes('subId=T2'), redirect.headers.get('location'))
+
+await fetch(`${ORIGIN}/r/${token}`, { redirect: 'manual' })
+r = await call('/links/stats')
+const stat = r.body?.links?.find((l) => l.id === token)
+check('클릭 2회 집계', stat?.clicks === 2, JSON.stringify(stat))
+check('채널별 집계', r.body?.byMall?.coupang === 2, JSON.stringify(r.body?.byMall))
+
+redirect = await fetch(`${ORIGIN}/r/does-not-exist`, { redirect: 'manual' })
+check('없는 링크 404', redirect.status === 404)
+
+// ── 구독 갱신 ─────────────────────────────────────────────────────────
+r = await call('/auth/me')
+const beforeRenew = r.body.user.credits
+r = await call('/payments/dev/renew', { method: 'POST', body: JSON.stringify({ cycle: '2026-09' }) })
+check('구독 갱신 시 월 크레딧 지급', r.body?.credits === beforeRenew + 600, `${beforeRenew} → ${r.body?.credits}`)
+
+r = await call('/payments/dev/renew', { method: 'POST', body: JSON.stringify({ cycle: '2026-09' }) })
+check('같은 청구 주기 재지급 차단', r.body?.granted === false && r.body?.credits === beforeRenew + 600,
+  JSON.stringify(r.body))
+
+r = await call('/payments/dev/renew', { method: 'POST', body: JSON.stringify({ cycle: '2026-10' }) })
+check('다음 주기에는 다시 지급', r.body?.credits === beforeRenew + 1200, JSON.stringify(r.body))
+
+r = await call('/payments/dev/cancel', { method: 'POST' })
+check('구독 해지 시 Free 로 강등', r.body?.planId === 'free')
+check('해지해도 기존 크레딧은 유지', r.body?.credits === beforeRenew + 1200, JSON.stringify(r.body))
+
+r = await call('/payments/dev/renew', { method: 'POST' })
+check('해지 후 갱신 시도 거부', r.status === 400)
+
 // 로그아웃
 r = await call('/auth/logout', { method: 'POST' })
 cookie = ''

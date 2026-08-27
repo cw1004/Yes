@@ -71,7 +71,7 @@ export function ShoppableCard({
 
       <div className="max-h-[168px] overflow-y-auto p-2">
         <p className="px-1 pb-1.5 text-[10px] font-semibold text-mist-400">
-          구매 링크 ({links.length}개 채널)
+          추천 제품 구매 링크 ({links.length}개 채널)
         </p>
         <div className="space-y-1">
           {links.map(({ mall, url, linked }) => (
@@ -103,6 +103,10 @@ export function ShoppableCard({
           ))}
         </div>
       </div>
+
+      <p className="border-t border-ink-700 px-3 py-1.5 text-[10px] leading-relaxed text-mist-500">
+        이미지는 AI 시안입니다. 이 제품은 스타일에 맞춰 고른 추천 상품으로, 이미지 속 가구와 동일한 제품이 아닐 수 있습니다.
+      </p>
 
       <div className="flex gap-1.5 border-t border-ink-700 p-2">
         <button

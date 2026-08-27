@@ -96,6 +96,37 @@ export const api = {
       '/credits/ledger',
     ),
 
+  /**
+   * 내보낼 링크를 발급받습니다. 응답 키는 `${sku}:${mallId}`.
+   * 같은 조합은 서버가 기존 토큰을 재사용하므로 통계가 흩어지지 않습니다.
+   */
+  mintLinks: (
+    items: { sku: string; mallId: string; url: string; label: string }[],
+    source: string,
+  ) =>
+    post<{ links: Record<string, string>; rejected: { sku: string; reason: string }[] }>('/links', {
+      items,
+      source,
+    }),
+
+  linkStats: () =>
+    request<{
+      links: {
+        id: string
+        sku: string
+        mallId: string
+        label: string
+        source: string
+        createdAt: number
+        clicks: number
+        visitors: number
+        lastClick: number | null
+      }[]
+      totalClicks: number
+      byMall: Record<string, number>
+      bySku: Record<string, number>
+    }>('/links/stats'),
+
   getState: <T>() => request<{ state: T | null; updatedAt: number | null }>('/sync/state'),
   putState: (state: unknown) => request<{ ok: boolean }>('/sync/state', {
     method: 'PUT',

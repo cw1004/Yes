@@ -29,6 +29,7 @@ const { attachUser, authRouter } = await import('./auth.js')
 const { paymentsRouter, stripeWebhook, paymentProvider } = await import('./payments.js')
 const { aiRouter, aiReady, aiModels } = await import('./ai.js')
 const { syncRouter } = await import('./sync.js')
+const { linksRouter, redirectHandler } = await import('./links.js')
 const { listLedger } = await import('./credits.js')
 const { requireAuth } = await import('./auth.js')
 
@@ -63,6 +64,10 @@ app.get('/api/health', (req, res) => {
 app.use('/api/auth', authRouter)
 app.use('/api/payments', paymentsRouter)
 app.use('/api/sync', syncRouter)
+app.use('/api/links', linksRouter)
+
+// 공개 리디렉트. 독자가 누르는 링크이므로 인증이 없고, 짧은 경로를 씁니다.
+app.get('/r/:id', redirectHandler)
 app.use('/api', aiRouter)
 
 app.get('/api/credits/ledger', requireAuth, (req, res) => {

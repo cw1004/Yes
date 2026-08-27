@@ -3,6 +3,9 @@ import { useStudio } from '../store/useStudio'
 import { CATALOG, productBySku } from '../data/catalog'
 import { styleById } from '../data/styles'
 import { copyToClipboard, downloadText, toShoppableHtml } from '../lib/exporters'
+import { resolveLinks } from '../lib/tracking'
+import { useAuth } from '../store/useAuth'
+import { productsBySkus } from '../data/catalog'
 import { usd } from '../lib/format'
 import { Badge, Button, inputClass } from './ui/primitives'
 
@@ -24,6 +27,8 @@ export function TagManager() {
   } = useStudio()
   const [picking, setPicking] = useState(false)
   const [q, setQ] = useState('')
+  const [exporting, setExporting] = useState(false)
+  const signedIn = Boolean(useAuth((s) => s.user))
 
   const style = styleById(styleId)
   const tagged = new Set(hotspots.map((h) => h.sku))
@@ -41,15 +46,41 @@ export function TagManager() {
       ]
   const candidates = matches.slice(0, 8)
 
-  const exportHtml = () => {
-    if (!render) return
-    return toShoppableHtml({
-      imageUrl: render.imageUrl,
-      hotspots,
+  /** 내보내기 직전에 추적 링크를 발급받습니다(비로그인이면 원본 딥링크로 폴백). */
+  const exportHtml = async () => {
+    if (!render) return null
+    const mallId = enabledMalls[0] ?? 'coupang'
+    const rows = productsBySkus(hotspots.map((h) => h.sku)).map((product) => ({ product, qty: 1 }))
+
+    const { resolver, tracked } = await resolveLinks({
+      rows,
+      mallIds: [mallId],
       affiliateIds,
-      mallId: enabledMalls[0] ?? 'coupang',
-      title: `${projectName} — ${style.name}`,
+      source: 'shoppable',
+      signedIn,
     })
+
+    return {
+      html: toShoppableHtml({
+        imageUrl: render.imageUrl,
+        hotspots,
+        affiliateIds,
+        mallId,
+        title: `${projectName} — ${style.name}`,
+        resolve: resolver,
+      }),
+      tracked,
+    }
+  }
+
+  const runExport = async (after: (html: string, tracked: boolean) => void) => {
+    setExporting(true)
+    try {
+      const result = await exportHtml()
+      if (result) after(result.html, result.tracked)
+    } finally {
+      setExporting(false)
+    }
   }
 
   return (
@@ -87,26 +118,30 @@ export function TagManager() {
           <Button
             size="sm"
             variant="success"
-            disabled={!hotspots.length || !render}
-            onClick={async () => {
-              const html = exportHtml()
-              if (!html) return
-              const ok = await copyToClipboard(html)
-              showToast(ok ? '쇼퍼블 이미지 HTML을 복사했습니다. 블로그 에디터에 붙여넣으세요.' : '복사에 실패했습니다.')
-            }}
+            disabled={!hotspots.length || !render || exporting}
+            onClick={() =>
+              void runExport(async (html, tracked) => {
+                const ok = await copyToClipboard(html)
+                showToast(
+                  ok
+                    ? `쇼퍼블 이미지 HTML을 복사했습니다.${tracked ? ' (클릭 추적 링크 적용)' : ''}`
+                    : '복사에 실패했습니다.',
+                )
+              })
+            }
           >
             📋 쇼퍼블 HTML 복사
           </Button>
           <Button
             size="sm"
             variant="outline"
-            disabled={!hotspots.length || !render}
-            onClick={() => {
-              const html = exportHtml()
-              if (!html) return
-              downloadText(`shoppable-${Date.now()}.html`, html, 'text/html')
-              showToast('쇼퍼블 이미지 HTML을 저장했습니다.')
-            }}
+            disabled={!hotspots.length || !render || exporting}
+            onClick={() =>
+              void runExport((html, tracked) => {
+                downloadText(`shoppable-${Date.now()}.html`, html, 'text/html')
+                showToast(`쇼퍼블 이미지 HTML을 저장했습니다.${tracked ? ' (클릭 추적 적용)' : ''}`)
+              })
+            }
           >
             ⤓ HTML
           </Button>
@@ -153,6 +188,7 @@ export function TagManager() {
       <p className="mt-2 text-[10px] leading-relaxed text-mist-500">
         내보낸 HTML은 이미지와 태그 위치를 그대로 담고 있어 블로그에서도 클릭하면 제휴 링크로 이동합니다.
         일부 에디터는 인라인 스타일을 제한하므로, 붙여넣은 뒤 미리보기로 확인하세요.
+        {signedIn ? ' 링크는 클릭 추적용으로 발급됩니다.' : ' 로그인하면 클릭 수가 집계됩니다.'}
       </p>
     </div>
   )

@@ -86,6 +86,39 @@ const MIGRATIONS = [
   );
   CREATE INDEX idx_templates_user ON templates(user_id, created_at);
   `,
+
+  // 2: 제휴 링크 클릭 추적 + 구독 식별자
+  `
+  -- 내보낸 제휴 링크. /r/:id 로 리디렉트하면서 클릭을 기록합니다.
+  CREATE TABLE links (
+    id         TEXT PRIMARY KEY,
+    user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    sku        TEXT NOT NULL,
+    mall_id    TEXT NOT NULL,
+    target_url TEXT NOT NULL,
+    label      TEXT NOT NULL DEFAULT '',
+    source     TEXT NOT NULL DEFAULT 'app',
+    created_at INTEGER NOT NULL
+  );
+  CREATE INDEX idx_links_user ON links(user_id, created_at);
+  -- 같은 (사용자, 제품, 몰, 채널) 조합은 토큰을 재사용해 통계가 흩어지지 않게 합니다.
+  CREATE UNIQUE INDEX idx_links_dedupe ON links(user_id, sku, mall_id, source);
+
+  CREATE TABLE link_clicks (
+    id           TEXT PRIMARY KEY,
+    link_id      TEXT NOT NULL REFERENCES links(id) ON DELETE CASCADE,
+    clicked_at   INTEGER NOT NULL,
+    referrer     TEXT,
+    user_agent   TEXT,
+    -- 원문 IP 는 저장하지 않습니다. 일별 솔트를 섞은 해시만 두어
+    -- 같은 날 같은 방문자의 중복 클릭만 구분합니다.
+    visitor_hash TEXT
+  );
+  CREATE INDEX idx_clicks_link ON link_clicks(link_id, clicked_at);
+
+  ALTER TABLE users ADD COLUMN stripe_customer_id TEXT;
+  ALTER TABLE users ADD COLUMN stripe_subscription_id TEXT;
+  `,
 ]
 
 function migrate() {

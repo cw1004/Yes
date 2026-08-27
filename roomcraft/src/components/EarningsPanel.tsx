@@ -4,6 +4,7 @@ import { planById } from '../data/plans'
 import { computeQuote } from '../lib/quote'
 import { krw, pct, usd } from '../lib/format'
 import { Badge, Button, Stat } from './ui/primitives'
+import { ClickStats } from './ClickStats'
 
 export function EarningsPanel() {
   const { templates, quote, affiliateIds, enabledMalls, conversionRate, openModal } = useStudio()
@@ -24,7 +25,7 @@ export function EarningsPanel() {
   return (
     <div className="h-full space-y-4 overflow-y-auto p-4">
       <div className="grid grid-cols-2 gap-2">
-        <Stat label="배치된 총 가구 견적" value={usd(total)} sub={`총 ${count}개 가구/소품`} />
+        <Stat label="추천 제품 총 견적" value={usd(total)} sub={`총 ${count}개 가구/소품`} />
         <Stat
           label="기대 제휴 정산액"
           value={`+${usd(est.expected, { cents: true })}`}
@@ -93,10 +94,13 @@ export function EarningsPanel() {
           </div>
         </div>
         <p className="mt-2 text-[10px] leading-relaxed text-mist-500">
-          ※ 배치 가구가 전부 팔렸다고 가정한 상한은 {usd(est.gross, { cents: true })} 이며, 위 기대값은 여기에 전환율
-          {' '}{pct(conversionRate, 1)}를 곱한 값입니다. 요율은 참고 구간이므로 각 프로그램 콘솔에서 확인하세요.
+          ※ <strong className="text-mist-400">전부 가정값입니다.</strong> 상한 {usd(est.gross, { cents: true })}
+          {' '}(배치 가구 전액 구매 가정)에 전환율 {pct(conversionRate, 1)}를 곱한 값이며, 요율도 참고 구간입니다.
+          실제 근거는 아래 실측 클릭과 각 제휴 콘솔의 정산 내역입니다.
         </p>
       </div>
+
+      <ClickStats />
 
       <div className="rounded-xl border border-ink-700 bg-ink-850 p-4">
         <h4 className="text-xs font-bold text-mist-200">수익원 요약 (이번 달)</h4>

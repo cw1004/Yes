@@ -10,7 +10,16 @@ import {
   mallById,
   programById,
 } from '../../lib/affiliate'
-import { copyToClipboard, downloadText, toBlogHtml, toCsv, toKakaoText } from '../../lib/exporters'
+import {
+  copyToClipboard,
+  downloadText,
+  toBlogHtml,
+  toCsv,
+  toKakaoText,
+  type LinkResolver,
+} from '../../lib/exporters'
+import { resolveLinks } from '../../lib/tracking'
+import { useAuth } from '../../store/useAuth'
 import { styleById } from '../../data/styles'
 import { spaceById } from '../../data/spaces'
 import { pct, usd } from '../../lib/format'
@@ -31,7 +40,9 @@ export function AffiliateTab() {
     showToast,
   } = useStudio()
   const { rows, total, count } = useMoodboardTotals()
+  const signedIn = Boolean(useAuth((s) => s.user))
   const [primaryMall, setPrimaryMall] = useState<MallId>('coupang')
+  const [exporting, setExporting] = useState(false)
   const [term, setTerm] = useState('')
   const [saved, setSaved] = useState(false)
 
@@ -45,15 +56,40 @@ export function AffiliateTab() {
   const linkedPrograms = PROGRAMS.filter((p) => (affiliateIds[p.id] ?? '').trim())
   const linkedMallCount = enabledMalls.filter((id) => isMallLinked(mallById(id), affiliateIds)).length
 
-  const copy = async (text: string, label: string) => {
+  const copy = async (text: string, label: string, note = '') => {
     const ok = await copyToClipboard(text)
-    showToast(ok ? `${label}을(를) 클립보드에 복사했습니다.` : '복사에 실패했습니다. 직접 선택해 주세요.')
+    showToast(ok ? `${label}을(를) 복사했습니다.${note}` : '복사에 실패했습니다. 직접 선택해 주세요.')
   }
+
+  /**
+   * 내보내기 직전에 추적 링크를 발급받습니다.
+   * 로그인하지 않았으면 원본 딥링크로 폴백합니다 — 추적만 빠지고 기능은 그대로 동작합니다.
+   */
+  const withLinks = async (
+    mallIds: MallId[],
+    source: string,
+    run: (resolve: LinkResolver, tracked: boolean) => Promise<void> | void,
+  ) => {
+    setExporting(true)
+    try {
+      const { resolver, tracked } = await resolveLinks({
+        rows,
+        mallIds,
+        affiliateIds,
+        source,
+        signedIn,
+      })
+      await run(resolver, tracked)
+    } finally {
+      setExporting(false)
+    }
+  }
+
 
   return (
     <div className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-3">
-        <Stat label="배치된 총 가구 견적" value={usd(total)} sub={`총 ${count}개 가구/소품 스타일링됨`} />
+        <Stat label="추천 제품 총 견적" value={usd(total)} sub={`총 ${count}개 추천 제품`} />
         <Stat
           label="기대 제휴 정산액"
           value={`+${usd(est.expected, { cents: true })}`}
@@ -237,7 +273,7 @@ export function AffiliateTab() {
       <section className="rounded-xl border border-ink-700 bg-ink-850 p-4">
         <SectionTitle
           icon="🔗"
-          title="현재 룸 배치 가구 대량 제휴 링크 일괄 생성 (Bulk Exporter)"
+          title="추천 제품 대량 제휴 링크 일괄 생성 (Bulk Exporter)"
           desc="블로그 포스팅, 카카오톡 공유, 유튜브 설명란, 인스타그램 프로필용으로 1클릭 복사하세요."
           right={
             <select
@@ -261,15 +297,19 @@ export function AffiliateTab() {
         <div className="mt-4 flex flex-wrap gap-2">
           <Button
             variant="success"
-            disabled={!rows.length}
+            disabled={!rows.length || exporting}
             onClick={() =>
-              void copy(
-                toBlogHtml(rows, affiliateIds, {
-                  styleName: style.name,
-                  spaceLabel: space.label,
-                  primaryMall,
-                }),
-                '블로그 포스팅 HTML',
+              void withLinks([primaryMall], 'blog', (resolve, tracked) =>
+                copy(
+                  toBlogHtml(
+                    rows,
+                    affiliateIds,
+                    { styleName: style.name, spaceLabel: space.label, primaryMall },
+                    resolve,
+                  ),
+                  '블로그 포스팅 HTML',
+                  tracked ? ' (클릭 추적 링크 적용)' : '',
+                ),
               )
             }
           >
@@ -277,28 +317,43 @@ export function AffiliateTab() {
           </Button>
           <Button
             variant="primary"
-            disabled={!rows.length}
+            disabled={!rows.length || exporting}
             onClick={() =>
-              void copy(toKakaoText(rows, affiliateIds, { styleName: style.name, primaryMall }), '카톡 공유 텍스트')
+              void withLinks([primaryMall], 'kakao', (resolve, tracked) =>
+                copy(
+                  toKakaoText(rows, affiliateIds, { styleName: style.name, primaryMall }, resolve),
+                  '카톡 공유 텍스트',
+                  tracked ? ' (클릭 추적 링크 적용)' : '',
+                ),
+              )
             }
           >
             📋 카톡 공유용 복사
           </Button>
           <Button
             variant="outline"
-            disabled={!rows.length || !enabledMalls.length}
-            onClick={() => {
-              downloadText(
-                `roomcraft-affiliate-${Date.now()}.csv`,
-                toCsv(rows, affiliateIds, enabledMalls),
-                'text/csv',
-              )
-              showToast(`활성 채널 ${enabledMalls.length}개 기준 CSV를 다운로드했습니다.`)
-            }}
+            disabled={!rows.length || !enabledMalls.length || exporting}
+            onClick={() =>
+              void withLinks(enabledMalls, 'csv', (resolve, tracked) => {
+                downloadText(
+                  `roomcraft-affiliate-${Date.now()}.csv`,
+                  toCsv(rows, affiliateIds, enabledMalls, resolve),
+                  'text/csv',
+                )
+                showToast(
+                  `활성 채널 ${enabledMalls.length}개 기준 CSV를 다운로드했습니다.${tracked ? ' (클릭 추적 적용)' : ''}`,
+                )
+              })
+            }
           >
             ⤓ CSV 다운로드 ({enabledMalls.length}채널)
           </Button>
         </div>
+        <p className="mt-2 text-[11px] leading-relaxed text-mist-500">
+          {signedIn
+            ? '내보내는 링크는 클릭 추적 링크(/r/…)로 발급되어, 아래 수익 대시보드에 클릭 수가 집계됩니다.'
+            : '⚠ 비로그인 상태에서는 원본 딥링크로 내보내집니다. 클릭 수가 집계되지 않아 어떤 채널이 돈이 되는지 알 수 없습니다.'}
+        </p>
         {!rows.length ? (
           <p className="mt-3 text-xs text-mist-500">무드보드에 가구를 먼저 담아주세요.</p>
         ) : (

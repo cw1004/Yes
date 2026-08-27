@@ -3,6 +3,27 @@ import { productBySku } from '../data/catalog'
 import { buildDeeplink, mallById } from './affiliate'
 import { usd } from './format'
 
+/**
+ * `sku` 와 몰을 받아 최종 링크를 돌려주는 함수.
+ * 로그인 상태면 추적 링크(/r/:id), 아니면 원본 딥링크가 들어옵니다.
+ */
+export type LinkResolver = (sku: string, mallId: MallId) => string
+
+const defaultResolver =
+  (ids: AffiliateIds): LinkResolver =>
+  (sku, mallId) =>
+    buildDeeplink(mallId, productBySku(sku)?.searchTerm ?? sku, ids)
+
+/**
+ * 제휴 링크 고지 문구.
+ *
+ * "이미지에 배치된 가구"라고 쓰면 안 됩니다 — 렌더에 그려진 가구와 링크의 제품은
+ * 서로 다른 물건입니다. 허위 표시는 제휴 계정 정지 사유이기도 합니다.
+ */
+export const DISCLOSURE =
+  '이 콘텐츠는 제휴 마케팅 링크를 포함하며, 구매 발생 시 작성자가 일정액의 수수료를 제공받습니다. ' +
+  '이미지는 AI로 생성된 시안이며, 아래 제품은 해당 스타일에 맞춰 고른 추천 상품으로 이미지 속 가구와 동일한 제품이 아닐 수 있습니다.'
+
 export interface ExportRow {
   product: Product
   qty: number
@@ -14,7 +35,12 @@ const csvCell = (v: string | number): string => {
 }
 
 /** 스프레드시트/정산용 CSV — 활성화된 채널만 열로 만듭니다. */
-export function toCsv(rows: ExportRow[], ids: AffiliateIds, mallIds: MallId[]): string {
+export function toCsv(
+  rows: ExportRow[],
+  ids: AffiliateIds,
+  mallIds: MallId[],
+  resolve: LinkResolver = defaultResolver(ids),
+): string {
   const malls = mallIds.map(mallById)
   const header = [
     'SKU',
@@ -34,7 +60,7 @@ export function toCsv(rows: ExportRow[], ids: AffiliateIds, mallIds: MallId[]): 
     qty,
     product.price,
     product.price * qty,
-    ...malls.map((m) => buildDeeplink(m.id, product.searchTerm, ids)),
+    ...malls.map((m) => resolve(product.sku, m.id)),
   ])
   return [header, ...body].map((r) => r.map(csvCell).join(',')).join('\n')
 }
@@ -44,13 +70,14 @@ export function toBlogHtml(
   rows: ExportRow[],
   ids: AffiliateIds,
   meta: { styleName: string; spaceLabel: string; primaryMall: MallId },
+  resolve: LinkResolver = defaultResolver(ids),
 ): string {
   const mall = mallById(meta.primaryMall)
   const total = rows.reduce((s, r) => s + r.product.price * r.qty, 0)
 
   const items = rows
     .map(({ product, qty }) => {
-      const link = buildDeeplink(meta.primaryMall, product.searchTerm, ids)
+      const link = resolve(product.sku, meta.primaryMall)
       return [
         '  <li style="margin:0 0 18px;">',
         `    <strong>${escapeHtml(product.name)}</strong>${qty > 1 ? ` × ${qty}` : ''}<br />`,
@@ -64,12 +91,12 @@ export function toBlogHtml(
 
   return [
     `<h2>${escapeHtml(meta.spaceLabel)} — ${escapeHtml(meta.styleName)} 스타일링 리스트</h2>`,
-    `<p>RoomCraft AI로 리모델링한 ${escapeHtml(meta.spaceLabel)}에 실제 배치된 가구 ${rows.length}종입니다. 총 견적 ${usd(total)}.</p>`,
+    `<p>RoomCraft AI로 만든 ${escapeHtml(meta.spaceLabel)} 시안에 어울리는 추천 제품 ${rows.length}종입니다. 총 견적 ${usd(total)}.</p>`,
     '<ul style="padding-left:18px;">',
     items,
     '</ul>',
-    '<p style="font-size:13px;color:#888;margin-top:24px;">',
-    '이 포스팅은 제휴 마케팅 링크를 포함하며, 구매 발생 시 작성자가 일정액의 수수료를 제공받습니다.',
+    '<p style="font-size:13px;color:#888;margin-top:24px;line-height:1.6;">',
+    escapeHtml(DISCLOSURE),
     '</p>',
   ].join('\n')
 }
@@ -79,17 +106,19 @@ export function toKakaoText(
   rows: ExportRow[],
   ids: AffiliateIds,
   meta: { styleName: string; primaryMall: MallId },
+  resolve: LinkResolver = defaultResolver(ids),
 ): string {
   const lines = rows.map(
     ({ product }, i) =>
-      `${i + 1}. ${product.name} (${usd(product.price)})\n${buildDeeplink(meta.primaryMall, product.searchTerm, ids)}`,
+      `${i + 1}. ${product.name} (${usd(product.price)})\n${resolve(product.sku, meta.primaryMall)}`,
   )
   return [
-    `🛋 ${meta.styleName} 스타일링 리스트`,
+    `🛋 ${meta.styleName} 추천 제품`,
     '',
     ...lines,
     '',
     '※ 제휴 링크 포함 (구매 시 수수료를 받을 수 있습니다)',
+    '※ 이미지는 AI 시안이며, 위 제품은 스타일에 맞춰 고른 추천 상품입니다',
   ].join('\n')
 }
 
@@ -106,23 +135,25 @@ export function toShoppableHtml({
   affiliateIds,
   mallId,
   title,
+  resolve,
 }: {
   imageUrl: string
   hotspots: Hotspot[]
   affiliateIds: AffiliateIds
   mallId: MallId
   title: string
+  resolve?: LinkResolver
 }): string {
   const mall = mallById(mallId)
+  const link = resolve ?? defaultResolver(affiliateIds)
 
   const tags = hotspots
     .map((h) => {
       const product = productBySku(h.sku)
       if (!product) return ''
-      const link = buildDeeplink(mallId, product.searchTerm, affiliateIds)
       const label = `${product.name} · ${usd(product.price)}`
       return [
-        `  <a href="${link}" target="_blank" rel="nofollow sponsored noopener"`,
+        `  <a href="${link(product.sku, mallId)}" target="_blank" rel="nofollow sponsored noopener"`,
         `     title="${escapeHtml(label)}"`,
         `     style="position:absolute;left:${(h.x * 100).toFixed(1)}%;top:${(h.y * 100).toFixed(1)}%;` +
           'transform:translate(-50%,-50%);display:inline-flex;align-items:center;gap:6px;' +
@@ -141,8 +172,7 @@ export function toShoppableHtml({
     .map((h) => {
       const product = productBySku(h.sku)
       if (!product) return ''
-      const link = buildDeeplink(mallId, product.searchTerm, affiliateIds)
-      return `  <li style="margin:0 0 8px;"><a href="${link}" target="_blank" rel="nofollow sponsored noopener">${escapeHtml(product.name)}</a> — ${usd(product.price)} <span style="color:#888;">(${escapeHtml(product.brand)})</span></li>`
+      return `  <li style="margin:0 0 8px;"><a href="${link(product.sku, mallId)}" target="_blank" rel="nofollow sponsored noopener">${escapeHtml(product.name)}</a> — ${usd(product.price)} <span style="color:#888;">(${escapeHtml(product.brand)})</span></li>`
     })
     .filter(Boolean)
     .join('\n')
@@ -154,13 +184,13 @@ export function toShoppableHtml({
     tags,
     '  </div>',
     `  <figcaption style="margin-top:10px;font:400 13px/1.5 system-ui,sans-serif;color:#666;">`,
-    `    ${escapeHtml(title)} — 이미지의 태그를 누르면 ${escapeHtml(mall.label)} 검색 결과로 이동합니다.`,
+    `    ${escapeHtml(title)} — AI 생성 시안입니다. 태그를 누르면 ${escapeHtml(mall.label)}의 추천 제품 검색 결과로 이동합니다.`,
     '  </figcaption>',
     '</figure>',
     '<ul style="padding-left:18px;font:400 14px/1.6 system-ui,sans-serif;">',
     list,
     '</ul>',
-    '<p style="font-size:13px;color:#888;">이 포스팅은 제휴 마케팅 링크를 포함하며, 구매 발생 시 작성자가 일정액의 수수료를 제공받습니다.</p>',
+    `<p style="font-size:13px;color:#888;line-height:1.6;">${escapeHtml(DISCLOSURE)}</p>`,
   ].join('\n')
 }
 

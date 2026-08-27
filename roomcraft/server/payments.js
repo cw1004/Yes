@@ -65,6 +65,27 @@ export const fulfillPayment = db.transaction((paymentId) => {
   return { ok: true, alreadyFulfilled: false, userId: payment.user_id }
 })
 
+/**
+ * 구독 갱신 지급.
+ *
+ * 최초 결제만 처리하면 둘째 달부터 카드는 빠져나가는데 크레딧이 지급되지 않습니다.
+ * ref 에 인보이스/기간 식별자를 넣어 같은 청구 주기에 두 번 지급되지 않게 합니다.
+ */
+export const grantSubscriptionRenewal = db.transaction((userId, planId, ref) => {
+  const plan = PLANS[planId] ?? PLANS.free
+  const granted = grantMonthlyCredits(userId, plan.id, ref)
+  if (granted) db.prepare('UPDATE users SET plan_id = ? WHERE id = ?').run(plan.id, userId)
+  return { granted, credits: getBalance(userId), planId: plan.id }
+})
+
+/** 구독 종료 → Free 로 강등. 이미 지급된 크레딧은 회수하지 않습니다. */
+export const endSubscription = db.transaction((userId) => {
+  db.prepare("UPDATE users SET plan_id = 'free', stripe_subscription_id = NULL WHERE id = ?").run(userId)
+})
+
+const userByStripeCustomer = (customerId) =>
+  customerId ? db.prepare('SELECT * FROM users WHERE stripe_customer_id = ?').get(customerId) : null
+
 export const paymentsRouter = Router()
 
 paymentsRouter.get('/config', (_req, res) => {
@@ -148,6 +169,27 @@ paymentsRouter.post('/dev/complete', requireAuth, (req, res) => {
 })
 
 /**
+ * dev 전용 구독 갱신/해지 시뮬레이터.
+ * Stripe 없이도 갱신 지급 경로와 멱등성을 확인할 수 있게 합니다.
+ */
+paymentsRouter.post('/dev/renew', requireAuth, (req, res) => {
+  if (stripe) return res.status(403).json({ error: 'dev 시뮬레이터는 Stripe 설정 시 비활성화됩니다.' })
+
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id)
+  if (user.plan_id === 'free') return res.status(400).json({ error: '구독 중인 플랜이 없습니다.' })
+
+  const cycle = String(req.body?.cycle ?? new Date().toISOString().slice(0, 7))
+  const result = grantSubscriptionRenewal(user.id, user.plan_id, `renew:${user.id}:${cycle}`)
+  res.json(result)
+})
+
+paymentsRouter.post('/dev/cancel', requireAuth, (req, res) => {
+  if (stripe) return res.status(403).json({ error: 'dev 시뮬레이터는 Stripe 설정 시 비활성화됩니다.' })
+  endSubscription(req.user.id)
+  res.json({ ok: true, planId: 'free', credits: getBalance(req.user.id) })
+})
+
+/**
  * Stripe 웹훅.
  * 서명 검증을 위해 raw body 가 필요하므로 이 라우트에만 express.raw 를 씁니다.
  */
@@ -168,7 +210,37 @@ export const stripeWebhook = [
     if (event.type === 'checkout.session.completed') {
       const session = event.data.object
       const paymentId = session.metadata?.paymentId || session.client_reference_id
+      const userId = session.metadata?.userId
+      // 갱신 인보이스는 결제 세션이 아니라 고객 ID 로 도착하므로, 여기서 연결해 둡니다.
+      if (userId && session.customer) {
+        db.prepare('UPDATE users SET stripe_customer_id = ?, stripe_subscription_id = ? WHERE id = ?').run(
+          session.customer,
+          session.subscription ?? null,
+          userId,
+        )
+      }
       if (paymentId) fulfillPayment(paymentId)
+    }
+
+    // 구독 갱신. 최초 결제분은 checkout.session.completed 가 이미 처리했으므로 건너뜁니다.
+    if (event.type === 'invoice.payment_succeeded') {
+      const invoice = event.data.object
+      if (invoice.billing_reason !== 'subscription_create') {
+        const user = userByStripeCustomer(invoice.customer)
+        if (user && user.plan_id !== 'free') {
+          grantSubscriptionRenewal(user.id, user.plan_id, `invoice:${invoice.id}`)
+        }
+      }
+    }
+
+    if (event.type === 'customer.subscription.deleted') {
+      const user = userByStripeCustomer(event.data.object?.customer)
+      if (user) endSubscription(user.id)
+    }
+
+    if (event.type === 'invoice.payment_failed') {
+      // 즉시 강등하지 않습니다 — Stripe 가 재시도하며, 최종 실패는 subscription.deleted 로 옵니다.
+      console.warn('결제 실패 인보이스:', event.data.object?.id)
     }
 
     if (event.type === 'checkout.session.expired' || event.type === 'payment_intent.payment_failed') {
