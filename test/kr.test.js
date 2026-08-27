@@ -96,11 +96,32 @@ test('집계기: 10초봉 경계가 정확히 10초마다 끊긴다', () => {
 
 test('집계기: 여러 주기가 같은 틱에서 동시에 만들어진다', () => {
   const agg = new TickAggregator('005930');
-  feed(agg, 300); // 5분치
-  assert.strictEqual(agg.getCandles('10s').length, 30);
-  assert.strictEqual(agg.getCandles('30s').length, 10);
-  assert.strictEqual(agg.getCandles('1m').length, 5);
-  assert.strictEqual(agg.getCandles('5m').length, 1);
+  feed(agg, 600); // 10분치
+  assert.strictEqual(agg.getCandles('10s').length, 60);
+  assert.strictEqual(agg.getCandles('30s').length, 20);
+  assert.strictEqual(agg.getCandles('1m').length, 10);
+  assert.strictEqual(agg.getCandles('3m').length, 4);   // 09:30 경계 기준 3분 버킷
+  assert.strictEqual(agg.getCandles('5m').length, 2);
+  assert.strictEqual(agg.getCandles('10m').length, 1);
+});
+
+test('단타 주기: 1분~10분봉이 모두 지원된다', () => {
+  ['1m', '3m', '5m', '10m'].forEach((tf) => {
+    assert.ok(C.TIMEFRAMES[tf] > 0, tf + ' 주기 정의');
+  });
+  assert.strictEqual(C.TIMEFRAMES['10m'], 600);
+});
+
+test('시딩: 1분봉으로 10분봉을 만들면 지표가 나올 만큼 쌓인다', () => {
+  const agg = new TickAggregator('005930');
+  // 정규장 하루치(390분)를 시딩하면 10분봉 39개 → 지표 계산에 충분(30봉 이상)
+  const mins = Array.from({ length: 390 }, (_, i) => ({
+    t: T0 + i * 60000, o: 74000, h: 74200, l: 73900, c: 74100, v: 5000,
+  }));
+  agg.seedFromMinutes(mins);
+  assert.ok(agg.getCandles('10m').length >= 30, '10분봉 30개 이상: ' + agg.getCandles('10m').length);
+  assert.ok(agg.getCandles('5m').length >= 30);
+  assert.strictEqual(agg.getCandles('10s').length, 0, '초봉은 틱이 있어야 생긴다');
 });
 
 test('집계기: OHLC와 매수/매도 체결량 분리', () => {
@@ -182,6 +203,30 @@ test('신호: 플랜은 비용 차감 후 손익비 1.5 이상을 목표로 잡�
   assert.ok(plan.rr >= 1.4, `손익비 ${plan.rr}`);
   assert.ok(plan.netPerShare > 0, '순익이 양수');
   assert.ok(plan.targetTicks > plan.breakevenTicks, '목표는 본전 호가보다 크다');
+});
+
+test('신호: 목표 호가 상한이 봉 주기에 따라 달라진다', () => {
+  const a = KRSignal.analyze(syntheticCandles());
+  const caps = {};
+  for (const [tf, sec] of Object.entries(C.TIMEFRAMES)) {
+    const plan = KRSignal.buildPlan(a, 50, { market: 'KOSPI', barSeconds: sec });
+    caps[tf] = plan.maxTargetTicks;
+    assert.strictEqual(plan.barSeconds, sec);
+  }
+  assert.ok(caps['10s'] < caps['1m'], '10초봉 상한 < 1분봉 상한');
+  assert.ok(caps['1m'] < caps['5m'], '1분봉 상한 < 5분봉 상한');
+  assert.ok(caps['5m'] < caps['10m'], '5분봉 상한 < 10분봉 상한');
+  assert.ok(caps['10s'] >= 8, '초봉도 최소 8호가는 허용');
+});
+
+test('신호: 같은 목표라도 짧은 주기에서는 보류, 긴 주기에서는 실행 가능', () => {
+  const a = KRSignal.analyze(syntheticCandles());
+  const short = KRSignal.buildPlan(a, 50, { market: 'KOSPI', barSeconds: 10, maxTargetTicks: 3 });
+  const long = KRSignal.buildPlan(a, 50, { market: 'KOSPI', barSeconds: 600 });
+  assert.strictEqual(short.viable, false, '10초봉에서 3호가 상한이면 보류');
+  assert.match(short.note, /10초봉 기준으로는 무리/);
+  assert.strictEqual(long.viable, true, '10분봉에서는 같은 목표가 실행 가능');
+  assert.match(long.note, /비용 차감 후/);
 });
 
 test('신호: 롱/숏 방향에 따라 손절·목표 위치가 뒤집힌다', () => {

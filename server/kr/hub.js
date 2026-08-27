@@ -66,7 +66,8 @@ class KrHub extends EventEmitter {
     try {
       const [quote, minutes] = await Promise.all([
         this.client.price(code),
-        this.client.minuteCandles(code, 200),
+        // 10분봉도 30봉 이상 나오도록 정규장 하루치(390분)를 시딩한다
+        this.client.minuteCandles(code, 390),
       ]);
       st.quote = quote;
       st.market = quote.market || 'KOSPI';

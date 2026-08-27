@@ -109,6 +109,7 @@
         quote: snap.quote,
         market: snap.market,
         phase: snap.phase,
+        barSeconds: C.TIMEFRAMES[state.tf] || 10,
       });
     } else {
       state.analysis = null;

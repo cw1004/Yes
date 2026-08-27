@@ -13,7 +13,7 @@
 
 const { TIMEFRAMES } = require('./config');
 
-const DEFAULT_TFS = ['10s', '20s', '30s', '1m', '3m', '5m'];
+const DEFAULT_TFS = ['10s', '20s', '30s', '1m', '3m', '5m', '10m'];
 
 class TickAggregator {
   /**

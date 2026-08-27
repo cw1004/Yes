@@ -185,6 +185,10 @@
     const atrTicks = atr ? Math.max(1, Math.round(atr / tick)) : 2;
     const stopTicks = Math.max(2, Math.min(20, atrTicks));
     const targetRR = ctx.targetRR || 1.5;
+    // 목표 호가 상한은 봉 주기에 따라 달라진다.
+    // 10초봉에서 40호가를 노리는 건 비현실적이지만, 10분봉이라면 정상 범위다.
+    const barSeconds = ctx.barSeconds || 10;
+    const maxTargetTicks = ctx.maxTargetTicks || Math.max(8, Math.round(Math.sqrt(barSeconds) * 2));
     // 목표는 "왕복비용을 덮고도 손익비 1.5가 되는" 호가수로 역산한다.
     //   순익 = 목표틱*틱 - 비용,  리스크 = 손절틱*틱 + 비용
     //   순익 / 리스크 >= targetRR  →  목표틱 = (targetRR*리스크 + 비용) / 틱
@@ -214,12 +218,14 @@
       stopTicks, targetTicks, breakevenTicks: beTicks,
       grossPerShare, costPerShare, netPerShare, riskPerShare,
       rr: riskPerShare > 0 ? netPerShare / riskPerShare : null,
-      // 초단타에서 15호가 넘게 벌어야 하는 자리는 사실상 잡기 어렵다
-      viable: netPerShare > 0 && targetTicks <= 15,
+      barSeconds,
+      maxTargetTicks,
+      // 해당 주기에서 현실적으로 잡을 수 있는 폭인지 확인한다
+      viable: netPerShare > 0 && targetTicks <= maxTargetTicks,
       note: netPerShare <= 0
         ? `목표 ${targetTicks}호가로는 비용(${Math.round(costPerShare)}원/주)을 못 덮는다`
-        : targetTicks > 15
-          ? `손익비 ${targetRR}을 맞추려면 ${targetTicks}호가가 필요해 초단타로는 무리`
+        : targetTicks > maxTargetTicks
+          ? `손익비 ${targetRR}을 맞추려면 ${targetTicks}호가가 필요해 ${labelFor(barSeconds)} 기준으로는 무리`
           : `비용 차감 후 주당 약 ${Math.round(netPerShare)}원`,
     };
   }
@@ -240,6 +246,12 @@
       notional: qty * entry,
       maxLoss: qty * riskPerShare,
     };
+  }
+
+  /** 봉 주기를 사람이 읽는 말로 */
+  function labelFor(seconds) {
+    if (seconds < 60) return `${seconds}초봉`;
+    return `${Math.round(seconds / 60)}분봉`;
   }
 
   function fmtQty(v) {

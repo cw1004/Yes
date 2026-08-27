@@ -164,7 +164,7 @@ function marketPhase(date = new Date()) {
 /** 초단타에서 쓰는 봉 주기 (초 단위) */
 const TIMEFRAMES = {
   '10s': 10, '20s': 20, '30s': 30,
-  '1m': 60, '3m': 180, '5m': 300,
+  '1m': 60, '3m': 180, '5m': 300, '10m': 600,
 };
 
 module.exports = {

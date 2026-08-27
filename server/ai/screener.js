@@ -135,6 +135,7 @@ async function screenKR(opts = {}) {
       quote,
       market: quote.market || 'KOSPI',
       phase: KRC.marketPhase(),
+      barSeconds: 60,   // 스크리닝은 1분봉 기준
     });
     const st = signal.stats;
 

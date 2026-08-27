@@ -192,6 +192,8 @@ class Trader extends EventEmitter {
       flow: st.agg.recentStats('10s', 6),
       quote: st.quote,
       market: st.market || 'KOSPI',
+      // 판단 주기에 맞춰 현실적인 목표 폭을 잡는다
+      barSeconds: C.TIMEFRAMES[this.config.timeframe] || 10,
     });
     st.signal = signal;
 

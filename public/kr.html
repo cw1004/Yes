@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>ScalpDesk KR · 한국 주식 초단타</title>
-<meta name="description" content="한국투자증권 API 기반 초단타 시스템 — 10초봉부터 5분봉까지, 호가창·체결틱·매매신호·자동매매" />
+<meta name="description" content="한국투자증권 API 기반 단타·초단타 시스템 — 10초봉부터 10분봉까지, 호가창·체결틱·매매신호·자동매매" />
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='26' font-size='26'%3E%E2%9A%A1%3C/text%3E%3C/svg%3E" />
 <link rel="manifest" href="/manifest.webmanifest" />
 <meta name="theme-color" content="#0b0d12" />
@@ -46,6 +46,7 @@
     <button data-tf="1m">1분</button>
     <button data-tf="3m">3분</button>
     <button data-tf="5m">5분</button>
+    <button data-tf="10m">10분</button>
   </div>
 
   <span id="phaseBadge" class="badge">—</span>
@@ -170,6 +171,8 @@
         <select id="cfgTimeframe">
           <option value="10s">10초봉</option><option value="20s">20초봉</option>
           <option value="30s">30초봉</option><option value="1m">1분봉</option>
+          <option value="3m">3분봉</option><option value="5m">5분봉</option>
+          <option value="10m">10분봉</option>
         </select>
       </label>
       <label>진입 점수 <input type="number" id="cfgEntryScore" value="45" min="10" max="100" /></label>
