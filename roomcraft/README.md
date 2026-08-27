@@ -434,6 +434,99 @@ CSP 를 좁게 잡았습니다(외부 스크립트·스타일을 쓰지 않으�
 `/assets` 아래 파일은 Vite 가 콘텐츠 해시를 붙이므로 1년 immutable 로 캐시하고,
 `index.html` 은 `no-cache` 로 항상 최신을 받게 합니다.
 
+### DNS 설정
+
+도메인을 정한 뒤 아래 순서로 설정합니다. **④번이 실제 병목입니다** — 인증 메일이
+도착하지 않으면 신규 가입자가 크레딧을 못 받고 그대로 이탈합니다.
+
+#### ① 앱 연결 (Fly 기준)
+
+```
+A     @      <fly가 알려주는 IPv4>
+AAAA  @      <fly가 알려주는 IPv6>
+CNAME www    <앱>.fly.dev
+```
+
+```bash
+fly certs add roomcraft.com
+fly certs add www.roomcraft.com
+```
+
+`fly.toml` 의 `APP_URL` 도 실제 도메인(https)으로 바꿔야 합니다. http 로 두면
+세션 쿠키가 secure 라 로그인이 아예 되지 않고, 서버가 기동을 거부합니다.
+
+#### ② 발송 도메인은 앱 도메인과 같게
+
+`MAIL_FROM=RoomCraft <no-reply@roomcraft.com>` 처럼 앱과 같은 도메인을 쓰세요.
+**DMARC 는 `From:` 헤더의 도메인을 기준으로 판정**하므로, 발신 도메인이 다르면
+SPF·DKIM 을 아무리 잘 맞춰도 정렬(alignment)에서 실패합니다.
+
+#### ③ SPF
+
+도메인당 **정확히 하나**만 둡니다. 두 개 이상이면 permerror 로 전부 무효가 됩니다.
+
+```
+TXT  @   v=spf1 include:<발송서비스가 안내하는 도메인> ~all
+```
+
+- `~all`(softfail) 로 시작해 안정되면 `-all`(hardfail) 로 조입니다
+- `+all` 은 절대 쓰지 마세요 — 누구나 이 도메인으로 발송할 수 있게 됩니다
+- **DNS 조회 10회 제한**이 있습니다. `include` 를 여러 개 붙이면 금방 넘고,
+  넘으면 SPF 전체가 무효가 됩니다
+
+#### ④ DKIM
+
+발송 서비스가 셀렉터와 공개키를 발급합니다. 서비스마다 셀렉터 이름이 다릅니다.
+
+```
+TXT  <셀렉터>._domainkey   v=DKIM1; k=rsa; p=<공개키>
+```
+
+`p=` 가 비어 있으면 **폐기된 키**입니다(RFC 6376). 검사기가 이 경우도 잡아냅니다.
+
+#### ⑤ DMARC
+
+Gmail·Outlook 은 대량 발신자에게 DMARC 를 요구합니다. 없으면 인증 메일이
+스팸함으로 갑니다.
+
+```
+TXT  _dmarc   v=DMARC1; p=none; rua=mailto:dmarc@roomcraft.com
+```
+
+`p=none` 은 **모니터링 단계**입니다. 리포트(`rua`)로 정렬 실패를 확인한 뒤
+`quarantine` → `reject` 로 올리세요. 처음부터 `reject` 로 두면 설정 실수가
+그대로 메일 전면 차단이 됩니다.
+
+#### 점검
+
+```bash
+node scripts/mail-doctor.mjs --domain roomcraft.com
+node scripts/mail-doctor.mjs --domain roomcraft.com --selector s1 --send me@example.com
+```
+
+검사 항목:
+
+| 항목 | 무엇을 보는가 |
+|---|---|
+| `From:` 정렬 | `MAIL_FROM` 도메인이 점검 도메인과 같은지 (DMARC 판정 기준) |
+| SPF | 존재·중복·`all` 정책·**DNS 조회 10회 제한** |
+| DKIM | 셀렉터별 공개키. 미지정 시 흔한 셀렉터 16개를 훑음. `p=` 빈 폐기 키 감지 |
+| DMARC | 정책 단계와 `rua` 리포트 주소 |
+| MX | 반송·문의 수신 가능 여부 |
+| SMTP | 실제 연결(`verify`)과 `--send` 로 실제 발송 |
+
+"레코드 없음" 과 "DNS 조회 실패" 를 구분합니다 — 타임아웃을 '없음' 으로 보고하면
+멀쩡한 설정을 고치려 들게 됩니다.
+
+`--send` 로 받은 메일은 **원문의 `Authentication-Results` 헤더**에서
+`spf=pass`, `dkim=pass`, `dmarc=pass` 를 확인하세요. 받은편지함에 왔다고
+끝이 아닙니다.
+
+#### 새 도메인 워밍업
+
+갓 등록한 도메인은 발신 평판이 없어 초기에 스팸 분류될 수 있습니다.
+오픈 전 며칠간 소량으로 실제 발송해 평판을 쌓으세요.
+
 ### 배포본 검증
 
 E2E 는 `BASE_URL` 로 어느 주소든 겨냥할 수 있습니다. 배포 후 실제 도메인에 대고 돌리세요.

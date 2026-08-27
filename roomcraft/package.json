@@ -14,7 +14,8 @@
     "test:e2e": "node smoke.mjs && node e2e-auth.mjs",
     "dev:all": "node -e \"console.log('터미널 두 개로: npm run server / npm run dev')\"",
     "start": "node server/index.js",
-    "build:deploy": "npm run build && NODE_ENV=production node server/index.js"
+    "build:deploy": "npm run build && NODE_ENV=production node server/index.js",
+    "mail:check": "node scripts/mail-doctor.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.120.0",
