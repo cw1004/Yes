@@ -65,6 +65,28 @@
 
   <section class="picks" id="picks"></section>
 
+  <section class="panel scan-panel" id="scanPanel">
+    <div class="panel-head">
+      <h2>⚡ 실시간 단타 후보 <span class="scan-dot" id="scanDot"></span></h2>
+      <span class="muted" id="scanNote">대기 중</span>
+      <label class="scan-toggle"><input type="checkbox" id="scanOn" /> 자동 스캔</label>
+    </div>
+    <p class="scan-help">
+      미국·한국 종목을 계속 다시 훑어 <b>지금 단타를 하기 좋은 순서</b>로 정렬합니다.
+      점수는 방향이 아니라 <b>단타 적합도</b>(유동성 · 변동성 · 비용 대비 기대폭 · 지금 움직이는가 · 방향의 선명함)입니다.
+    </p>
+    <div class="scan-grid">
+      <div class="scan-col">
+        <div class="scan-col-head">🇺🇸 미국 <span class="muted" id="scanUsMeta"></span></div>
+        <div id="scanUs" class="scan-list"><div class="muted scan-empty">아직 스캔 전</div></div>
+      </div>
+      <div class="scan-col">
+        <div class="scan-col-head">🇰🇷 한국 <span class="muted" id="scanKrMeta"></span></div>
+        <div id="scanKr" class="scan-list"><div class="muted scan-empty">아직 스캔 전</div></div>
+      </div>
+    </div>
+  </section>
+
   <section class="panel perf-panel" id="perfPanel">
     <div class="panel-head">
       <h2>추천 성과 추적</h2>

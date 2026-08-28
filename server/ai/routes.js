@@ -8,6 +8,7 @@
 
 const recommender = require('./recommender');
 const screener = require('./screener');
+const scanner = require('./scanner');
 const providers = require('./providers');
 const tracker = require('./tracker');
 const news = require('./news');
@@ -21,6 +22,7 @@ const HORIZONS = ['당일 단타', '당일~2일 단타', '2~3일 스윙', '1~2�
 const RISKS = ['보수적', '중립', '공격적'];
 
 const pick = (value, allowed, fallback) => (allowed.includes(value) ? value : fallback);
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
 /** 성과 채점에 쓸 현재가 조회 */
 async function getPrice(market, symbol) {
@@ -76,6 +78,42 @@ async function handle(req, res, url, sendJSON) {
           codes: market === 'KR' ? symbols : undefined,
           limit: Number(params.get('limit')) || 10,
         }));
+        return true;
+      }
+
+      case '/api/ai/scan': {
+        // 실시간 단타 후보 — 구독자가 없으면 여기서 한 번 돌려서 씨앗을 만든다
+        const sc = scanner.get();
+        const limit = clamp(Number(params.get('limit')) || 8, 3, 20);
+        if (params.get('start') === '1') sc.start();
+        sendJSON(res, 200, Object.assign(sc.snapshot(limit), { best: sc.best(limit) }));
+        return true;
+      }
+
+      case '/api/ai/scan/stream': {
+        const sc = scanner.get();
+        res.writeHead(200, {
+          'Content-Type': 'text/event-stream; charset=utf-8',
+          'Cache-Control': 'no-cache, no-transform',
+          Connection: 'keep-alive',
+          'X-Accel-Buffering': 'no',
+        });
+        res.write(': connected\n\n');
+        const client = sc.addClient(res);
+        // 붙자마자 지금까지 모아 둔 결과를 먼저 보낸다 (첫 스캔까지 기다리지 않게)
+        res.write(`data: ${JSON.stringify({ type: 'snapshot', data: sc.snapshot() })}\n\n`);
+        const ping = setInterval(() => {
+          try { res.write(': ping\n\n'); } catch (_) { clearInterval(ping); }
+        }, 15000);
+        req.on('close', () => {
+          clearInterval(ping);
+          sc.removeClient(client);
+        });
+        return true;
+      }
+
+      case '/api/ai/scan/stop': {
+        sendJSON(res, 200, scanner.get().stop('사용자 정지'));
         return true;
       }
 

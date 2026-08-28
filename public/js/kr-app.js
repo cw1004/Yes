@@ -452,7 +452,11 @@
     setIf('#cfgTimeframe', cfg.timeframe);
     setIf('#cfgEntryScore', cfg.entryScore);
     setIf('#cfgExitScore', cfg.exitScore);
+    setIf('#cfgSizingMode', cfg.sizingMode || 'auto');
     setIf('#cfgOrderAmount', cfg.orderAmount);
+    setIf('#cfgRiskPct', cfg.riskPct);
+    setIf('#cfgFixedQty', cfg.fixedQty);
+    syncSizingFields();
     setIf('#cfgMaxPositions', cfg.maxPositions);
     setIf('#cfgMaxHold', cfg.maxHoldSeconds);
     setIf('#cfgTrailing', cfg.trailingTicks);
@@ -512,7 +516,10 @@
         timeframe: $('#cfgTimeframe').value,
         entryScore: Number($('#cfgEntryScore').value),
         exitScore: Number($('#cfgExitScore').value),
+        sizingMode: $('#cfgSizingMode').value,
         orderAmount: Number($('#cfgOrderAmount').value),
+        riskPct: Number($('#cfgRiskPct').value),
+        fixedQty: Number($('#cfgFixedQty').value),
         exitBasis: $('#cfgExitBasis').value,
         stopLossPct: Number($('#cfgStopPct').value),
         takeProfitPct: Number($('#cfgTpPct').value),
@@ -537,7 +544,7 @@
   /** 선택한 기준의 입력칸만 보여 준다 */
   function syncExitFields() {
     const basis = $('#cfgExitBasis').value;
-    $$('.exit-fields').forEach((el) => { el.hidden = el.dataset.basis !== basis; });
+    $$('.exit-fields[data-basis]').forEach((el) => { el.hidden = el.dataset.basis !== basis; });
     const hints = {
       signal: '신호 엔진이 변동성(ATR)에 맞춰 손절·목표를 자동으로 잡습니다.',
       percent: '진입가 기준 퍼센트로 손절·목표를 잡습니다. 봉 주기와 무관합니다.',
@@ -545,6 +552,12 @@
       ticks: '호가(틱) 개수로 잡습니다. 가장 촘촘한 초단타용입니다.',
     };
     $('#exitHint').innerHTML = `${hints[basis] || ''} 봉 주기와 상관없이 <b>틱 단위 실시간</b>으로 감시합니다.`;
+  }
+
+  /** 수량 결정 방식에 맞는 입력칸만 보여 준다 */
+  function syncSizingFields() {
+    const mode = $('#cfgSizingMode').value;
+    $$('.exit-fields[data-sizing]').forEach((el) => { el.hidden = el.dataset.sizing !== mode; });
   }
 
   /** 지금 설정으로 사면 손절·목표가 얼마가 되는지 미리 보여 준다 */
@@ -643,6 +656,7 @@
 
     $('#cfgSave').addEventListener('click', saveTraderConfig);
     $('#cfgExitBasis').addEventListener('change', () => { syncExitFields(); updateBracketPreview(); });
+    $('#cfgSizingMode').addEventListener('change', syncSizingFields);
     $('#ordBracket').addEventListener('change', updateBracketPreview);
     $$('.exit-fields input').forEach((el) => el.addEventListener('input', updateBracketPreview));
     $('#resumeBtn').addEventListener('click', async () => {
@@ -685,6 +699,7 @@
     bindControls();
     bindSearch();
     syncExitFields();
+    syncSizingFields();
     renderWatchlist();
     loadNames();
     refreshWatchQuotes();

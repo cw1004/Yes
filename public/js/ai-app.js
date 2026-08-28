@@ -26,6 +26,9 @@
     performance: null,
     startedAt: 0,
     timer: null,
+    scanOn: LS.get('scanOn', false),
+    scanES: null,
+    scan: { US: null, KR: null },
   };
 
   /* ------------------------------------------------------------- 유틸 */
@@ -388,7 +391,119 @@
     }
 
     $('#picks').innerHTML = '<div class="empty-state">아직 분석 결과가 없습니다. 상단의 <b>AI 분석 실행</b>을 눌러 주세요.</div>';
+    bindScanner();
     loadPerformance();
+  }
+
+
+  /* --------------------------------------------------- 실시간 단타 스캐너 */
+
+  /** 시장별 가격 표기 (스캐너는 두 시장을 동시에 보여 주므로 행마다 따로 판단한다) */
+  const rowPrice = (v, market) => (v == null || !isFinite(v) ? '—'
+    : market === 'KR' ? Math.round(v).toLocaleString('ko-KR') : v.toFixed(2));
+
+  function scanRow(r) {
+    const chartHref = r.market === 'KR'
+      ? '/kr.html#' + encodeURIComponent(r.symbol)
+      : '/#' + encodeURIComponent(r.symbol);
+    const dir = r.side === 'long' ? '매수' : '매도';
+    const why = (r.parts || []).slice(0, 3).map((p) => esc(p.label)).join(' · ');
+    const planText = r.plan
+      ? `진입 ${rowPrice(r.plan.entry, r.market)} · 손절 ${rowPrice(r.plan.stop, r.market)} · 목표 ${rowPrice(r.plan.target, r.market)}`
+      : '플랜 없음';
+    return `<a class="scan-row grade-${esc(r.grade)}" href="${chartHref}">
+      <span class="scan-fit">${r.fit}</span>
+      <span class="scan-main">
+        <span class="scan-name">${esc(r.name || r.symbol)}
+          <span class="scan-sym">${esc(r.symbol)}</span>
+          ${r.isNew ? '<span class="scan-new">NEW</span>' : ''}
+          <span class="scan-side ${r.side}">${dir}</span>
+        </span>
+        <span class="scan-why">${why || '&nbsp;'}</span>
+        <span class="scan-plan">${planText}</span>
+      </span>
+      <span class="scan-right">
+        <span>${rowPrice(r.price, r.market)}</span>
+        <span class="${cls(r.changePercent)}">${pct(r.changePercent)}</span>
+        <span class="scan-grade">${esc(r.grade)} · ${esc(r.text)}</span>
+      </span>
+    </a>`;
+  }
+
+  function renderScanMarket(market) {
+    const view = state.scan[market];
+    const listEl = $(market === 'US' ? '#scanUs' : '#scanKr');
+    const metaEl = $(market === 'US' ? '#scanUsMeta' : '#scanKrMeta');
+    if (!view) return;
+
+    if (view.error) {
+      metaEl.textContent = '오류';
+      listEl.innerHTML = `<div class="muted scan-empty">스캔 실패: ${esc(view.error)}</div>`;
+      return;
+    }
+    const parts = [];
+    if (view.asOf) parts.push(new Date(view.asOf).toLocaleTimeString('ko-KR', { hour12: false }));
+    if (view.scanned) parts.push(view.scanned + '종목');
+    if (view.source) parts.push(view.source === 'mock' ? '데모' : view.source);
+    if (view.phase && view.phase !== 'regular') parts.push(phaseText(view.phase));
+    metaEl.textContent = parts.join(' · ');
+
+    const rows = (view.top || []).filter((r) => r.fit >= 40);
+    listEl.innerHTML = rows.length
+      ? rows.map(scanRow).join('')
+      : '<div class="muted scan-empty">지금은 단타에 쓸 만한 종목이 없습니다</div>';
+  }
+
+  const PHASE_TEXT = {
+    preopen: '장전 동시호가', regular: '정규장', closeauction: '장마감 동시호가',
+    after: '시간외', closed: '장 마감',
+  };
+  const phaseText = (p) => PHASE_TEXT[p] || p;
+
+  function applyScan(snapshot) {
+    if (snapshot.US) state.scan.US = snapshot.US;
+    if (snapshot.KR) state.scan.KR = snapshot.KR;
+    renderScanMarket('US');
+    renderScanMarket('KR');
+    const running = (state.scan.US && state.scan.US.running) || (state.scan.KR && state.scan.KR.running);
+    $('#scanDot').classList.toggle('on', !!running);
+    $('#scanNote').textContent = running ? '실시간 스캔 중' : '정지됨';
+  }
+
+  function startScan() {
+    if (state.scanES) return;
+    $('#scanNote').textContent = '연결 중…';
+    const es = new EventSource('/api/ai/scan/stream');
+    state.scanES = es;
+    es.onmessage = (ev) => {
+      let msg;
+      try { msg = JSON.parse(ev.data); } catch (_) { return; }
+      if (msg.type === 'snapshot') applyScan(msg.data);
+      else if (msg.type === 'scan') applyScan({ [msg.market]: msg.data });
+    };
+    es.onerror = () => {
+      $('#scanNote').textContent = '연결 끊김 · 다시 연결 중';
+    };
+  }
+
+  function stopScan() {
+    if (state.scanES) { state.scanES.close(); state.scanES = null; }
+    $('#scanDot').classList.remove('on');
+    $('#scanNote').textContent = '정지됨';
+  }
+
+  function bindScanner() {
+    const box = $('#scanOn');
+    box.checked = !!state.scanOn;
+    box.addEventListener('change', () => {
+      state.scanOn = box.checked;
+      LS.set('scanOn', state.scanOn);
+      if (state.scanOn) startScan(); else stopScan();
+    });
+    // 켜져 있지 않아도 마지막으로 모아 둔 결과는 한 번 보여 준다
+    api('/api/ai/scan').then(applyScan).catch(() => {});
+    if (state.scanOn) startScan();
+    window.addEventListener('beforeunload', stopScan);
   }
 
   function fillSelect(sel, options, selected) {

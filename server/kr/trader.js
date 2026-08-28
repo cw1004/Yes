@@ -33,6 +33,11 @@ const DEFAULT_CONFIG = {
   entryScore: 45,           // 이 점수 이상이면 매수 진입
   exitScore: -15,           // 보유 중 점수가 이 아래로 떨어지면 청산
   maxPositions: 2,
+  // 수량 결정 방식
+  //   auto : 계좌·위험도(riskPct)·1회 투입액(orderAmount)에서 자동 계산 (기본)
+  //   qty  : 아래 fixedQty 주식 수를 그대로 사용 (직접 입력)
+  sizingMode: 'auto',
+  fixedQty: 10,             // sizingMode='qty' 일 때 매수할 주식 수
   orderAmount: 1000000,     // 1회 최대 투입액(원)
   riskPct: 0.5,             // 계좌 대비 1회 허용 손실(%)
   // 청산 기준 — 봉 주기와 무관하게 이 값으로 손절·목표 가격이 정해진다
@@ -124,6 +129,8 @@ class Trader extends EventEmitter {
     next.entryScore = clamp(num(next.entryScore, 45), 10, 100);
     next.exitScore = clamp(num(next.exitScore, -15), -100, 50);
     next.maxPositions = clamp(Math.floor(num(next.maxPositions, 2)), 1, 10);
+    next.sizingMode = next.sizingMode === 'qty' ? 'qty' : 'auto';
+    next.fixedQty = clamp(Math.floor(num(next.fixedQty, 10)), 1, 100000);
     next.orderAmount = Math.max(0, num(next.orderAmount, 1000000));
     next.riskPct = clamp(num(next.riskPct, 0.5), 0.05, 10);
     next.maxHoldSeconds = clamp(Math.floor(num(next.maxHoldSeconds, 180)), 5, 3600);
@@ -368,6 +375,47 @@ class Trader extends EventEmitter {
     };
   }
 
+  /**
+   * 매수 수량을 정한다.
+   *   sizingMode='qty'  → 사용자가 입력한 주식 수 그대로. 단, 주문가능현금을 넘지는 못한다.
+   *   sizingMode='auto' → 기존처럼 계좌·위험도·1회 투입액에서 역산.
+   * @returns {{qty:number, reason:string, wanted:number, limitedBy:string}|null}
+   */
+  resolveQty({ cash, entry, riskPerShare }) {
+    const cfg = this.config;
+    if (!entry || entry <= 0) return null;
+
+    if (cfg.sizingMode === 'qty') {
+      const wanted = Math.max(1, Math.floor(cfg.fixedQty));
+      const affordable = Math.floor(cash / entry);
+      const qty = Math.max(0, Math.min(wanted, affordable));
+      return {
+        qty,
+        wanted,
+        limitedBy: qty < wanted ? 'cash' : 'fixed',
+        reason: qty < wanted
+          ? `직접 입력 ${wanted}주 → 현금 부족으로 ${qty}주`
+          : `직접 입력 ${wanted}주`,
+      };
+    }
+
+    const sizing = KRSignal.positionSize({
+      cash,
+      riskPct: cfg.riskPct,
+      riskPerShare,
+      entry,
+      maxAmount: cfg.orderAmount,
+    });
+    if (!sizing) return null;
+    const label = { risk: '위험도', cap: '1회 투입액', cash: '현금' }[sizing.limitedBy] || sizing.limitedBy;
+    return {
+      qty: sizing.qty,
+      wanted: sizing.qty,
+      limitedBy: sizing.limitedBy,
+      reason: `자동 계산 ${sizing.qty}주 (${label} 기준)`,
+    };
+  }
+
   /* ------------------------------------------------------------ 진입/청산 */
 
   async _enter(st, signal) {
@@ -379,21 +427,18 @@ class Trader extends EventEmitter {
       return;
     }
 
-    let cash = this.config.orderAmount;
+    // 수량을 직접 입력한 경우에는 1회 투입액 한도로 깎지 않는다 (입력한 수량이 곧 의도)
+    const cap = this.config.sizingMode === 'qty' ? Infinity : this.config.orderAmount;
+    let cash = isFinite(cap) ? cap : this.config.fixedQty * plan.entry;
     try {
       const bal = await this.client.balance();
-      cash = Math.min(this.config.orderAmount, bal.orderableCash || bal.cash || 0);
+      const orderable = bal.orderableCash || bal.cash || 0;
+      cash = isFinite(cap) ? Math.min(cap, orderable) : orderable;
     } catch (err) {
       this._log('warn', 'BALANCE', `잔고 조회 실패, 설정 금액으로 진행: ${err.message}`);
     }
 
-    const sizing = KRSignal.positionSize({
-      cash,
-      riskPct: this.config.riskPct,
-      riskPerShare: plan.riskPerShare,
-      entry: plan.entry,
-      maxAmount: this.config.orderAmount,
-    });
+    const sizing = this.resolveQty({ cash, entry: plan.entry, riskPerShare: plan.riskPerShare });
     if (!sizing || sizing.qty < 1) {
       this._log('info', 'SKIP', `${code} 수량 0주 (투입 가능 ${Math.round(cash).toLocaleString()}원)`);
       return;
@@ -402,7 +447,7 @@ class Trader extends EventEmitter {
     const result = await this._placeOrder({
       code, side: 'buy', qty: sizing.qty, price: plan.entry,
       ordDvsn: this.config.entryOrdDvsn,
-      why: `신호 ${signal.score}점 (${signal.label})`,
+      why: `신호 ${signal.score}점 (${signal.label}) · ${sizing.reason}`,
     });
     if (!result.ok) return;
 
@@ -521,7 +566,9 @@ class Trader extends EventEmitter {
     if (this.inFlight.has(code)) return { ok: false, reason: '중복 주문 방지' };
 
     const amount = qty * price;
-    if (side === 'buy' && this.config.orderAmount > 0 && amount > this.config.orderAmount * 1.02) {
+    // 수량을 직접 입력했다면 그 수량이 곧 사용자의 의도이므로 금액 한도로 되돌려 막지 않는다.
+    const amountCapped = this.config.sizingMode !== 'qty';
+    if (side === 'buy' && amountCapped && this.config.orderAmount > 0 && amount > this.config.orderAmount * 1.02) {
       return { ok: false, reason: `1회 투입 한도 초과 (${Math.round(amount).toLocaleString()}원)` };
     }
 

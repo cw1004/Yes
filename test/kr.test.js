@@ -702,6 +702,61 @@ test('테스트 정리: 장 상태 함수를 원래대로 되돌린다', () => {
   assert.strictEqual(C.marketPhase, REAL_MARKET_PHASE);
 });
 
+/* ---------------------------------------------------- 수량 직접 입력 */
+
+test('수량: 직접 입력 모드는 신호와 상관없이 그 주식 수로 산다', () => {
+  const trader = makeTrader({ sizingMode: 'qty', fixedQty: 7 });
+  const r = trader.resolveQty({ cash: 100000000, entry: 74800, riskPerShare: 300 });
+  assert.strictEqual(r.qty, 7, '입력한 7주 그대로');
+  assert.match(r.reason, /직접 입력 7주/);
+  trader.close();
+});
+
+test('수량: 직접 입력이어도 주문가능현금을 넘지는 못한다', () => {
+  const trader = makeTrader({ sizingMode: 'qty', fixedQty: 100 });
+  const r = trader.resolveQty({ cash: 300000, entry: 74800, riskPerShare: 300 });
+  assert.strictEqual(r.qty, 4, '30만원이면 74,800원짜리는 4주');
+  assert.strictEqual(r.limitedBy, 'cash');
+  assert.match(r.reason, /현금 부족/);
+  trader.close();
+});
+
+test('수량: 직접 입력 모드에서는 1회 투입액 한도로 주문이 막히지 않는다', async () => {
+  const trader = makeTrader({ sizingMode: 'qty', fixedQty: 50, orderAmount: 100000 });
+  const r = await trader._placeOrder({
+    code: '005930', side: 'buy', qty: 50, price: 74800,
+    ordDvsn: C.ORD_DVSN.지정가, why: '테스트', force: true,
+  });
+  assert.strictEqual(r.ok, true, '374만원이어도 직접 입력이면 나간다');
+  trader.close();
+});
+
+test('수량: 자동 계산 모드는 1회 투입액 한도를 그대로 지킨다', async () => {
+  const trader = makeTrader({ sizingMode: 'auto', orderAmount: 100000 });
+  const r = await trader._placeOrder({
+    code: '005930', side: 'buy', qty: 50, price: 74800,
+    ordDvsn: C.ORD_DVSN.지정가, why: '테스트', force: true,
+  });
+  assert.strictEqual(r.ok, false);
+  assert.match(r.reason, /1회 투입 한도 초과/);
+  trader.close();
+});
+
+test('수량: 자동 계산 모드는 위험도·금액에서 역산한다', () => {
+  const trader = makeTrader({ sizingMode: 'auto', riskPct: 1, orderAmount: 10000000 });
+  const r = trader.resolveQty({ cash: 10000000, entry: 10000, riskPerShare: 100 });
+  // 위험 허용액 10만원 / 주당 위험 100원 = 1000주, 현금으로는 1000주 → 1000주
+  assert.strictEqual(r.qty, 1000);
+  assert.match(r.reason, /자동 계산/);
+  trader.close();
+});
+
+test('수량: fixedQty 는 1주 미만으로 내려가지 않는다', () => {
+  const trader = makeTrader({ sizingMode: 'qty', fixedQty: 0 });
+  assert.strictEqual(trader.config.fixedQty, 1);
+  trader.close();
+});
+
 /* ------------------------------------------------------------------ 실행 */
 
 (async () => {

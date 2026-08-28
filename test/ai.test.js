@@ -518,6 +518,163 @@ test('스크리너: 조회 실패 종목은 건너뛴다', async () => {
   assert.ok(!scan.candidates.some((c) => c.symbol.includes('!')));
 });
 
+/* ------------------------------------------------ 실시간 단타 스캐너 */
+
+const scanner = require('../server/ai/scanner.js');
+
+/** 스캐너 테스트용 종목 행 */
+function row(over = {}) {
+  return Object.assign({
+    symbol: 'AAPL', name: 'Apple', price: 200, changePercent: 1.0,
+    score: 60, label: '매수',
+    technicals: { atrPct: 0.8, volumeRatio: 2.0, breakevenTicks: 3 },
+    plan: { side: 'long', entry: 200, stop: 198, target: 204, rr: 2.0, targetTicks: 9 },
+  }, over);
+}
+
+test('스캐너: 적합도는 방향 점수가 아니라 단타 조건으로 매긴다', () => {
+  // 방향 점수는 같지만 거래량·변동성이 다르면 적합도가 갈린다
+  const good = scanner.fitness(row(), 'US');
+  const thin = scanner.fitness(row({
+    technicals: { atrPct: 0.05, volumeRatio: 0.2 },
+  }), 'US');
+  assert.ok(good.fit > thin.fit, `활발한 종목이 더 높아야 함 (${good.fit} vs ${thin.fit})`);
+  assert.ok(thin.fit < 45, '거래도 없고 안 움직이면 단타 부적합: ' + thin.fit);
+});
+
+test('스캐너: 변동성이 과열이면 오히려 감점한다', () => {
+  const sweet = scanner.fitness(row({ technicals: { atrPct: 0.9, volumeRatio: 2.0 } }), 'US');
+  const wild = scanner.fitness(row({ technicals: { atrPct: 4.5, volumeRatio: 2.0 } }), 'US');
+  assert.ok(sweet.breakdown.volatility > wild.breakdown.volatility,
+    `적정 변동성이 과열보다 높아야 함 (${sweet.breakdown.volatility} vs ${wild.breakdown.volatility})`);
+});
+
+test('스캐너: 한국 종목은 본전 호가를 넘는 목표라야 가점을 받는다', () => {
+  const worth = scanner.fitness(row({
+    technicals: { atrPct: 1.0, volumeRatio: 2.0, breakevenTicks: 2 },
+    plan: { targetTicks: 10, entry: 74800, stop: 74400, target: 75800 },
+  }), 'KR');
+  const notWorth = scanner.fitness(row({
+    technicals: { atrPct: 1.0, volumeRatio: 2.0, breakevenTicks: 8 },
+    plan: { targetTicks: 8, entry: 74800, stop: 74400, target: 75600 },
+  }), 'KR');
+  assert.ok(worth.breakdown.edge > 0, '본전보다 목표가 크면 가점');
+  assert.strictEqual(notWorth.breakdown.edge, 0, '비용을 못 넘으면 가점 0');
+});
+
+test('스캐너: 하락 신호는 매도 방향으로 잡되 적합도는 그대로 잰다', () => {
+  const f = scanner.fitness(row({ score: -55, label: '매도' }), 'US');
+  assert.strictEqual(f.side, 'short');
+  assert.ok(f.breakdown.conviction > 0, '방향이 선명하면 아래쪽도 가점');
+});
+
+test('스캐너: 직전 스캔 대비 움직임이 있으면 가점된다', () => {
+  const hist = [
+    { t: 1, score: 10, price: 198 },
+    { t: 2, score: 20, price: 199 },
+  ];
+  const still = scanner.fitness(row({ score: 20, price: 199 }), 'US', hist);
+  const moving = scanner.fitness(row({ score: 60, price: 202 }), 'US', hist);
+  assert.ok(moving.breakdown.motion > still.breakdown.motion,
+    `움직이는 쪽이 높아야 함 (${moving.breakdown.motion} vs ${still.breakdown.motion})`);
+});
+
+test('스캐너: 등급은 적합도 구간으로 갈린다', () => {
+  assert.strictEqual(scanner.grade(80).grade, 'A');
+  assert.strictEqual(scanner.grade(65).grade, 'B');
+  assert.strictEqual(scanner.grade(50).grade, 'C');
+  assert.strictEqual(scanner.grade(20).grade, 'D');
+});
+
+test('스캐너: 미국·한국을 각각 돌리고 적합도 순으로 정렬한다', async () => {
+  const sc = new scanner.Scanner();
+  try {
+    await sc._tick('US');
+    const view = sc.marketView('US');
+    assert.ok(view.top.length > 0, '후보가 나와야 함');
+    for (let i = 1; i < view.top.length; i++) {
+      assert.ok(view.top[i - 1].fit >= view.top[i].fit, '적합도 내림차순');
+    }
+    assert.ok(view.top.every((r) => r.market === 'US' && r.grade), '시장·등급이 붙는다');
+  } finally { sc.stop(); }
+});
+
+test('스캐너: 두 시장을 섞어 지금 가장 좋은 것만 뽑는다', async () => {
+  const sc = new scanner.Scanner();
+  try {
+    await Promise.all([sc._tick('US'), sc._tick('KR')]);
+    const best = sc.best(5);
+    assert.ok(best.length > 0);
+    assert.ok(best.length <= 5);
+    for (let i = 1; i < best.length; i++) assert.ok(best[i - 1].fit >= best[i].fit);
+    const markets = new Set(sc.snapshot().US.top.concat(sc.snapshot().KR.top).map((r) => r.market));
+    assert.ok(markets.has('US') && markets.has('KR'), '두 시장이 모두 스캔됐다');
+  } finally { sc.stop(); }
+});
+
+/** 구독을 붙이면 곧바로 첫 스캔이 시작된다 — 그 스캔이 끝날 때까지 기다린다 */
+function firstScan(sc, market = 'US') {
+  return new Promise((resolve) => {
+    const on = (view) => { if (view.market === market) { sc.off('scan', on); resolve(view); } };
+    sc.on('scan', on);
+  });
+}
+
+test('스캐너: 구독자를 붙이면 스캔이 저절로 시작된다', async () => {
+  const sc = new scanner.Scanner();
+  try {
+    const done = firstScan(sc);
+    const client = sc.addClient({ write() {} });
+    assert.strictEqual(sc.snapshot().clients, 1);
+    await done;
+    assert.ok(sc.marketView('US').top.length > 0, '구독만으로 결과가 채워진다');
+    sc.removeClient(client);
+    assert.strictEqual(sc.snapshot().clients, 0);
+    assert.ok(sc.marketView('US').top.length > 0, '떠나도 마지막 결과는 남아 있다');
+  } finally { sc.stop(); }
+});
+
+test('스캐너: 스캔 결과는 구독자에게 그대로 전달된다', async () => {
+  const sc = new scanner.Scanner();
+  const sent = [];
+  try {
+    const done = firstScan(sc);
+    const client = sc.addClient({ write: (s) => sent.push(s) });
+    await done;
+    sc.removeClient(client);
+    assert.ok(sent.length > 0, '한 건 이상 전송');
+    const msg = JSON.parse(sent[sent.length - 1].replace(/^data: /, ''));
+    assert.strictEqual(msg.type, 'scan');
+    assert.ok(Array.isArray(msg.data.top));
+  } finally { sc.stop(); }
+});
+
+test('스캐너: 첫 스캔에서는 NEW 를 붙이지 않는다', async () => {
+  const sc = new scanner.Scanner();
+  try {
+    await sc._tick('KR');
+    assert.ok(sc.marketView('KR').top.every((r) => !r.isNew), '처음엔 전부 처음 보는 종목이라 NEW 가 의미 없다');
+  } finally { sc.stop(); }
+});
+
+test('스캐너: 스캔이 실패해도 엔진은 죽지 않고 사유를 남긴다', async () => {
+  const sc = new scanner.Scanner();
+  const screenerMod = require('../server/ai/screener.js');
+  const real = screenerMod.screenUS;
+  screenerMod.screenUS = async () => { throw new Error('상방 API 장애'); };
+  try {
+    await sc._tick('US');
+    assert.match(sc.marketView('US').error, /상방 API 장애/);
+    // 다음 스캔이 성공하면 오류는 지워진다
+    screenerMod.screenUS = real;
+    await sc._tick('US');
+    assert.strictEqual(sc.marketView('US').error, null);
+  } finally {
+    screenerMod.screenUS = real;
+    sc.stop();
+  }
+});
+
 /* ------------------------------------------------------------------ 실행 */
 
 (async () => {

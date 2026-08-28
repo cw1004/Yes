@@ -151,3 +151,78 @@ body.ai { overflow: hidden; }
 
 /* 뉴스 요약 */
 .news-line { font-size: 11.5px; color: var(--muted); margin-top: 6px; }
+
+/* ------------------------------------------------- 실시간 단타 스캐너 */
+
+.scan-panel .panel-head { align-items: center; gap: 10px; flex-wrap: wrap; }
+.scan-toggle {
+  margin-left: auto; display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12px; color: var(--muted); cursor: pointer; white-space: nowrap;
+}
+.scan-dot {
+  display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+  background: var(--line); vertical-align: middle; margin-left: 4px;
+}
+.scan-dot.on { background: var(--up); box-shadow: 0 0 0 0 rgba(46, 204, 113, .6); animation: scanpulse 1.8s infinite; }
+@keyframes scanpulse {
+  70% { box-shadow: 0 0 0 7px rgba(46, 204, 113, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(46, 204, 113, 0); }
+}
+.scan-help { margin: 0 14px 10px; font-size: 11.5px; color: var(--muted); line-height: 1.6; }
+.scan-help b { color: var(--accent); }
+
+.scan-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+  padding: 0 14px 14px;
+}
+@media (max-width: 860px) { .scan-grid { grid-template-columns: 1fr; } }
+
+.scan-col { min-width: 0; }
+.scan-col-head {
+  font-size: 12px; font-weight: 600; padding: 0 0 7px;
+  border-bottom: 1px solid var(--line); margin-bottom: 7px;
+  display: flex; align-items: baseline; gap: 7px;
+}
+.scan-col-head .muted { font-size: 10.5px; font-weight: 400; }
+
+.scan-list { display: flex; flex-direction: column; gap: 5px; }
+.scan-empty { font-size: 11.5px; padding: 12px 2px; }
+
+.scan-row {
+  display: grid; grid-template-columns: 40px 1fr auto; gap: 9px; align-items: center;
+  background: var(--panel-2); border: 1px solid var(--line);
+  border-left-width: 3px; border-radius: 8px;
+  padding: 7px 9px; text-decoration: none; color: inherit;
+  transition: border-color .12s, transform .12s;
+  min-width: 0;
+}
+.scan-row:hover { border-color: var(--accent); transform: translateX(1px); }
+.scan-row.grade-A { border-left-color: var(--up); }
+.scan-row.grade-B { border-left-color: var(--accent); }
+.scan-row.grade-C { border-left-color: var(--warn); }
+.scan-row.grade-D { border-left-color: var(--line); opacity: .68; }
+
+.scan-fit {
+  font-size: 18px; font-weight: 700; text-align: center;
+  font-variant-numeric: tabular-nums; line-height: 1;
+}
+.scan-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.scan-name { font-size: 12.5px; font-weight: 600; display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+.scan-sym { font-size: 10px; color: var(--muted); font-weight: 400; }
+.scan-new {
+  font-size: 9px; font-weight: 700; letter-spacing: .04em;
+  background: var(--up); color: #04140b; padding: 1px 4px; border-radius: 3px;
+}
+.scan-side { font-size: 9.5px; padding: 1px 5px; border-radius: 999px; border: 1px solid var(--line); }
+.scan-side.long { color: var(--up); border-color: var(--up); }
+.scan-side.short { color: var(--down); border-color: var(--down); }
+.scan-why, .scan-plan {
+  font-size: 10.5px; color: var(--muted); line-height: 1.45;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.scan-plan { font-variant-numeric: tabular-nums; }
+.scan-right {
+  display: flex; flex-direction: column; align-items: flex-end; gap: 1px;
+  font-size: 11.5px; font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.scan-grade { font-size: 9.5px; color: var(--muted); }
