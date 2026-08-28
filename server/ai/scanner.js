@@ -15,6 +15,8 @@
 const { EventEmitter } = require('events');
 const screener = require('./screener');
 const KRC = require('../kr/config');
+const sessions = require('../sessions');
+const daypart = require('./daypart');
 
 /** 시장별 스캔 주기(ms) — 상방 API 유량을 지키면서 단타에 쓸 만큼은 자주 */
 const INTERVAL = { US: 20000, KR: 15000 };
@@ -223,6 +225,9 @@ class Scanner extends EventEmitter {
       rows.sort((a, b) => b.fit - a.fit);
       for (const r of rows) if (r.fit >= 60) m.seen.add(r.symbol);
 
+      // 시간대별 실측 프로파일에 이번 스캔을 쌓는다 (가정이 아니라 측정으로 골든타임을 찾기 위해)
+      try { daypart.record(market, rows); } catch (_) { /* 기록 실패가 스캔을 막지 않는다 */ }
+
       m.results = rows;
       m.asOf = now;
       m.source = raw.source;
@@ -252,6 +257,8 @@ class Scanner extends EventEmitter {
       scanned: m.scanned,
       error: m.error,
       intervalMs: INTERVAL[market],
+      // 지금이 거래하기 좋은 시간인가 (가정 기반 구간표)
+      session: sessions.windowNow(market),
       top: m.results.slice(0, limit),
     };
   }

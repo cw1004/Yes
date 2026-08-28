@@ -180,6 +180,14 @@
           <option value="10m">10분봉</option>
         </select>
       </label>
+      <label>거래 시간대
+        <select id="cfgSessionFilter">
+          <option value="off">제한 없음 (정규장 내내)</option>
+          <option value="ranked">주요 구간만 (점심 제외)</option>
+          <option value="golden">골든타임만 (09:00~09:40)</option>
+        </select>
+      </label>
+      <div class="exit-hint" id="sessionHint"></div>
       <label>진입 점수 <input type="number" id="cfgEntryScore" value="45" min="10" max="100" /></label>
       <label>청산 점수 <input type="number" id="cfgExitScore" value="-15" min="-100" max="50" /></label>
 

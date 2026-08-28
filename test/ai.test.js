@@ -858,6 +858,124 @@ test('신뢰성: 연속 실패하면 잠시 호출을 끊는다 (서킷 브레�
   reliability.reset();
 });
 
+/* -------------------------------------------------- 거래 시간대(골든타임) */
+
+const sessions = require('../server/sessions.js');
+const daypart = require('../server/ai/daypart.js');
+
+/** 특정 KST 시각의 Date (2026-08-25는 화요일) */
+const kstAt = (h, m, day = 25) => new Date(Date.UTC(2026, 7, day, h - 9, m));
+
+test('시간대: 한국 09:00~09:40 은 1순위 골든타임이다', () => {
+  const w = sessions.windowNow('KR', kstAt(9, 10));
+  assert.strictEqual(w.inWindow, true);
+  assert.strictEqual(w.window.key, 'kr-open');
+  assert.strictEqual(w.window.quality, 'golden');
+  assert.strictEqual(w.minutesLeft, 30);
+});
+
+test('시간대: 점심 공백은 거래 구간으로 치지 않는다', () => {
+  const w = sessions.windowNow('KR', kstAt(12, 0));
+  assert.strictEqual(w.window.quality, 'avoid');
+  assert.strictEqual(w.inWindow, false, 'avoid 구간은 inWindow 가 아니다');
+});
+
+test('시간대: 구간 사이에는 다음 구간까지 남은 시간을 알려 준다', () => {
+  const w = sessions.windowNow('KR', kstAt(9, 50));
+  assert.strictEqual(w.window, null);
+  assert.strictEqual(w.next.key, 'kr-inst');
+  assert.strictEqual(w.minutesToNext, 10);
+});
+
+test('시간대: 주말에는 어떤 구간도 열리지 않는다', () => {
+  const sat = sessions.windowNow('KR', kstAt(9, 10, 29));   // 2026-08-29 토요일
+  assert.strictEqual(sat.weekend, true);
+  assert.strictEqual(sat.inWindow, false);
+});
+
+test('시간대: 미국 구간은 현지 시각으로 정의하고 KST 로 환산해 보여 준다', () => {
+  const rows = sessions.schedule(kstAt(12, 0));
+  const open = rows.find((r) => r.key === 'us-open');
+  assert.strictEqual(open.local, '09:30~10:30', '현지(ET) 기준');
+  // 8월은 서머타임(EDT, UTC-4) → KST 22:30. 겨울(EST)이면 23:30 이 된다.
+  assert.strictEqual(open.kst, '22:30~23:30');
+});
+
+test('시간대: 서머타임이 끝나면 KST 환산이 한 시간 밀린다', () => {
+  const winter = new Date(Date.UTC(2026, 0, 20, 3, 0));   // 1월 (EST)
+  const rows = sessions.schedule(winter);
+  const open = rows.find((r) => r.key === 'us-open');
+  assert.strictEqual(open.local, '09:30~10:30');
+  assert.strictEqual(open.kst, '23:30~00:30', '겨울에는 KST 23:30');
+});
+
+test('시간대: 계획표는 KST 순서로 정렬되고 두 시장을 모두 담는다', () => {
+  const rows = sessions.schedule(kstAt(12, 0));
+  assert.ok(rows.some((r) => r.market === 'KR') && rows.some((r) => r.market === 'US'));
+  for (let i = 1; i < rows.length; i++) {
+    assert.ok(rows[i - 1].kst <= rows[i].kst, 'KST 오름차순');
+  }
+});
+
+test('시간대: shouldTrade — golden 은 1순위만, ranked 는 점심만 막는다', () => {
+  const at = (h, m) => kstAt(h, m);
+  // 09:10 시초가 폭풍 (golden)
+  assert.strictEqual(sessions.shouldTrade('KR', at(9, 10), 'golden').ok, true);
+  assert.strictEqual(sessions.shouldTrade('KR', at(9, 10), 'ranked').ok, true);
+  // 10:30 기관 1차 매매 (fair)
+  assert.strictEqual(sessions.shouldTrade('KR', at(10, 30), 'golden').ok, false, 'golden 은 1순위만');
+  assert.strictEqual(sessions.shouldTrade('KR', at(10, 30), 'ranked').ok, true, 'ranked 는 허용');
+  // 12:00 점심
+  assert.strictEqual(sessions.shouldTrade('KR', at(12, 0), 'ranked').ok, false);
+  assert.match(sessions.shouldTrade('KR', at(12, 0), 'ranked').reason, /점심/);
+  // off 는 언제나 통과
+  assert.strictEqual(sessions.shouldTrade('KR', at(12, 0), 'off').ok, true);
+});
+
+test('시간대: 막힐 때는 다음 구간이 언제인지까지 알려 준다', () => {
+  const r = sessions.shouldTrade('KR', kstAt(13, 45), 'ranked');
+  assert.strictEqual(r.ok, false);
+  assert.match(r.reason, /마감 물량 사냥/);
+  assert.match(r.reason, /분 뒤/);
+});
+
+/* ------------------------------------------- 시간대 실측 프로파일 */
+
+test('실측: 스캔 결과를 10분 칸에 쌓고 하루 평균 대비 배수를 낸다', () => {
+  daypart.reset();
+  const rows = (vol) => [{ fit: 60, technicals: { volumeRatio: vol, atrPct: 1 } }];
+  // 09:00~09:10 칸에 거래량 배율 3.0 을, 12:00~12:10 칸에 1.0 을 충분히 쌓는다
+  for (let i = 0; i < daypart.MIN_SAMPLES; i++) {
+    daypart.record('KR', rows(3.0), kstAt(9, 5));
+    daypart.record('KR', rows(1.0), kstAt(12, 5));
+  }
+  const p = daypart.profile('KR');
+  const peak = p.buckets.find((b) => b.kst === '09:00');
+  const quiet = p.buckets.find((b) => b.kst === '12:00');
+  assert.ok(peak.volumeIndex > quiet.volumeIndex, '개장 직후가 점심보다 활발해야 한다');
+  assert.strictEqual(peak.reliable, true);
+  assert.strictEqual(p.peak.kst, '09:00');
+  assert.strictEqual(p.trough.kst, '12:00');
+  daypart.reset();
+});
+
+test('실측: 표본이 부족한 칸은 신뢰 구간으로 세지 않는다', () => {
+  daypart.reset();
+  daypart.record('US', [{ fit: 50, technicals: { volumeRatio: 9, atrPct: 5 } }], kstAt(23, 35));
+  const p = daypart.profile('US');
+  assert.strictEqual(p.reliableBuckets, 0, '한 번 쟀다고 결론 내지 않는다');
+  assert.strictEqual(p.peak, null);
+  assert.match(p.note, /표본이 찼습니다|스캐너를/);
+  daypart.reset();
+});
+
+test('실측: 지표가 없는 행은 세지 않는다', () => {
+  daypart.reset();
+  daypart.record('KR', [{ fit: 10 }, { fit: 20 }], kstAt(9, 5));
+  assert.strictEqual(daypart.profile('KR').samples, 0);
+  daypart.reset();
+});
+
 /* ------------------------------------------------------------------ 실행 */
 
 (async () => {

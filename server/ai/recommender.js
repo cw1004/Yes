@@ -24,6 +24,7 @@ const validate = require('./validate');
 const reliability = require('./reliability');
 const budget = require('./budget');
 const scanner = require('./scanner');
+const sessions = require('../sessions');
 
 const cache = new Map();
 const CACHE_TTL = Number(process.env.AI_CACHE_TTL_MS || 600000); // 10분
@@ -86,6 +87,7 @@ async function recommend(opts = {}) {
     scan, news: collected, newsText, market, horizon, risk, client: opts.client,
     costs: costTable(scan, market),
     trackRecord: opts._trackRecord || safeCalibration(),
+    session: sessions.windowNow(market),
   };
   const settled = await Promise.allSettled(
     impls.map((p) => (opts._raw ? p.analyze(ctx) : reliability.guardedAnalyze(p, ctx)))
@@ -332,6 +334,7 @@ function merge({ outputs, failures, scan, market, horizon, risk, news: collected
       .filter((o) => o.passReason)
       .map((o) => ({ provider: o.provider, label: o.label, reason: o.passReason })),
     reliability: reliability.status(),
+    session: sessions.windowNow(market),
     marketContext: outputs[0].marketContext || '',
     picks,
     dataSource: scan.source,
@@ -411,6 +414,7 @@ function fallbackPicks(scan, market, horizon, risk) {
     dropped: [],
     passReasons: [],
     reliability: reliability.status(),
+    session: sessions.windowNow(market),
     picks,
     dataSource: scan.source,
     scanned: scan.scanned,

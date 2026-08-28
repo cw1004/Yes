@@ -757,6 +757,58 @@ test('수량: fixedQty 는 1주 미만으로 내려가지 않는다', () => {
   trader.close();
 });
 
+/* ------------------------------------------------- 거래 시간대 제한 */
+
+test('시간대 제한: 기본값은 off — 정규장이면 언제든 진입 가능', () => {
+  const trader = makeTrader();
+  assert.strictEqual(trader.config.sessionFilter, 'off');
+  assert.strictEqual(trader._gate('005930').ok, true);
+  trader.close();
+});
+
+test('시간대 제한: golden 을 켜면 시초가 구간 밖에서는 진입이 막힌다', () => {
+  const sessions = require('../server/sessions.js');
+  const trader = makeTrader({ sessionFilter: 'golden' });
+  const real = sessions.shouldTrade;
+  try {
+    sessions.shouldTrade = () => ({ ok: false, reason: '점심 공백 구간입니다 — 거래가 마릅니다.' });
+    const gate = trader._gate('005930');
+    assert.strictEqual(gate.ok, false);
+    assert.match(gate.reason, /거래 시간대 아님/);
+    assert.match(gate.reason, /점심 공백/);
+  } finally {
+    sessions.shouldTrade = real;
+    trader.close();
+  }
+});
+
+test('시간대 제한: 골든타임 안이면 그대로 통과한다', () => {
+  const sessions = require('../server/sessions.js');
+  const trader = makeTrader({ sessionFilter: 'golden' });
+  const real = sessions.shouldTrade;
+  try {
+    sessions.shouldTrade = () => ({ ok: true, reason: '시초가 폭풍 · 25분 남음' });
+    assert.strictEqual(trader._gate('005930').ok, true);
+  } finally {
+    sessions.shouldTrade = real;
+    trader.close();
+  }
+});
+
+test('시간대 제한: 모르는 값은 off 로 떨어진다', () => {
+  const trader = makeTrader({ sessionFilter: '아무거나' });
+  assert.strictEqual(trader.config.sessionFilter, 'off');
+  trader.close();
+});
+
+test('시간대 제한: 상태에 지금 구간이 함께 실린다', () => {
+  const trader = makeTrader();
+  const st = trader.status();
+  assert.ok(st.session, '상태에 session 포함');
+  assert.strictEqual(st.session.market, 'KR');
+  trader.close();
+});
+
 /* ------------------------------------------------------------------ 실행 */
 
 (async () => {

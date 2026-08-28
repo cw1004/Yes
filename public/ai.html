@@ -54,6 +54,24 @@
 
 <main class="ai-main">
 
+  <section class="panel session-panel" id="sessionPanel">
+    <div class="session-now" id="sessionNow"><span class="muted">거래 시간대 확인 중…</span></div>
+    <details class="session-plan">
+      <summary>하루 계획표 (한국 시간)</summary>
+      <div class="table-scroll">
+        <table class="sched-table" id="schedTable">
+          <thead><tr><th>KST</th><th>시장</th><th>구간</th><th>등급</th><th>전략</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p class="sched-note">
+        구간·순위는 <b>일반적으로 알려진 시장 미시구조</b>를 옮긴 <b>가정</b>입니다.
+        아래 <b>실측</b>은 이 앱의 스캐너가 직접 잰 값이며, 둘이 다르면 <b>실측이 맞습니다.</b>
+      </p>
+      <div id="daypartBox" class="daypart"></div>
+    </details>
+  </section>
+
   <section class="ai-status" id="statusBar">
     <div class="muted">‘AI 분석 실행’을 누르면 종목을 스캔한 뒤 최신 뉴스를 조사합니다.</div>
   </section>

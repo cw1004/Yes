@@ -116,7 +116,7 @@ const SYSTEM_PROMPT = `당신은 한국어로 보고하는 주식 리서치 애�
  *  - **모델 자신의 과거 적중률**을 준다. "높음이라고 한 게 실제로는 38%밖에 안 맞았다"를
  *    보여 주면 신뢰도를 과장하지 않는다.
  */
-function buildUserPrompt({ market, horizon, risk, scan, newsText, canSearch, costs, trackRecord }) {
+function buildUserPrompt({ market, horizon, risk, scan, newsText, canSearch, costs, trackRecord, session }) {
   const now = new Date();
   const fmt = (tz, locale) => new Intl.DateTimeFormat(locale, { timeZone: tz, dateStyle: 'full', timeStyle: 'short' }).format(now);
   const marketName = market === 'KR' ? '한국 주식시장(KOSPI/KOSDAQ)' : '미국 주식시장';
@@ -140,6 +140,7 @@ ${marketName}에서 지금 살 만한 종목을 **최대 3개** 골라 주세요
 - 투자 기간: ${horizon}
 - 리스크 성향: ${risk}
 ${scan.phase ? `- 한국 장 상태: ${scan.phase}` : ''}
+${sessionLine(session)}
 
 # 후보 종목 (자체 지표 엔진 스캔 결과 ${scan.scanned}종목 중 상위 ${scan.candidates.length}개)
 ${dataNote}
@@ -157,6 +158,23 @@ ${research}
 3. 예상 변동폭이 **본전 변동폭보다 작은** 종목은 버리세요. 맞혀도 손해입니다.
 4. 남은 것 중 근거가 확실한 것만 최대 3개까지 ${TOOL_NAME} 도구로 제출하세요.
    남은 게 없으면 빈 배열과 passReason 을 제출하세요.`;
+}
+
+/** 지금이 거래하기 좋은 시간대인지 — 모델이 이걸 알면 판단이 달라진다 */
+function sessionLine(session) {
+  if (!session) return '';
+  if (session.weekend) return '- 거래 시간대: 주말(휴장)';
+  if (session.window && session.window.quality === 'avoid') {
+    return `- 거래 시간대: **${session.window.label}** — ${session.window.why}\n` +
+      '  이 구간은 거래가 마르는 시간입니다. 신뢰도를 낮게 잡고, 확실하지 않으면 고르지 마세요.';
+  }
+  if (!session.window) {
+    return session.next
+      ? `- 거래 시간대: 지금은 주요 구간이 아닙니다. 다음은 ${session.next.label} (KST ${session.next.kst}, ${session.minutesToNext}분 뒤).`
+      : '- 거래 시간대: 오늘 남은 주요 구간이 없습니다.';
+  }
+  return `- 거래 시간대: **${session.window.label}** (${session.window.quality}, ${session.minutesLeft}분 남음)\n` +
+    `  ${session.window.why}\n  통상 전략: ${session.window.strategy}`;
 }
 
 /** 종목별 왕복 비용과 "이만큼은 움직여야 본전" 표 */

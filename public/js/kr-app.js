@@ -452,6 +452,8 @@
     setIf('#cfgTimeframe', cfg.timeframe);
     setIf('#cfgEntryScore', cfg.entryScore);
     setIf('#cfgExitScore', cfg.exitScore);
+    setIf('#cfgSessionFilter', cfg.sessionFilter || 'off');
+    renderSessionHint(t.session, cfg.sessionFilter || 'off');
     setIf('#cfgSizingMode', cfg.sizingMode || 'auto');
     setIf('#cfgOrderAmount', cfg.orderAmount);
     setIf('#cfgRiskPct', cfg.riskPct);
@@ -516,6 +518,7 @@
         timeframe: $('#cfgTimeframe').value,
         entryScore: Number($('#cfgEntryScore').value),
         exitScore: Number($('#cfgExitScore').value),
+        sessionFilter: $('#cfgSessionFilter').value,
         sizingMode: $('#cfgSizingMode').value,
         orderAmount: Number($('#cfgOrderAmount').value),
         riskPct: Number($('#cfgRiskPct').value),
@@ -552,6 +555,29 @@
       ticks: '호가(틱) 개수로 잡습니다. 가장 촘촘한 초단타용입니다.',
     };
     $('#exitHint').innerHTML = `${hints[basis] || ''} 봉 주기와 상관없이 <b>틱 단위 실시간</b>으로 감시합니다.`;
+  }
+
+  /** 지금이 어떤 거래 구간인지, 이 설정이면 진입이 되는지 한 줄로 */
+  function renderSessionHint(session, mode) {
+    const el = $('#sessionHint');
+    if (!el) return;
+    if (!session) { el.textContent = ''; return; }
+    if (session.weekend) { el.innerHTML = '주말은 휴장입니다.'; return; }
+
+    const w = session.window;
+    if (w && w.quality === 'avoid') {
+      el.innerHTML = `지금은 <b class="down">${esc(w.label)}</b> — ${esc(w.why)}`;
+    } else if (w) {
+      const ok = mode === 'off' || mode === 'ranked' || w.quality === 'golden';
+      el.innerHTML = `지금은 <b class="up">${esc(w.label)}</b> (${session.minutesLeft}분 남음) · ` +
+        (ok ? '<b>진입 가능</b>' : '<b class="down">이 설정에서는 진입 안 함</b>') +
+        `<br><span class="muted">${esc(w.strategy)}</span>`;
+    } else if (session.next) {
+      el.innerHTML = `주요 구간이 아닙니다. 다음은 <b>${esc(session.next.label)}</b> ` +
+        `— ${session.minutesToNext}분 뒤 (${esc(session.next.kst)})`;
+    } else {
+      el.innerHTML = '오늘 남은 주요 구간이 없습니다.';
+    }
   }
 
   /** 수량 결정 방식에 맞는 입력칸만 보여 준다 */

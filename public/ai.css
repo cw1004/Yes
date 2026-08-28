@@ -289,3 +289,57 @@ body.ai { overflow: hidden; }
 .invalidation span { color: var(--warn); font-weight: 600; margin-right: 4px; }
 
 .empty-state.no-pick { line-height: 1.8; }
+
+/* ------------------------------------------------- 거래 시간대(골든타임) */
+
+.session-panel { padding: 11px 14px; margin-bottom: 12px; }
+.sess-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.sess {
+  display: inline-flex; align-items: center; gap: 7px; flex-wrap: wrap;
+  font-size: 12px; padding: 4px 10px; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--panel-2);
+}
+.sess.golden { border-color: var(--up); color: var(--up); }
+.sess.good { border-color: var(--accent); color: var(--accent); }
+.sess.fair { border-color: var(--warn); color: var(--warn); }
+.sess.avoid { border-color: var(--down); color: var(--down); }
+.sess.idle, .sess.closed { color: var(--muted); }
+.sess b { color: inherit; }
+.sess-q { font-size: 10px; opacity: .85; }
+.sess-left { font-size: 10.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+.sess-advice {
+  margin-top: 8px; font-size: 11.5px; line-height: 1.6;
+  padding-left: 9px; border-left: 2px solid var(--line); color: var(--muted);
+}
+.sess-advice.golden { border-left-color: var(--up); color: var(--fg); }
+.sess-advice.good { border-left-color: var(--accent); }
+.sess-advice.avoid { border-left-color: var(--down); color: var(--down); }
+
+.session-plan { margin-top: 10px; }
+.session-plan summary { font-size: 11.5px; color: var(--muted); cursor: pointer; }
+.sched-table { width: 100%; border-collapse: collapse; font-size: 11.5px; margin-top: 8px; }
+.sched-table th, .sched-table td { padding: 5px 8px; text-align: left; border-bottom: 1px solid var(--line); }
+.sched-table th { font-size: 10px; color: var(--muted); font-weight: 500; }
+.sched-table td { font-variant-numeric: tabular-nums; }
+.sched-strategy { color: var(--muted); font-variant-numeric: normal; }
+.sched-table tr.q-avoid { opacity: .55; }
+.qpill { font-size: 9.5px; padding: 1px 6px; border-radius: 999px; border: 1px solid var(--line); white-space: nowrap; }
+.qpill.golden { color: var(--up); border-color: var(--up); }
+.qpill.good { color: var(--accent); border-color: var(--accent); }
+.qpill.fair { color: var(--warn); border-color: var(--warn); }
+.qpill.avoid { color: var(--down); border-color: var(--down); }
+.sched-note { font-size: 10.5px; color: var(--muted); line-height: 1.6; margin: 8px 0 0; }
+.sched-note b { color: var(--accent); }
+
+/* 실측 막대 */
+.daypart { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin-top: 10px; }
+.dp-block { border: 1px solid var(--line); border-radius: 9px; padding: 9px 11px; background: var(--panel-2); }
+.dp-head { font-size: 11.5px; font-weight: 600; margin-bottom: 7px; }
+.dp-head .muted { font-weight: 400; font-size: 10px; }
+.dp-chart { display: flex; align-items: flex-end; gap: 2px; height: 62px; }
+.dp-bar { flex: 1; min-width: 3px; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; position: relative; }
+.dp-fill { background: var(--accent); border-radius: 2px 2px 0 0; min-height: 2px; }
+.dp-label { font-size: 8px; color: var(--muted); text-align: center; margin-top: 2px; }
+.dp-summary { font-size: 10.5px; color: var(--muted); margin-top: 7px; font-variant-numeric: tabular-nums; }
+.dp-empty { font-size: 10.5px; line-height: 1.6; }

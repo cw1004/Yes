@@ -460,6 +460,8 @@
 
     $('#picks').innerHTML = '<div class="empty-state">아직 분석 결과가 없습니다. 상단의 <b>AI 분석 실행</b>을 눌러 주세요.</div>';
     bindScanner();
+    loadSessions();
+    setInterval(loadSessions, 60000);   // 1분마다 남은 시간 갱신
     loadPerformance();
   }
 
@@ -572,6 +574,98 @@
     api('/api/ai/scan').then(applyScan).catch(() => {});
     if (state.scanOn) startScan();
     window.addEventListener('beforeunload', stopScan);
+  }
+
+
+  /* ------------------------------------------------- 거래 시간대(골든타임) */
+
+  const QUALITY = {
+    golden: { text: '1순위 골든타임', cls: 'golden' },
+    good: { text: '양호', cls: 'good' },
+    fair: { text: '보통', cls: 'fair' },
+    avoid: { text: '피해야 할 시간', cls: 'avoid' },
+  };
+
+  function renderSessionNow(st) {
+    const box = $('#sessionNow');
+    const parts = [];
+    for (const market of ['KR', 'US']) {
+      const s = st[market];
+      const flag = market === 'KR' ? '🇰🇷' : '🇺🇸';
+      if (s.weekend) { parts.push(`<span class="sess closed">${flag} 주말 휴장</span>`); continue; }
+      if (s.window) {
+        const q = QUALITY[s.window.quality] || QUALITY.fair;
+        parts.push(`<span class="sess ${q.cls}" title="${esc(s.window.why)}">
+          ${flag} <b>${esc(s.window.label)}</b>
+          <span class="sess-q">${esc(q.text)}</span>
+          <span class="sess-left">${s.minutesLeft}분 남음</span>
+        </span>`);
+      } else if (s.next) {
+        parts.push(`<span class="sess idle">${flag} 대기 —
+          <b>${esc(s.next.label)}</b>까지 ${s.minutesToNext}분 <span class="muted">(KST ${esc(s.next.kst)})</span>
+        </span>`);
+      } else {
+        parts.push(`<span class="sess closed">${flag} 오늘 구간 종료</span>`);
+      }
+    }
+    const active = st.active;
+    const advice = active
+      ? `<div class="sess-advice ${esc(active.window.quality)}">${esc(active.window.strategy)}</div>`
+      : '<div class="sess-advice idle">지금은 쉬는 시간입니다. 단타는 오래 붙어 있을수록 불리합니다.</div>';
+    box.innerHTML = `<div class="sess-row">${parts.join('')}</div>${advice}`;
+  }
+
+  function renderSchedule(rows) {
+    $('#schedTable tbody').innerHTML = rows.map((r) => {
+      const q = QUALITY[r.quality] || QUALITY.fair;
+      return `<tr class="q-${q.cls}">
+        <td><b>${esc(r.kst)}</b></td>
+        <td>${r.market === 'KR' ? '🇰🇷' : '🇺🇸'}</td>
+        <td>${esc(r.label)}</td>
+        <td><span class="qpill ${q.cls}">${esc(q.text)}</span></td>
+        <td class="sched-strategy">${esc(r.strategy)}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  /** 실측 프로파일 — 가정이 맞는지 사용자의 데이터로 확인한다 */
+  function renderDaypart(measured) {
+    const box = $('#daypartBox');
+    const markets = ['KR', 'US'].filter((m) => measured[m]);
+    if (!markets.length) { box.innerHTML = ''; return; }
+
+    box.innerHTML = markets.map((m) => {
+      const p = measured[m];
+      const usable = p.buckets.filter((b) => b.reliable);
+      if (!usable.length) {
+        return `<div class="dp-block"><div class="dp-head">${m === 'KR' ? '🇰🇷' : '🇺🇸'} 실측</div>
+          <div class="muted dp-empty">${esc(p.note || '아직 표본이 없습니다. 자동 스캔을 켜 두면 쌓입니다.')}</div></div>`;
+      }
+      const max = Math.max(...usable.map((b) => b.volumeIndex || 0), 1);
+      const bars = usable.map((b) => `
+        <div class="dp-bar" title="${esc(b.kst)} · 거래량 지수 ${b.volumeIndex} · 표본 ${b.n}">
+          <div class="dp-fill" style="height:${Math.round(((b.volumeIndex || 0) / max) * 100)}%"></div>
+          <span class="dp-label">${esc(b.kst.slice(0, 2))}</span>
+        </div>`).join('');
+      return `<div class="dp-block">
+        <div class="dp-head">${m === 'KR' ? '🇰🇷' : '🇺🇸'} 실측 <span class="muted">스캔 ${p.samples}회 · 신뢰 구간 ${p.reliableBuckets}개</span></div>
+        <div class="dp-chart">${bars}</div>
+        ${p.peak ? `<div class="dp-summary">
+          가장 활발: <b>${esc(p.peak.kst)}</b> (평균의 ${p.peak.volumeIndex}배)
+          · 가장 한산: <b>${esc(p.trough.kst)}</b> (${p.trough.volumeIndex}배)
+        </div>` : ''}
+        ${p.note ? `<div class="muted dp-empty">${esc(p.note)}</div>` : ''}
+      </div>`;
+    }).join('');
+  }
+
+  async function loadSessions() {
+    try {
+      const r = await api('/api/ai/sessions');
+      renderSessionNow(r.status);
+      renderSchedule(r.schedule);
+      renderDaypart(r.measured || {});
+    } catch (_) { /* 시간대 표시는 실패해도 화면을 막지 않는다 */ }
   }
 
   function fillSelect(sel, options, selected) {

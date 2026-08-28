@@ -18,6 +18,7 @@ const fs = require('fs');
 const path = require('path');
 const { EventEmitter } = require('events');
 const C = require('./config');
+const sessions = require('../sessions');
 const KRSignal = require('../../public/js/kr-signal.js');
 
 const BASE_DIR = process.env.KR_STATE_DIR || path.join(__dirname, '..', '..');
@@ -61,6 +62,11 @@ const DEFAULT_CONFIG = {
   cooldownSeconds: 30,      // 청산 후 같은 종목 재진입 금지 시간
   minSpreadTicks: 3,        // 스프레드가 이 이상이면 진입 안 함
   minFlowTicks: 2,          // 봉당 체결건수가 이보다 적으면 진입 안 함
+  // 거래 시간대 제한 — 거래가 몰리는 구간에서만 진입한다
+  //   off    : 제한 없음 (정규장 내내)
+  //   ranked : 골든/양호/보통 구간 (점심 공백 제외)
+  //   golden : 1순위 구간만 — 09:00~09:40 시초가 폭풍
+  sessionFilter: 'off',
   forceExitAt: '15:15',     // 이 시각(KST) 이후에는 신규 진입 금지 + 보유분 청산
   entryOrdDvsn: C.ORD_DVSN.최유리지정가,
   exitOrdDvsn: C.ORD_DVSN.시장가,
@@ -115,6 +121,7 @@ class Trader extends EventEmitter {
       killReason: this.killReason,
       daily: this.daily,
       phase: C.marketPhase(),
+      session: sessions.windowNow('KR'),
       accountMode: this.client.mock ? '데모' : this.client.paper ? '모의투자' : '실전',
       liveArmed: !this.config.dryRun && (this.client.paper || this.client.mock || this.config.allowLive),
       positions: Array.from(this.positions.values()),
@@ -137,6 +144,7 @@ class Trader extends EventEmitter {
     next.dailyLossLimit = Math.max(0, num(next.dailyLossLimit, 300000));
     next.maxOrdersPerDay = clamp(Math.floor(num(next.maxOrdersPerDay, 60)), 1, 500);
     next.cooldownSeconds = clamp(Math.floor(num(next.cooldownSeconds, 30)), 0, 3600);
+    next.sessionFilter = ['off', 'ranked', 'golden'].includes(next.sessionFilter) ? next.sessionFilter : 'off';
     next.exitBasis = ['signal', 'percent', 'amount', 'ticks'].includes(next.exitBasis) ? next.exitBasis : 'signal';
     next.stopLossPct = clamp(num(next.stopLossPct, 1), 0.05, 30);
     next.takeProfitPct = clamp(num(next.takeProfitPct, 1.5), 0.05, 100);
@@ -541,6 +549,10 @@ class Trader extends EventEmitter {
     if (this.killed) return { ok: false, reason: `킬스위치(${this.killReason})` };
     if (!this.config.enabled) return { ok: false, reason: '엔진 꺼짐' };
     if (C.marketPhase() !== 'regular') return { ok: false, reason: '정규장 아님' };
+    if (this.config.sessionFilter !== 'off') {
+      const win = sessions.shouldTrade('KR', new Date(), this.config.sessionFilter);
+      if (!win.ok) return { ok: false, reason: `거래 시간대 아님 — ${win.reason}` };
+    }
     if (this._pastForceExit()) return { ok: false, reason: `${this.config.forceExitAt} 이후 신규 진입 금지` };
     if (this.inFlight.has(code)) return { ok: false, reason: '이미 주문 진행 중' };
     if (this.positions.has(code)) return { ok: false, reason: '이미 보유 중' };

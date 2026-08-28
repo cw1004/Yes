@@ -11,6 +11,8 @@ const screener = require('./screener');
 const scanner = require('./scanner');
 const budget = require('./budget');
 const reliability = require('./reliability');
+const daypart = require('./daypart');
+const sessions = require('../sessions');
 const providers = require('./providers');
 const tracker = require('./tracker');
 const news = require('./news');
@@ -144,6 +146,18 @@ async function handle(req, res, url, sendJSON) {
           inFlight.set(key, job);
         }
         sendJSON(res, 200, await job);
+        return true;
+      }
+
+      case '/api/ai/sessions': {
+        // 거래 시간대: 가정(구간표)과 실측(daypart)을 나란히
+        const market = pick(String(params.get('market') || '').toUpperCase(), MARKETS, null);
+        sendJSON(res, 200, {
+          status: sessions.status(),
+          schedule: sessions.schedule(),
+          measured: market ? daypart.profile(market)
+            : { US: daypart.profile('US'), KR: daypart.profile('KR') },
+        });
         return true;
       }
 
