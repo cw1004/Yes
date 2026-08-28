@@ -559,6 +559,120 @@ test('자동매매: 강제청산 시각 이후에는 신규 진입이 막힌다'
   trader.close();
 });
 
+test('청산 기준: 퍼센트로 지정하면 봉 주기와 무관하게 그 가격이 나온다', () => {
+  const trader = makeTrader({ exitBasis: 'percent', stopLossPct: 1, takeProfitPct: 2 });
+  const r = trader.resolveExitLevels({ entry: 75000, qty: 10, market: 'KOSPI' });
+  assert.ok(Math.abs(r.stopPct - 1) < 0.15, `손절 약 -1% (실제 ${r.stopPct.toFixed(2)}%)`);
+  assert.ok(Math.abs(r.targetPct - 2) < 0.15, `목표 약 +2% (실제 ${r.targetPct.toFixed(2)}%)`);
+  const tick = C.tickSize(75000, 'KOSPI');
+  assert.strictEqual(r.stop % tick, 0, '손절가는 호가단위에 맞는다');
+  assert.strictEqual(r.target % tick, 0);
+  assert.match(r.basis, /-1% \/ 목표 \+2%/);
+  trader.close();
+});
+
+test('청산 기준: 금액으로 지정하면 수량으로 나눠 주당 가격이 된다', () => {
+  const trader = makeTrader({ exitBasis: 'amount', stopLossWon: 50000, takeProfitWon: 100000 });
+  const r = trader.resolveExitLevels({ entry: 75000, qty: 10, market: 'KOSPI' });
+  // 10주로 5만원 손실 = 주당 5,000원 → 70,000
+  assert.ok(Math.abs(r.stop - 70000) <= C.tickSize(75000, 'KOSPI'), `손절 ${r.stop}`);
+  assert.ok(Math.abs(r.target - 85000) <= C.tickSize(85000, 'KOSPI'), `목표 ${r.target}`);
+  trader.close();
+});
+
+test('청산 기준: 손절·목표는 최소 1호가 이상 벌어진다', () => {
+  const trader = makeTrader({ exitBasis: 'percent', stopLossPct: 0.05, takeProfitPct: 0.05 });
+  const r = trader.resolveExitLevels({ entry: 74800, qty: 1, market: 'KOSPI' });
+  const tick = C.tickSize(74800, 'KOSPI');
+  assert.ok(r.stop <= 74800 - tick, '손절은 최소 1호가 아래');
+  assert.ok(r.target >= 74800 + tick, '목표는 최소 1호가 위');
+  trader.close();
+});
+
+test('실시간 청산: 봉이 닫히지 않아도 틱 하나로 손절된다', async () => {
+  const trader = makeTrader({ exitBasis: 'percent', stopLossPct: 1, takeProfitPct: 2, cooldownSeconds: 0 });
+  trader.hub.get = () => ({ code: '005930', market: 'KOSPI', quote: { price: 74000 } });
+  await trader.attachManualPosition({ code: '005930', qty: 10, entry: 75000, market: 'KOSPI', simulated: true });
+  const pos = trader.positions.get('005930');
+  assert.ok(pos.stop < 75000 && pos.target > 75000);
+
+  trader._onTick({ price: 74800 }, { code: '005930', market: 'KOSPI' });   // 아직 손절 위
+  assert.strictEqual(trader.positions.size, 1, '손절선 위면 유지');
+
+  trader._onTick({ price: pos.stop - 100 }, { code: '005930', market: 'KOSPI' });
+  await new Promise((r) => setTimeout(r, 30));
+  assert.strictEqual(trader.positions.size, 0, '틱 하나로 즉시 청산');
+  assert.ok(trader.logs.some((l) => /손절/.test(l.message)), '손절 사유 기록');
+  trader.close();
+});
+
+test('실시간 청산: 목표 도달도 틱 단위로 잡는다', async () => {
+  const trader = makeTrader({ exitBasis: 'percent', stopLossPct: 1, takeProfitPct: 2, cooldownSeconds: 0 });
+  trader.hub.get = () => ({ code: '005930', market: 'KOSPI', quote: { price: 76500 } });
+  await trader.attachManualPosition({ code: '005930', qty: 10, entry: 75000, market: 'KOSPI', simulated: true });
+  const target = trader.positions.get('005930').target;
+  trader._onTick({ price: target }, { code: '005930', market: 'KOSPI' });
+  await new Promise((r) => setTimeout(r, 30));
+  assert.strictEqual(trader.positions.size, 0);
+  assert.ok(trader.logs.some((l) => /목표 도달/.test(l.message)));
+  trader.close();
+});
+
+test('실시간 청산: 트레일링(%)은 고점 대비 되돌림에서 걸린다', async () => {
+  const trader = makeTrader({ exitBasis: 'percent', stopLossPct: 5, takeProfitPct: 10, trailingPct: 1, cooldownSeconds: 0 });
+  trader.hub.get = () => ({ code: '005930', market: 'KOSPI', quote: { price: 76000 } });
+  await trader.attachManualPosition({ code: '005930', qty: 10, entry: 75000, market: 'KOSPI', simulated: true });
+  const tick = (p) => trader._onTick({ price: p }, { code: '005930', market: 'KOSPI' });
+  tick(77000);                       // 고점 갱신
+  assert.strictEqual(trader.positions.size, 1);
+  tick(76500);                       // 고점 대비 -0.65% → 아직
+  assert.strictEqual(trader.positions.size, 1);
+  tick(76100);                       // 고점 대비 -1.17% → 청산
+  await new Promise((r) => setTimeout(r, 30));
+  assert.strictEqual(trader.positions.size, 0);
+  assert.ok(trader.logs.some((l) => /트레일링/.test(l.message)));
+  trader.close();
+});
+
+test('수동 감시: 시간 제한 없이 유지되고, 해제해도 주식은 그대로', async () => {
+  const trader = makeTrader({ maxHoldSeconds: 5 });
+  await trader.attachManualPosition({ code: '005930', qty: 10, entry: 75000, market: 'KOSPI', simulated: true });
+  const pos = trader.positions.get('005930');
+  assert.strictEqual(pos.maxHoldSeconds, 0, '수동 포지션은 시간 제한 없음');
+  pos.entryTime = Date.now() - 60000;      // 1분 경과
+  trader._housekeeping();
+  await new Promise((r) => setTimeout(r, 30));
+  assert.strictEqual(trader.positions.size, 1, '시간이 지나도 유지된다');
+
+  assert.strictEqual(trader.detachManualPosition('005930'), true);
+  assert.strictEqual(trader.positions.size, 0, '감시만 해제');
+  assert.ok(trader.logs.some((l) => l.code === 'MANUAL_UNWATCH'));
+  trader.close();
+});
+
+test('안전: 실제로 산 주식은 모의 실행 설정이어도 실제로 청산된다', async () => {
+  const trader = makeTrader({ dryRun: true, exitBasis: 'percent', stopLossPct: 1, cooldownSeconds: 0 });
+  trader.hub.get = () => ({ code: '005930', market: 'KOSPI', quote: { price: 70000 } });
+  await trader.attachManualPosition({ code: '005930', qty: 10, entry: 75000, market: 'KOSPI', simulated: false });
+  trader.orders.length = 0;
+  trader._onTick({ price: 70000 }, { code: '005930', market: 'KOSPI' });
+  await new Promise((r) => setTimeout(r, 40));
+  assert.strictEqual(trader.orders.length, 1, 'dryRun 이어도 실제 매도 주문이 나간다');
+  assert.strictEqual(trader.orders[0].side, 'sell');
+  trader.close();
+});
+
+test('안전: 모의 진입은 모의로 청산된다 (실주문 없음)', async () => {
+  const trader = makeTrader({ dryRun: true, exitBasis: 'percent', stopLossPct: 1, cooldownSeconds: 0 });
+  trader.hub.get = () => ({ code: '005930', market: 'KOSPI', quote: { price: 70000 } });
+  await trader.attachManualPosition({ code: '005930', qty: 10, entry: 75000, market: 'KOSPI', simulated: true });
+  trader.orders.length = 0;
+  trader._onTick({ price: 70000 }, { code: '005930', market: 'KOSPI' });
+  await new Promise((r) => setTimeout(r, 40));
+  assert.strictEqual(trader.orders.length, 0, '모의 포지션은 실제 주문을 내지 않는다');
+  trader.close();
+});
+
 test('자동매매: 킬스위치 상태는 재기동해도 유지된다', async () => {
   const trader = makeTrader({ dryRun: true });
   await trader.kill('한도 초과', false);

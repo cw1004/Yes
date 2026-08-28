@@ -35,8 +35,19 @@ const DEFAULT_CONFIG = {
   maxPositions: 2,
   orderAmount: 1000000,     // 1회 최대 투입액(원)
   riskPct: 0.5,             // 계좌 대비 1회 허용 손실(%)
-  stopTicks: 0,             // 0이면 신호 플랜의 손절 사용
-  takeProfitTicks: 0,       // 0이면 신호 플랜의 목표 사용
+  // 청산 기준 — 봉 주기와 무관하게 이 값으로 손절·목표 가격이 정해진다
+  //   signal  : 신호 엔진의 ATR 기반 플랜 (기본)
+  //   percent : 손절 -x% / 목표 +y%
+  //   amount  : 총 평가손익 금액(원) 기준
+  //   ticks   : 호가 개수 기준
+  exitBasis: 'signal',
+  stopLossPct: 1.0,         // exitBasis='percent' 일 때 손절 폭(%)
+  takeProfitPct: 1.5,       // exitBasis='percent' 일 때 목표 폭(%)
+  stopLossWon: 0,           // exitBasis='amount' 일 때 총 손실 한도(원)
+  takeProfitWon: 0,         // exitBasis='amount' 일 때 총 목표 이익(원)
+  trailingPct: 0,           // >0이면 고점 대비 N% 밀리면 청산
+  stopTicks: 0,             // exitBasis='ticks' 일 때 손절 호가 수
+  takeProfitTicks: 0,       // exitBasis='ticks' 일 때 목표 호가 수
   trailingTicks: 0,         // >0이면 고점 대비 N틱 밀리면 청산
   maxHoldSeconds: 180,      // 이 시간 넘으면 무조건 청산 (초단타)
   dailyLossLimit: 300000,   // 하루 실현손실이 이만큼이면 킬스위치 자동 발동
@@ -119,6 +130,15 @@ class Trader extends EventEmitter {
     next.dailyLossLimit = Math.max(0, num(next.dailyLossLimit, 300000));
     next.maxOrdersPerDay = clamp(Math.floor(num(next.maxOrdersPerDay, 60)), 1, 500);
     next.cooldownSeconds = clamp(Math.floor(num(next.cooldownSeconds, 30)), 0, 3600);
+    next.exitBasis = ['signal', 'percent', 'amount', 'ticks'].includes(next.exitBasis) ? next.exitBasis : 'signal';
+    next.stopLossPct = clamp(num(next.stopLossPct, 1), 0.05, 30);
+    next.takeProfitPct = clamp(num(next.takeProfitPct, 1.5), 0.05, 100);
+    next.stopLossWon = Math.max(0, num(next.stopLossWon, 0));
+    next.takeProfitWon = Math.max(0, num(next.takeProfitWon, 0));
+    next.trailingPct = clamp(num(next.trailingPct, 0), 0, 30);
+    next.stopTicks = clamp(Math.floor(num(next.stopTicks, 0)), 0, 500);
+    next.takeProfitTicks = clamp(Math.floor(num(next.takeProfitTicks, 0)), 0, 500);
+    next.trailingTicks = clamp(Math.floor(num(next.trailingTicks, 0)), 0, 500);
     next.symbols = (next.symbols || []).map((s) => String(s).trim()).filter(Boolean).slice(0, 10);
 
     const wasLive = this.config.allowLive;
@@ -164,22 +184,91 @@ class Trader extends EventEmitter {
     this._evaluate(st).catch((e) => this._log('error', 'EVAL', `${st.code} 판단 오류: ${e.message}`));
   }
 
+  /**
+   * 틱이 들어올 때마다 확인한다 — 봉이 닫히기를 기다리지 않는다.
+   * 그래서 1분봉을 쓰든 10분봉을 쓰든 손절·목표는 실시간으로 걸린다.
+   */
   _onTick(tick, st) {
     const pos = this.positions.get(st.code);
     if (!pos || pos.status !== 'open') return;
     pos.last = tick.price;
     pos.high = Math.max(pos.high, tick.price);
     pos.low = Math.min(pos.low, tick.price);
+    pos.pnl = (tick.price - pos.entry) * pos.qty;
+    pos.pnlPct = ((tick.price - pos.entry) / pos.entry) * 100;
 
-    const tickSize = C.tickSize(pos.entry, st.market || 'KOSPI');
+    const market = pos.market || st.market || 'KOSPI';
+    const tickSize = pos.tick || C.tickSize(pos.entry, market);
+    const cfg = this.config;
+
     let reason = null;
-    if (tick.price <= pos.stop) reason = '손절';
-    else if (pos.target && tick.price >= pos.target) reason = '목표 도달';
-    else if (this.config.trailingTicks > 0) {
-      const trail = pos.high - this.config.trailingTicks * tickSize;
-      if (tick.price <= trail && pos.high > pos.entry) reason = '트레일링 스탑';
+    if (tick.price <= pos.stop) {
+      reason = `손절 (${pos.pnlPct.toFixed(2)}%)`;
+    } else if (pos.target && tick.price >= pos.target) {
+      reason = `목표 도달 (+${pos.pnlPct.toFixed(2)}%)`;
+    } else {
+      // 고점 대비 되돌림 — %와 호가 중 설정된 쪽을 쓴다
+      const trailDist = cfg.trailingPct > 0
+        ? pos.high * (cfg.trailingPct / 100)
+        : cfg.trailingTicks > 0 ? cfg.trailingTicks * tickSize : 0;
+      if (trailDist > 0 && pos.high > pos.entry && tick.price <= pos.high - trailDist) {
+        reason = `트레일링 스탑 (고점 ${pos.high.toLocaleString()} 대비)`;
+      }
     }
     if (reason) this._exit(st.code, reason).catch((e) => this._log('error', 'EXIT_FAIL', `${st.code} ${e.message}`));
+  }
+
+  /**
+   * 수동으로 산 주식에도 같은 실시간 감시를 걸어 준다.
+   * 화면에서 "자동 청산 걸기"를 켜고 매수하면 여기로 등록된다.
+   *
+   * ⚠️ 이 감시는 이 앱이 켜져 있는 동안에만 동작한다. 증권사 서버에 걸어 두는 예약주문이 아니다.
+   */
+  async attachManualPosition({ code, qty, entry, market = 'KOSPI', name, simulated }) {
+    if (!code || !(qty > 0) || !(entry > 0)) throw new Error('수량·가격이 올바르지 않습니다.');
+    if (this.positions.has(code)) throw new Error('이미 감시 중인 종목입니다.');
+
+    const levels = this.resolveExitLevels({ entry, qty, market });
+    this.positions.set(code, {
+      code, name, qty, entry, market,
+      stop: levels.stop,
+      target: levels.target,
+      exitBasis: levels.basis,
+      tick: C.tickSize(entry, market),
+      entryTime: Date.now(),
+      high: entry, low: entry, last: entry,
+      pnl: 0, pnlPct: 0,
+      status: 'open',
+      manual: true,
+      maxHoldSeconds: 0,          // 수동 매수는 시간 제한을 두지 않는다
+      simulated: !!simulated,
+    });
+
+    // 틱을 받아야 감시가 되므로 구독을 붙이고 유지한다
+    try {
+      await this.hub.watch(code);
+      this.hub.pin(code, true);
+    } catch (err) {
+      this._log('warn', 'WATCH', `${code} 실시간 구독 실패: ${err.message}`);
+    }
+
+    this._log('trade', 'MANUAL_WATCH',
+      `[수동] ${code} ${qty}주 @ ${entry.toLocaleString()} 자동 청산 감시 시작 · ` +
+      `손절 ${levels.stop.toLocaleString()}(${levels.stopPct.toFixed(2)}%) / ` +
+      `목표 ${levels.target.toLocaleString()}(+${levels.targetPct.toFixed(2)}%) · ${levels.basis}`);
+    this.emit('changed');
+    return this.positions.get(code);
+  }
+
+  /** 감시만 해제 (주식은 그대로 보유) */
+  detachManualPosition(code) {
+    const pos = this.positions.get(code);
+    if (!pos || !pos.manual) return false;
+    this.positions.delete(code);
+    this.hub.pin(code, false);
+    this._log('info', 'MANUAL_UNWATCH', `[수동] ${code} 자동 청산 감시를 껐습니다. 주식은 그대로 보유 중입니다.`);
+    this.emit('changed');
+    return true;
   }
 
   async _evaluate(st) {
@@ -225,6 +314,60 @@ class Trader extends EventEmitter {
     await this._enter(st, signal);
   }
 
+  /**
+   * 손절·목표 가격을 정한다. **봉 주기와 무관하게** 사용자가 정한 기준을 그대로 가격으로 바꾼다.
+   * 계산된 가격은 호가단위에 맞추고, 최소 1호가는 떨어지게 보정한다.
+   *
+   * @param {{entry:number, qty:number, market:string, plan?:object}} ctx
+   * @returns {{stop:number, target:number, basis:string}}
+   */
+  resolveExitLevels({ entry, qty, market = 'KOSPI', plan = null }) {
+    const cfg = this.config;
+    const tick = C.tickSize(entry, market);
+    const down = (p) => C.alignPrice(p, market, 'down');
+    const up = (p) => C.alignPrice(p, market, 'up');
+
+    let stop = null;
+    let target = null;
+    let basis = '';
+
+    if (cfg.exitBasis === 'percent') {
+      stop = down(entry * (1 - cfg.stopLossPct / 100));
+      target = up(entry * (1 + cfg.takeProfitPct / 100));
+      basis = `손절 -${cfg.stopLossPct}% / 목표 +${cfg.takeProfitPct}%`;
+    } else if (cfg.exitBasis === 'amount' && qty > 0) {
+      // 총 금액을 주당으로 나눠 가격으로 환산한다
+      if (cfg.stopLossWon > 0) stop = down(entry - cfg.stopLossWon / qty);
+      if (cfg.takeProfitWon > 0) target = up(entry + cfg.takeProfitWon / qty);
+      basis = `손절 -${Math.round(cfg.stopLossWon).toLocaleString()}원 / 목표 +${Math.round(cfg.takeProfitWon).toLocaleString()}원 (${qty}주 기준)`;
+    } else if (cfg.exitBasis === 'ticks') {
+      if (cfg.stopTicks > 0) stop = entry - cfg.stopTicks * tick;
+      if (cfg.takeProfitTicks > 0) target = entry + cfg.takeProfitTicks * tick;
+      basis = `손절 ${cfg.stopTicks}호가 / 목표 ${cfg.takeProfitTicks}호가`;
+    }
+
+    // 지정하지 않았거나 signal 기준이면 신호 플랜을 쓴다
+    if (stop == null) {
+      stop = plan ? plan.stop : down(entry * 0.99);
+      if (!basis) basis = plan ? '신호 플랜(ATR 기반)' : '기본 -1%';
+    }
+    if (target == null) {
+      target = plan ? plan.target : up(entry * 1.015);
+    }
+
+    // 최소 1호가는 벌어지게 (같은 가격이면 진입 즉시 청산되어 버린다)
+    if (stop >= entry) stop = entry - tick;
+    if (target <= entry) target = entry + tick;
+
+    return {
+      stop,
+      target,
+      basis,
+      stopPct: ((entry - stop) / entry) * 100,
+      targetPct: ((target - entry) / entry) * 100,
+    };
+  }
+
   /* ------------------------------------------------------------ 진입/청산 */
 
   async _enter(st, signal) {
@@ -256,10 +399,6 @@ class Trader extends EventEmitter {
       return;
     }
 
-    const stopTicks = this.config.stopTicks || plan.stopTicks;
-    const tpTicks = this.config.takeProfitTicks || plan.targetTicks;
-    const tick = plan.tick;
-
     const result = await this._placeOrder({
       code, side: 'buy', qty: sizing.qty, price: plan.entry,
       ordDvsn: this.config.entryOrdDvsn,
@@ -268,22 +407,31 @@ class Trader extends EventEmitter {
     if (!result.ok) return;
 
     const entry = result.filledPrice || plan.entry;
+    const market = st.market || 'KOSPI';
+    const levels = this.resolveExitLevels({ entry, qty: sizing.qty, market, plan });
+
     this.positions.set(code, {
       code,
       name: st.quote && st.quote.name,
       qty: sizing.qty,
       entry,
-      stop: entry - stopTicks * tick,
-      target: entry + tpTicks * tick,
-      stopTicks, tpTicks, tick,
+      stop: levels.stop,
+      target: levels.target,
+      exitBasis: levels.basis,
+      tick: C.tickSize(entry, market),
+      market,
       entryTime: Date.now(),
       high: entry, low: entry, last: entry,
-      status: result.simulated ? 'open' : 'open',   // 실주문도 즉시 관리 시작(체결통보로 정정)
+      status: 'open',                 // 실주문도 즉시 관리 시작(체결통보로 정정)
       orderNo: result.orderNo,
       simulated: !!result.simulated,
       signalScore: signal.score,
     });
-    this._log('trade', 'ENTRY', `${code} ${sizing.qty}주 @ ${entry.toLocaleString()} · 손절 ${stopTicks}틱 / 목표 ${tpTicks}틱 · ${result.simulated ? '모의' : '실주문'}`);
+    this._log('trade', 'ENTRY',
+      `${code} ${sizing.qty}주 @ ${entry.toLocaleString()} · ` +
+      `손절 ${levels.stop.toLocaleString()}(${levels.stopPct.toFixed(2)}%) / ` +
+      `목표 ${levels.target.toLocaleString()}(+${levels.targetPct.toFixed(2)}%) · ` +
+      `${levels.basis} · ${result.simulated ? '모의' : '실주문'}`);
     this.emit('changed');
   }
 
@@ -298,7 +446,10 @@ class Trader extends EventEmitter {
       code, side: 'sell', qty: pos.qty, price,
       ordDvsn: this.config.exitOrdDvsn,
       why: reason,
-      force: true,   // 청산은 일일 주문수 한도에 막히면 안 된다
+      force: true,          // 청산은 일일 주문수 한도에 막히면 안 된다
+      // 실제로 체결된 주식은 모의 실행 설정과 상관없이 실제로 팔아야 한다.
+      // 그러지 않으면 손절선을 넘겨도 포지션이 그대로 남는다.
+      forceReal: pos.simulated === false,
     });
 
     const exitPrice = result.filledPrice || price;
@@ -362,7 +513,7 @@ class Trader extends EventEmitter {
    * 실제 주문 전송 지점. 여기서만 client.order() 를 호출한다.
    */
   async _placeOrder(req) {
-    const { code, side, qty, price, ordDvsn, why, force } = req;
+    const { code, side, qty, price, ordDvsn, why, force, forceReal } = req;
     if (!force) {
       const gate = this._gate(code);
       if (!gate.ok) return { ok: false, reason: gate.reason };
@@ -375,7 +526,8 @@ class Trader extends EventEmitter {
     }
 
     // ── 모의 실행 (기본값) ──────────────────────────────────────────
-    if (this.config.dryRun) {
+    // forceReal 은 "실제로 산 주식을 파는" 경우다. 이때는 모의로 넘기면 안 된다.
+    if (this.config.dryRun && !forceReal) {
       this.daily.orders++;
       this._log('order', side === 'buy' ? 'DRY_BUY' : 'DRY_SELL',
         `[모의] ${code} ${side === 'buy' ? '매수' : '매도'} ${qty}주 @ ${Math.round(price).toLocaleString()} — ${why}`);
@@ -385,8 +537,14 @@ class Trader extends EventEmitter {
     // ── 실전 계좌인데 allowLive 가 꺼져 있으면 여기서 막는다 ──────────
     const isRealAccount = !this.client.paper && !this.client.mock;
     if (isRealAccount && !this.config.allowLive) {
-      this._log('warn', 'BLOCKED', `${code} 실전 주문이 차단되었습니다 (allowLive=false). 설정에서 명시적으로 켜야 전송됩니다.`);
-      return { ok: false, reason: 'allowLive=false' };
+      if (forceReal) {
+        // 이미 실제로 보유한 주식의 청산은 막지 않는다. 막으면 손절이 걸리지 않는다.
+        this._log('warn', 'EXIT_OVERRIDE',
+          `${code} 보유 중인 실물 포지션이라 allowLive=false 여도 청산 주문을 전송합니다.`);
+      } else {
+        this._log('warn', 'BLOCKED', `${code} 실전 주문이 차단되었습니다 (allowLive=false). 설정에서 명시적으로 켜야 전송됩니다.`);
+        return { ok: false, reason: 'allowLive=false' };
+      }
     }
 
     this.inFlight.add(code);
@@ -412,7 +570,9 @@ class Trader extends EventEmitter {
     for (const [code, pos] of this.positions) {
       if (pos.status !== 'open') continue;
       const held = (now - pos.entryTime) / 1000;
-      if (held >= this.config.maxHoldSeconds) {
+      // 수동 감시 포지션은 시간 제한 없음(maxHoldSeconds = 0)
+      const limit = pos.maxHoldSeconds != null ? pos.maxHoldSeconds : this.config.maxHoldSeconds;
+      if (limit > 0 && held >= limit) {
         this._exit(code, `보유시간 ${Math.round(held)}초 초과`).catch(() => {});
       } else if (this._pastForceExit()) {
         this._exit(code, `${this.config.forceExitAt} 강제청산`).catch(() => {});

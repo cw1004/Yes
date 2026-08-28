@@ -388,6 +388,9 @@
       <div class="confirm-row"><span>가격</span><b>${isMarket ? '시장가' : won(price) + '원'}</b></div>
       <div class="confirm-row"><span>수량</span><b>${qty.toLocaleString()}주</b></div>
       <div class="confirm-row"><span>예상 금액</span><b>${won(price * qty)}원</b></div>
+      ${side === 'buy' && $('#ordBracket').checked
+        ? '<div class="confirm-row"><span>자동 청산</span><b class="warn-text">매수 후 손절·목표 감시 시작</b></div>'
+        : ''}
       ${mode === '실전' ? '<div class="confirm-warn">실전 계좌입니다. 전송하면 실제 주문이 나갑니다.</div>' : ''}`;
 
     const modal = $('#confirmModal');
@@ -399,8 +402,13 @@
           code: snap.code, side, qty,
           price: isMarket ? 0 : price,
           ordDvsn: isMarket ? C.ORD_DVSN.시장가 : C.ORD_DVSN.지정가,
+          bracket: side === 'buy' && $('#ordBracket').checked,
         });
         toast(`주문 접수 · 주문번호 ${r.orderNo || '-'}`, 'ok');
+        if (r.bracket) {
+          toast(`🛡 자동 청산 감시 시작 — 손절 ${won(r.bracket.stop)} / 목표 ${won(r.bracket.target)}`, 'ok');
+        }
+        if (r.bracketError) toast('자동 청산을 걸지 못했습니다: ' + r.bracketError, 'warn');
         refreshTrader();
       } catch (err) {
         toast('주문 실패: ' + err.message, 'err');
@@ -448,19 +456,30 @@
     setIf('#cfgMaxPositions', cfg.maxPositions);
     setIf('#cfgMaxHold', cfg.maxHoldSeconds);
     setIf('#cfgTrailing', cfg.trailingTicks);
+    setIf('#cfgExitBasis', cfg.exitBasis);
+    setIf('#cfgStopPct', cfg.stopLossPct);
+    setIf('#cfgTpPct', cfg.takeProfitPct);
+    setIf('#cfgStopWon', cfg.stopLossWon);
+    setIf('#cfgTpWon', cfg.takeProfitWon);
+    setIf('#cfgStopTicks', cfg.stopTicks);
+    setIf('#cfgTpTicks', cfg.takeProfitTicks);
+    setIf('#cfgTrailingPct', cfg.trailingPct);
+    syncExitFields();
     setIf('#cfgDailyLoss', cfg.dailyLossLimit);
     setIf('#cfgForceExit', cfg.forceExitAt);
     $('.live-row').classList.toggle('armed', cfg.allowLive && !cfg.dryRun);
 
     $('#positions').innerHTML = t.positions.length
-      ? '<div class="pos-head">보유 포지션</div>' + t.positions.map((p) => {
+      ? '<div class="pos-head">보유 포지션 · 실시간 감시 중</div>' + t.positions.map((p) => {
         const pnl = (p.last - p.entry) * p.qty;
-        return `<div class="pos-row">
-          <span>${esc(p.name || p.code)}</span>
+        const pct = p.entry ? ((p.last - p.entry) / p.entry) * 100 : 0;
+        return `<div class="pos-row ${p.manual ? 'manual' : ''}">
+          <span>${esc(p.name || p.code)} ${p.manual ? '<span class="pos-badge">수동</span>' : ''}</span>
           <span>${p.qty}주 @ ${won(p.entry)}</span>
-          <span class="${cls(pnl)}">${won(pnl)}원</span>
+          <span class="${cls(pnl)}">${won(pnl)}원 (${pct > 0 ? '+' : ''}${pct.toFixed(2)}%)</span>
           <button class="mini-btn" data-close="${p.code}">청산</button>
-        </div>`;
+        </div>
+        <div class="pos-levels">손절 <b class="down">${won(p.stop)}</b> · 목표 <b class="up">${won(p.target)}</b>${p.exitBasis ? ` <span class="muted">· ${esc(p.exitBasis)}</span>` : ''}</div>`;
       }).join('')
       : '<div class="muted" style="font-size:11px;padding:4px 0">보유 포지션 없음</div>';
     $('#positions').querySelectorAll('[data-close]').forEach((b) =>
@@ -494,6 +513,14 @@
         entryScore: Number($('#cfgEntryScore').value),
         exitScore: Number($('#cfgExitScore').value),
         orderAmount: Number($('#cfgOrderAmount').value),
+        exitBasis: $('#cfgExitBasis').value,
+        stopLossPct: Number($('#cfgStopPct').value),
+        takeProfitPct: Number($('#cfgTpPct').value),
+        stopLossWon: Number($('#cfgStopWon').value),
+        takeProfitWon: Number($('#cfgTpWon').value),
+        stopTicks: Number($('#cfgStopTicks').value),
+        takeProfitTicks: Number($('#cfgTpTicks').value),
+        trailingPct: Number($('#cfgTrailingPct').value),
         maxPositions: Number($('#cfgMaxPositions').value),
         maxHoldSeconds: Number($('#cfgMaxHold').value),
         trailingTicks: Number($('#cfgTrailing').value),
@@ -505,6 +532,40 @@
     } catch (err) {
       toast('설정 저장 실패: ' + err.message, 'err');
     }
+  }
+
+  /** 선택한 기준의 입력칸만 보여 준다 */
+  function syncExitFields() {
+    const basis = $('#cfgExitBasis').value;
+    $$('.exit-fields').forEach((el) => { el.hidden = el.dataset.basis !== basis; });
+    const hints = {
+      signal: '신호 엔진이 변동성(ATR)에 맞춰 손절·목표를 자동으로 잡습니다.',
+      percent: '진입가 기준 퍼센트로 손절·목표를 잡습니다. 봉 주기와 무관합니다.',
+      amount: '총 손익 금액으로 잡습니다. 수량이 정해진 뒤 주당 가격으로 환산됩니다.',
+      ticks: '호가(틱) 개수로 잡습니다. 가장 촘촘한 초단타용입니다.',
+    };
+    $('#exitHint').innerHTML = `${hints[basis] || ''} 봉 주기와 상관없이 <b>틱 단위 실시간</b>으로 감시합니다.`;
+  }
+
+  /** 지금 설정으로 사면 손절·목표가 얼마가 되는지 미리 보여 준다 */
+  let previewTimer = null;
+  function updateBracketPreview() {
+    const box = $('#bracketPreview');
+    if (!$('#ordBracket').checked) { box.hidden = true; return; }
+    clearTimeout(previewTimer);
+    previewTimer = setTimeout(async () => {
+      const snap = state.snapshot;
+      if (!snap || !snap.quote) return;
+      const price = Number($('#ordPrice').value) || snap.quote.price;
+      const qty = Math.max(1, Math.floor(Number($('#ordQty').value) || 1));
+      try {
+        const r = await api(`/api/kr/trader/preview?entry=${price}&qty=${qty}&market=${encodeURIComponent(snap.market || 'KOSPI')}`);
+        box.hidden = false;
+        box.innerHTML = `매수 후 자동 감시: 손절 <b class="down">${won(r.stop)}</b> (${r.stopPct.toFixed(2)}%)
+          · 목표 <b class="up">${won(r.target)}</b> (+${r.targetPct.toFixed(2)}%)<br>
+          <span class="muted">기준: ${esc(r.basis)} — 자동매매 패널에서 바꿀 수 있습니다</span>`;
+      } catch (_) { box.hidden = true; }
+    }, 200);
   }
 
   /* ------------------------------------------------------------- 검색 */
@@ -573,14 +634,17 @@
       refreshWatchQuotes();
     });
 
-    $('#ordPrice').addEventListener('input', updateOrderEstimate);
-    $('#ordQty').addEventListener('input', updateOrderEstimate);
+    $('#ordPrice').addEventListener('input', () => { updateOrderEstimate(); updateBracketPreview(); });
+    $('#ordQty').addEventListener('input', () => { updateOrderEstimate(); updateBracketPreview(); });
     $('#btnBuy').addEventListener('click', () => confirmOrder('buy'));
     $('#btnSell').addEventListener('click', () => confirmOrder('sell'));
     $('#confirmCancel').addEventListener('click', () => ($('#confirmModal').hidden = true));
     $('#confirmModal').addEventListener('click', (e) => { if (e.target.id === 'confirmModal') e.target.hidden = true; });
 
     $('#cfgSave').addEventListener('click', saveTraderConfig);
+    $('#cfgExitBasis').addEventListener('change', () => { syncExitFields(); updateBracketPreview(); });
+    $('#ordBracket').addEventListener('change', updateBracketPreview);
+    $$('.exit-fields input').forEach((el) => el.addEventListener('input', updateBracketPreview));
     $('#resumeBtn').addEventListener('click', async () => {
       try {
         state.trader = await post('/api/kr/trader/resume', {});
@@ -620,6 +684,7 @@
     $$('#tfGroup button').forEach((b) => b.classList.toggle('active', b.dataset.tf === state.tf));
     bindControls();
     bindSearch();
+    syncExitFields();
     renderWatchlist();
     loadNames();
     refreshWatchQuotes();

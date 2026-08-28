@@ -185,6 +185,24 @@ async function handle(req, res, url, sendJSON) {
         sendJSON(res, 200, trader.resume());
         return true;
 
+      case '/api/kr/trader/unwatch': {
+        // 주식은 그대로 두고 자동 청산 감시만 해제
+        const body = await readBody(req);
+        const target = String(body.code || '').toUpperCase();
+        sendJSON(res, 200, { ok: trader.detachManualPosition(target), status: trader.status() });
+        return true;
+      }
+
+      case '/api/kr/trader/preview': {
+        // 지금 설정으로 사면 손절·목표가 얼마가 되는지 미리 보여 준다
+        const entry = Number(params.get('entry'));
+        const qty = Number(params.get('qty')) || 1;
+        const market = params.get('market') === 'KOSDAQ' ? 'KOSDAQ' : 'KOSPI';
+        if (!(entry > 0)) return bad(res, sendJSON, '가격이 필요합니다.');
+        sendJSON(res, 200, trader.resolveExitLevels({ entry, qty, market }));
+        return true;
+      }
+
       case '/api/kr/order': {
         // 수동 주문: 화면에서 확인을 거친 뒤에만 호출된다
         const body = await readBody(req);
@@ -195,9 +213,36 @@ async function handle(req, res, url, sendJSON) {
         if (mode === 'live' && !trader.config.allowLive) {
           return bad(res, sendJSON, '실전 주문이 잠겨 있습니다. 자동매매 설정에서 "실전 주문 허용"을 켜야 합니다.', 423);
         }
-        const result = await client.order({ code: String(c).toUpperCase(), side, qty: Number(qty), price: Number(price) || 0, ordDvsn });
+        const code2 = String(c).toUpperCase();
+        const result = await client.order({ code: code2, side, qty: Number(qty), price: Number(price) || 0, ordDvsn });
         trader._log('order', side === 'buy' ? 'MANUAL_BUY' : 'MANUAL_SELL',
-          `[수동] ${c} ${side === 'buy' ? '매수' : '매도'} ${qty}주 @ ${price ? Number(price).toLocaleString() : '시장가'}`);
+          `[수동] ${code2} ${side === 'buy' ? '매수' : '매도'} ${qty}주 @ ${price ? Number(price).toLocaleString() : '시장가'}`);
+
+        // "자동 청산 걸기"를 켜고 매수했다면 실시간 감시를 붙인다
+        if (body.bracket && side === 'buy') {
+          try {
+            const st = hub.get(code2);
+            const entry = result.filledPrice || Number(price) || (st && st.quote && st.quote.price);
+            const watched = await trader.attachManualPosition({
+              code: code2,
+              qty: Number(qty),
+              entry,
+              market: (st && st.market) || 'KOSPI',
+              name: st && st.quote && st.quote.name,
+              simulated: !!result.mock,
+            });
+            result.bracket = {
+              stop: watched.stop,
+              target: watched.target,
+              basis: watched.exitBasis,
+            };
+          } catch (err) {
+            result.bracketError = err.message;
+            trader._log('warn', 'BRACKET', `${code2} 자동 청산 감시를 걸지 못했습니다: ${err.message}`);
+          }
+        }
+        if (side === 'sell') trader.detachManualPosition(code2);
+
         sendJSON(res, 200, result);
         return true;
       }
