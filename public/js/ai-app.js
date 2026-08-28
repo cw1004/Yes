@@ -148,7 +148,14 @@
     $('#contextCard').hidden = !r.marketContext;
     $('#marketContext').textContent = r.marketContext || '';
 
-    $('#picks').innerHTML = r.picks.map((p, i) => pickCard(p, i)).join('');
+    renderVerdict(r);
+    $('#picks').innerHTML = r.picks.length
+      ? r.picks.map((p, i) => pickCard(p, i)).join('')
+      : `<div class="empty-state no-pick">
+           <b>오늘은 살 만한 종목이 없습니다.</b><br />
+           ${esc((r.passReasons || []).map((x) => x.reason).join(' / ')) || '기준을 넘는 후보가 없었습니다.'}
+           <div class="muted" style="margin-top:8px">억지로 3개를 채우지 않는 것이 이 화면의 기본 동작입니다.</div>
+         </div>`;
     $('#candidatesPanel').hidden = false;
     $('#candidateNote').textContent = `${r.scanned}종목 스캔 · 상위 ${r.candidates.length}개`;
 
@@ -166,6 +173,59 @@
       </tr>`).join('');
 
     if (r.disclaimer) $('#disclaimer').textContent = r.disclaimer;
+  }
+
+  /** 전체 판정 — "지금 사도 되나"에 대한 한 줄 답 */
+  function renderVerdict(r) {
+    const box = $('#verdictBar');
+    const e = r.edgeSummary;
+    if (!e) { box.hidden = true; return; }
+    box.hidden = false;
+    const kind = { act: 'act', wait: 'wait', avoid: 'avoid' }[e.verdict] || 'wait';
+    const head = { act: '기대값 양수 종목이 있습니다', wait: '지금은 관망', avoid: '거래하지 마세요' }[e.verdict];
+    box.className = 'verdict ' + kind;
+    box.innerHTML = `
+      <div class="verdict-main">
+        <strong>${esc(head)}</strong>
+        <span>${esc(e.note)}</span>
+      </div>
+      <div class="verdict-counts">
+        <span class="vc take">진입 ${e.take}</span>
+        <span class="vc hold">보류 ${e.hold}</span>
+        <span class="vc reject">제외 ${e.reject}</span>
+      </div>
+      ${dropNote(r)}`;
+  }
+
+  /** 모델이 지어내서 버려진 항목 — 숨기지 않는다 */
+  function dropNote(r) {
+    if (!r.dropped || !r.dropped.length) return '';
+    const items = r.dropped.map((d) =>
+      `<li><b>${esc(d.symbol)}</b> — ${esc(d.why)} <span class="muted">(${esc(d.label || d.provider || '')})</span></li>`).join('');
+    return `<details class="drop-note"><summary>걸러 낸 항목 ${r.dropped.length}건</summary><ul>${items}</ul></details>`;
+  }
+
+  /** 이 거래가 돈이 되는 구조인지 — 필요 승률과 기대값 */
+  function edgeBlock(p) {
+    const e = p.edge;
+    if (!e) return '';
+    const label = { take: '진입 가능', hold: '보류', reject: '제외' }[e.verdict] || e.verdict;
+    const rows = [];
+    if (e.breakevenWinRate != null) {
+      rows.push(`<div><span>본전 승률</span><b>${(e.breakevenWinRate * 100).toFixed(1)}%</b></div>`);
+    }
+    if (e.hitProb != null) {
+      rows.push(`<div><span>실측 승률</span><b class="${e.hitProb >= (e.breakevenWinRate || 1) ? 'up' : 'down'}">${(e.hitProb * 100).toFixed(1)}%</b></div>`);
+    }
+    if (e.rrNet != null) rows.push(`<div><span>비용 뺀 손익비</span><b>${e.rrNet.toFixed(2)}:1</b></div>`);
+    if (e.costPerShare != null) rows.push(`<div><span>왕복 비용</span><b>${price(e.costPerShare)}/주</b></div>`);
+    if (e.evPct != null) {
+      rows.push(`<div><span>기대값</span><b class="${e.evPct > 0 ? 'up' : 'down'}">${e.evPct > 0 ? '+' : ''}${e.evPct.toFixed(3)}%</b></div>`);
+    }
+    return `<div class="edge-box ${esc(e.verdict)}">
+      <div class="edge-head"><span class="edge-verdict">${esc(label)}</span>${esc(e.reason)}</div>
+      ${rows.length ? `<div class="edge-grid">${rows.join('')}</div>` : ''}
+    </div>`;
   }
 
   function pickCard(p, i) {
@@ -197,9 +257,17 @@
         ${p.inCandidates ? '' : '<span class="pill warn">후보 목록 밖 · 지표 미검증</span>'}
         ${s && s.score <= -20 ? '<span class="pill warn">⚠ 지표는 매도 신호</span>' : ''}
         ${s && s.plan && s.plan.side === 'SHORT' ? '<span class="pill warn">하락 방향 플랜</span>' : ''}
+        ${p.expectedMovePct != null ? `<span class="pill">예상 ${p.expectedMovePct > 0 ? '+' : ''}${p.expectedMovePct}%</span>` : ''}
+        ${p.edge ? `<span class="pill verdict-${esc(p.edge.verdict)}">${
+          { take: '기대값 +', hold: '보류', reject: '제외' }[p.edge.verdict] || ''}</span>` : ''}
+        ${p.sources && p.sources.length && !p.sourcesVerified
+          ? '<span class="pill warn">출처 미확인</span>' : ''}
       </div>
 
+      ${edgeBlock(p)}
+
       <p class="pick-thesis">${esc(p.thesis)}</p>
+      ${p.invalidation ? `<p class="invalidation"><span>틀렸다고 볼 조건</span> ${esc(p.invalidation)}</p>` : ''}
 
       ${listSection('catalysts', '상승 촉매', p.catalysts)}
       ${listSection('risks', '리스크', p.risks)}

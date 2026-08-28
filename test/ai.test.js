@@ -278,7 +278,7 @@ test('합의: 두 엔진이 겹쳐 고른 종목이 앞으로 온다', async () 
   const a = fakeProvider('claude', 'Claude', [samplePick('AMD', 'AMD'), samplePick('MSFT', 'MS'), samplePick('SPY', 'SPY')]);
   const b = fakeProvider('llama', 'Llama', [samplePick('MSFT', 'MS'), samplePick('NVDA', 'NV'), samplePick('TSLA', 'TSLA')]);
   const out = await recommender.recommend({
-    market: 'US', symbols: US_SYMBOLS, force: true, _providerImpls: [a, b],
+    market: 'US', symbols: US_SYMBOLS, force: true, _skipBudget: true, _providerImpls: [a, b],
   });
   assert.strictEqual(out.picks[0].symbol, 'MSFT', '양쪽이 고른 종목이 1위');
   assert.strictEqual(out.picks[0].consensus.votes, 2);
@@ -293,7 +293,7 @@ test('합의: 두 엔진이 겹쳐 고른 종목이 앞으로 온다', async () 
 test('합의: 엔진별 서술을 나란히 보관해 의견 차이를 볼 수 있다', async () => {
   const a = fakeProvider('claude', 'Claude', [samplePick('MSFT', 'MS', { thesis: 'A 관점', confidence: '높음' })]);
   const b = fakeProvider('llama', 'Llama', [samplePick('MSFT', 'MS', { thesis: 'B 관점', confidence: '낮음' })]);
-  const out = await recommender.recommend({ market: 'US', symbols: US_SYMBOLS, force: true, _providerImpls: [a, b] });
+  const out = await recommender.recommend({ market: 'US', symbols: US_SYMBOLS, force: true, _skipBudget: true, _providerImpls: [a, b] });
   const msft = out.picks.find((p) => p.symbol === 'MSFT');
   assert.strictEqual(msft.perProvider.length, 2);
   assert.deepStrictEqual(msft.perProvider.map((x) => x.thesis), ['A 관점', 'B 관점']);
@@ -304,7 +304,7 @@ test('합의: 한 엔진이 실패해도 나머지 결과로 진행하고 실패
   const ok = fakeProvider('claude', 'Claude', [samplePick('MSFT', 'MS'), samplePick('NVDA', 'NV'), samplePick('AMD', 'AMD')]);
   const bad = { name: 'llama', label: 'Llama', available: () => true, ready: async () => ({ ok: true }),
     analyze: async () => { throw new Error('연결 실패'); } };
-  const out = await recommender.recommend({ market: 'US', symbols: US_SYMBOLS, force: true, _providerImpls: [ok, bad] });
+  const out = await recommender.recommend({ market: 'US', symbols: US_SYMBOLS, force: true, _skipBudget: true, _providerImpls: [ok, bad] });
   assert.strictEqual(out.engine, 'ai');
   assert.strictEqual(out.picks.length, 3);
   assert.strictEqual(out.failures.length, 1);
@@ -314,7 +314,7 @@ test('합의: 한 엔진이 실패해도 나머지 결과로 진행하고 실패
 test('합의: 모든 엔진이 실패하면 지표 전용으로 내려가고 사유를 밝힌다', async () => {
   const bad = (n) => ({ name: n, label: n, available: () => true, ready: async () => ({ ok: true }),
     analyze: async () => { throw new Error(n + ' 오류'); } });
-  const out = await recommender.recommend({ market: 'US', symbols: US_SYMBOLS, force: true, _providerImpls: [bad('claude'), bad('llama')] });
+  const out = await recommender.recommend({ market: 'US', symbols: US_SYMBOLS, force: true, _skipBudget: true, _providerImpls: [bad('claude'), bad('llama')] });
   assert.strictEqual(out.engine, 'rules');
   assert.match(out.marketContext, /모든 AI 엔진 호출이 실패/);
   assert.strictEqual(out.failures.length, 2);
@@ -325,18 +325,24 @@ test('합의: 출처는 두 엔진 것을 합치되 중복 URL 은 제거한다'
   const same = { title: '같은 기사', url: 'https://example.com/same', publisher: 'Reuters' };
   const a = fakeProvider('claude', 'Claude', [samplePick('MSFT', 'MS', { sources: [same, { title: 'A', url: 'https://a.com' }] })]);
   const b = fakeProvider('llama', 'Llama', [samplePick('MSFT', 'MS', { sources: [same, { title: 'B', url: 'https://b.com' }] })]);
-  const out = await recommender.recommend({ market: 'US', symbols: US_SYMBOLS, force: true, _providerImpls: [a, b] });
+  const out = await recommender.recommend({ market: 'US', symbols: US_SYMBOLS, force: true, _skipBudget: true, _providerImpls: [a, b] });
   const urls = out.picks[0].sources.map((s) => s.url);
   assert.strictEqual(new Set(urls).size, urls.length, '중복 없음');
   assert.ok(urls.includes('https://a.com') && urls.includes('https://b.com'), '양쪽 출처 병합');
 });
 
-test('환각 방어: 후보에 없던 심볼은 inCandidates=false 이고 스냅샷이 비어 있다', async () => {
+test('환각 방어: 후보에 없던 심볼은 아예 결과에서 빠지고, 왜 빠졌는지 남는다', async () => {
   const a = fakeProvider('claude', 'Claude', [samplePick('FAKE', '없는종목'), samplePick('MSFT', 'MS'), samplePick('NVDA', 'NV')]);
-  const out = await recommender.recommend({ market: 'US', symbols: US_SYMBOLS, force: true, _providerImpls: [a] });
-  const fake = out.picks.find((p) => p.symbol === 'FAKE');
-  assert.strictEqual(fake.inCandidates, false);
-  assert.strictEqual(fake.snapshot, null);
+  const out = await recommender.recommend({
+    market: 'US', symbols: US_SYMBOLS, force: true, _skipBudget: true, _providerImpls: [a], _skipBudget: true,
+  });
+  assert.ok(!out.picks.some((p) => p.symbol === 'FAKE'), '지어낸 종목은 화면까지 오지 않는다');
+  const d = (out.dropped || []).find((x) => x.symbol === 'FAKE');
+  assert.ok(d, '버린 사실을 숨기지 않는다');
+  assert.match(d.why, /후보 목록에 없는/);
+  assert.strictEqual(d.provider, 'claude', '어느 엔진이 지어냈는지도 남는다');
+  // 남은 추천은 전부 실제 후보 안의 종목이다
+  assert.ok(out.picks.every((p) => p.inCandidates && p.snapshot));
 });
 
 test('환각 방어: 화면에 쓰이는 가격·점수는 AI 값이 아니라 우리 엔진 값이다', async () => {
@@ -345,7 +351,7 @@ test('환각 방어: 화면에 쓰이는 가격·점수는 AI 값이 아니라 �
   const a = fakeProvider('claude', 'Claude', [
     samplePick(target.symbol, '엉뚱한이름'), samplePick('MSFT', 'MS'), samplePick('NVDA', 'NV'),
   ]);
-  const out = await recommender.recommend({ market: 'US', symbols: US_SYMBOLS, force: true, _providerImpls: [a] });
+  const out = await recommender.recommend({ market: 'US', symbols: US_SYMBOLS, force: true, _skipBudget: true, _providerImpls: [a] });
   const p = out.picks.find((x) => x.symbol === target.symbol);
   assert.strictEqual(p.snapshot.score, target.score);
   assert.strictEqual(p.snapshot.price, target.price);
@@ -489,7 +495,7 @@ test('성과: 숏 추천은 하락했을 때 수익으로 계산한다', async (
 
 test('성과: 추천이 나오면 자동으로 기록된다', async () => {
   const a = fakeProvider('claude', 'Claude', [samplePick('MSFT', 'MS'), samplePick('NVDA', 'NV'), samplePick('AMD', 'AMD')]);
-  const out = await recommender.recommend({ market: 'US', symbols: US_SYMBOLS, force: true, _providerImpls: [a] });
+  const out = await recommender.recommend({ market: 'US', symbols: US_SYMBOLS, force: true, _skipBudget: true, _providerImpls: [a] });
   assert.strictEqual(out.tracked, 3, '3건 기록');
 });
 
@@ -673,6 +679,183 @@ test('스캐너: 스캔이 실패해도 엔진은 죽지 않고 사유를 남긴
     screenerMod.screenUS = real;
     sc.stop();
   }
+});
+
+/* --------------------------------------------- 검증: 환각·규격 위반 차단 */
+
+const validate = require('../server/ai/validate.js');
+const reliability = require('../server/ai/reliability.js');
+
+const CANDS = [
+  { symbol: 'AAPL', name: 'Apple', price: 200 },
+  { symbol: 'MSFT', name: 'Microsoft', price: 400 },
+];
+
+test('검증: 후보에 없는 종목은 떨어뜨리고 이유를 남긴다', () => {
+  const r = validate.validatePicks([
+    { symbol: 'AAPL', confidence: '높음', horizon: '당일', sources: [] },
+    { symbol: 'NVDA', confidence: '높음', horizon: '당일', sources: [] },   // 후보에 없음
+  ], { candidates: CANDS, allowedUrls: [], market: 'US' });
+
+  assert.strictEqual(r.picks.length, 1);
+  assert.strictEqual(r.picks[0].symbol, 'AAPL');
+  assert.strictEqual(r.dropped.length, 1);
+  assert.strictEqual(r.dropped[0].symbol, 'NVDA');
+  assert.match(r.dropped[0].why, /후보 목록에 없는/);
+});
+
+test('검증: 같은 종목을 두 번 추천하면 하나만 남는다', () => {
+  const r = validate.validatePicks([
+    { symbol: 'AAPL', confidence: '높음', horizon: '당일', sources: [] },
+    { symbol: 'aapl', confidence: '중간', horizon: '당일', sources: [] },
+  ], { candidates: CANDS, allowedUrls: [], market: 'US' });
+  assert.strictEqual(r.picks.length, 1);
+  assert.match(r.dropped[0].why, /중복/);
+});
+
+test('검증: 열거형 밖의 신뢰도·기간은 가장 보수적인 값으로 내려간다', () => {
+  const r = validate.validatePicks([
+    { symbol: 'AAPL', confidence: '매우 높음', horizon: '3개월', sources: [] },
+  ], { candidates: CANDS, allowedUrls: [], market: 'US' });
+  assert.strictEqual(r.picks[0].confidence, '낮음');
+  assert.strictEqual(r.picks[0].horizon, '당일');
+});
+
+test('검증: 출처는 우리가 준 목록에 있었는지 표시한다 (지우지는 않는다)', () => {
+  const given = 'https://example.com/real';
+  const r = validate.validatePicks([{
+    symbol: 'AAPL', confidence: '높음', horizon: '당일',
+    sources: [
+      { title: '진짜', url: given },
+      { title: '검색으로 찾음', url: 'https://other.com/x' },
+      { title: '주소 아님', url: 'javascript:alert(1)' },
+    ],
+  }], { candidates: CANDS, allowedUrls: [given], market: 'US' });
+
+  const s = r.picks[0].sources;
+  assert.strictEqual(s.length, 2, 'http(s) 아닌 주소는 제거');
+  assert.strictEqual(s[0].verified, true);
+  assert.strictEqual(s[1].verified, false, '검색 결과는 확인 불가로 표시');
+  assert.strictEqual(r.picks[0].sourcesVerified, 1);
+});
+
+/* ------------------------------------------------------- 기대값 계산 */
+
+test('기대값: 목표가 비용도 못 넘으면 확률과 무관하게 거절한다', () => {
+  // 한국: 74,800원에서 목표 74,900원 → 100원 벌자고 왕복 비용이 그보다 크다
+  const e = validate.edgeOf({ entry: 74800, stop: 74400, target: 74900, side: 'LONG', market: 'KR' });
+  assert.strictEqual(e.verdict, 'reject');
+  assert.match(e.reason, /비용.*넘지 못/);
+});
+
+test('기대값: 필요 승률은 확률 추정 없이도 계산된다', () => {
+  // 위험 2, 순보상 약 3 → 본전 승률 = 2 / (2+3) ≈ 40%
+  const e = validate.edgeOf({ entry: 100, stop: 98, target: 103, side: 'LONG', market: 'US' });
+  assert.ok(e.breakevenWinRate > 0.39 && e.breakevenWinRate < 0.42, '본전 승률 ' + e.breakevenWinRate);
+  assert.strictEqual(e.hitProb, null, '실적을 안 주면 승률은 비어 있다');
+  assert.strictEqual(e.verdict, 'hold');
+});
+
+test('기대값: 실측 승률이 필요 승률을 넘으면 take, 못 넘으면 hold', () => {
+  const plan = { entry: 100, stop: 98, target: 103, side: 'LONG', market: 'US' };
+  const good = validate.edgeOf(plan, { prob: 0.55, basis: '실적', measured: true, n: 40 });
+  const bad = validate.edgeOf(plan, { prob: 0.30, basis: '실적', measured: true, n: 40 });
+  assert.strictEqual(good.verdict, 'take');
+  assert.ok(good.evPerShare > 0);
+  assert.strictEqual(bad.verdict, 'hold');
+  assert.ok(bad.evPerShare < 0);
+});
+
+test('기대값: 표본이 부족하면 승률이 높아도 take 로 올리지 않는다', () => {
+  const e = validate.edgeOf(
+    { entry: 100, stop: 98, target: 103, side: 'LONG', market: 'US' },
+    { prob: 0.9, basis: '표본 부족', measured: false, n: 3 }
+  );
+  assert.strictEqual(e.verdict, 'hold');
+  assert.match(e.reason, /근거가 약해/);
+});
+
+test('기대값: 방향과 앞뒤가 안 맞는 계획은 거절한다', () => {
+  // 매수인데 손절이 진입보다 위
+  const e = validate.edgeOf({ entry: 100, stop: 102, target: 105, side: 'LONG', market: 'US' });
+  assert.strictEqual(e.verdict, 'reject');
+  assert.match(e.reason, /방향과 맞지 않/);
+});
+
+test('기대값: 매도(숏)도 같은 규칙으로 계산된다', () => {
+  const e = validate.edgeOf(
+    { entry: 100, stop: 102, target: 96, side: 'SHORT', market: 'US' },
+    { prob: 0.6, basis: '실적', measured: true, n: 40 }
+  );
+  assert.strictEqual(e.verdict, 'take');
+  assert.strictEqual(e.side, 'SHORT');
+});
+
+/* ------------------------------------------------- 신뢰성: 재시도·차단 */
+
+test('신뢰성: 네트워크 오류는 재시도하고, 모델 거절은 재시도하지 않는다', () => {
+  assert.strictEqual(reliability.isTransient(new Error('fetch failed')), true);
+  assert.strictEqual(reliability.isTransient(Object.assign(new Error('busy'), { status: 429 })), true);
+  assert.strictEqual(reliability.isTransient(Object.assign(new Error('nope'), { status: 500 })), true);
+  assert.strictEqual(reliability.isTransient(new Error('모델이 요청을 거절했습니다 (policy).')), false);
+  assert.strictEqual(reliability.isTransient(Object.assign(new Error('bad'), { status: 400 })), false);
+});
+
+test('신뢰성: 일시적 오류는 다시 걸어 성공하면 그대로 통과시킨다', async () => {
+  reliability.reset();
+  let calls = 0;
+  const p = {
+    name: 'test', label: '테스트',
+    analyze: async () => {
+      calls++;
+      if (calls === 1) throw new Error('fetch failed');
+      return { picks: [], marketContext: '' };
+    },
+  };
+  const out = await reliability.guardedAnalyze(p, {});
+  assert.strictEqual(calls, 2);
+  assert.strictEqual(out.attempts, 2);
+  reliability.reset();
+});
+
+test('신뢰성: 거절은 한 번만 부르고 끝낸다 (요금 낭비 방지)', async () => {
+  reliability.reset();
+  let calls = 0;
+  const p = {
+    name: 'test2', label: '테스트',
+    analyze: async () => { calls++; throw new Error('모델이 요청을 거절했습니다.'); },
+  };
+  await assert.rejects(() => reliability.guardedAnalyze(p, {}));
+  assert.strictEqual(calls, 1, '거절에는 재시도하지 않는다');
+  reliability.reset();
+});
+
+test('신뢰성: 응답이 없으면 시간 제한에 걸린다', async () => {
+  reliability.reset();
+  process.env.AI_TIMEOUT_MS = '50';
+  delete require.cache[require.resolve('../server/ai/reliability.js')];
+  const R = require('../server/ai/reliability.js');
+  const p = { name: 'slow', label: '느림', analyze: () => new Promise(() => {}) };
+  await assert.rejects(() => R.guardedAnalyze(p, {}), /시간이 초과/);
+  delete process.env.AI_TIMEOUT_MS;
+  delete require.cache[require.resolve('../server/ai/reliability.js')];
+});
+
+test('신뢰성: 연속 실패하면 잠시 호출을 끊는다 (서킷 브레이커)', async () => {
+  reliability.reset();
+  let calls = 0;
+  const p = {
+    name: 'dead', label: '죽음',
+    analyze: async () => { calls++; throw new Error('그냥 실패'); },
+  };
+  for (let i = 0; i < reliability.BREAKER_THRESHOLD; i++) {
+    await assert.rejects(() => reliability.guardedAnalyze(p, {}));
+  }
+  const before = calls;
+  await assert.rejects(() => reliability.guardedAnalyze(p, {}), /호출을 멈춘 상태/);
+  assert.strictEqual(calls, before, '차단된 동안에는 아예 부르지 않는다');
+  assert.strictEqual(reliability.status().dead.open, true);
+  reliability.reset();
 });
 
 /* ------------------------------------------------------------------ 실행 */

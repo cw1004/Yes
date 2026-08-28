@@ -165,6 +165,89 @@ function summary() {
   };
 }
 
-const round2 = (v) => (isFinite(v) ? Math.round(v * 100) / 100 : null);
+/**
+ * 보정(calibration) — "우리가 '높음'이라고 한 추천은 실제로 몇 % 맞았나".
+ *
+ * 기대값 계산과 AI 프롬프트 양쪽에서 쓴다. 표본이 적을 때 그대로 쓰면 3건 중 2건 맞았다고
+ * 승률 67% 라고 우기게 되므로, 중립값(50%) 쪽으로 끌어당기는 축소추정(shrinkage)을 쓴다.
+ *   p̂ = (맞은 수 + k·0.5) / (전체 + k),  k = 10
+ * 표본이 쌓일수록 실측값에 가까워지고, 적을 때는 50%에 머문다.
+ */
+const SHRINK_K = 10;
+/** 이 이상 쌓여야 "측정됐다"고 본다 */
+const MIN_SAMPLE = 10;
 
-module.exports = { record, scoreAll, summary, readAll, HORIZON_HOURS, FILE };
+function calibration() {
+  const latest = new Map();
+  for (const r of readAll()) latest.set(r.id, r);
+  const closed = Array.from(latest.values()).filter((r) => r.closed && typeof r.pnlPct === 'number');
+
+  const bucket = (rows) => {
+    const n = rows.length;
+    const hits = rows.filter((r) => r.outcome === 'target').length;
+    const stops = rows.filter((r) => r.outcome === 'stop').length;
+    const expired = rows.filter((r) => r.outcome === 'expired').length;
+    const raw = n ? hits / n : null;
+    return {
+      n,
+      targetRate: raw == null ? null : round2(raw * 100),
+      stopRate: n ? round2((stops / n) * 100) : null,
+      expiredRate: n ? round2((expired / n) * 100) : null,
+      // 축소추정 승률 — 표본이 적으면 50%에 가깝게 눌린다
+      hitProb: round4((hits + SHRINK_K * 0.5) / (n + SHRINK_K)),
+      avgPnlPct: n ? round2(rows.reduce((a, r) => a + r.pnlPct, 0) / n) : null,
+      measured: n >= MIN_SAMPLE,
+    };
+  };
+
+  const group = (keyFn) => {
+    const map = new Map();
+    for (const r of closed) {
+      const k = keyFn(r);
+      if (!k) continue;
+      if (!map.has(k)) map.set(k, []);
+      map.get(k).push(r);
+    }
+    return Object.fromEntries(Array.from(map, ([k, v]) => [k, bucket(v)]));
+  };
+
+  return {
+    overall: bucket(closed),
+    byConfidence: group((r) => r.confidence),
+    byMarket: group((r) => r.market),
+    byEngine: group((r) => r.engine),
+    minSample: MIN_SAMPLE,
+  };
+}
+
+/**
+ * 특정 조건에서 쓸 승률 추정치. 조건이 구체적일수록 우선하되,
+ * 표본이 부족하면 더 넓은 집합으로 물러난다.
+ * @returns {{prob:number, basis:string, n:number, measured:boolean}}
+ */
+function hitProbFor({ confidence, market } = {}) {
+  const cal = calibration();
+  const tries = [
+    [cal.byConfidence[confidence], `신뢰도 '${confidence}' 실적`],
+    [cal.byMarket[market], `${market} 시장 실적`],
+    [cal.overall, '전체 실적'],
+  ];
+  for (const [b, basis] of tries) {
+    if (b && b.measured) return { prob: b.hitProb, basis, n: b.n, measured: true };
+  }
+  const b = cal.overall;
+  return {
+    prob: b && b.n ? b.hitProb : 0.5,
+    basis: `표본 부족(${(b && b.n) || 0}건) — 중립 50%로 가정`,
+    n: (b && b.n) || 0,
+    measured: false,
+  };
+}
+
+const round2 = (v) => (isFinite(v) ? Math.round(v * 100) / 100 : null);
+const round4 = (v) => (isFinite(v) ? Math.round(v * 1e4) / 1e4 : null);
+
+module.exports = {
+  record, scoreAll, summary, readAll, calibration, hitProbFor,
+  HORIZON_HOURS, MIN_SAMPLE, FILE,
+};

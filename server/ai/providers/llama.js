@@ -99,7 +99,8 @@ async function analyze(ctx) {
     label: 'Llama (Meta)',
     model: json.model || MODEL,
     marketContext: submitted.marketContext || '',
-    picks: submitted.picks,
+    passReason: submitted.passReason || '',
+    picks: submitted.picks || [],
     webSearches: 0,
     usage: {
       input_tokens: usage.prompt_tokens || 0,

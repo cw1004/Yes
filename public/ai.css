@@ -226,3 +226,66 @@ body.ai { overflow: hidden; }
   font-size: 11.5px; font-variant-numeric: tabular-nums; white-space: nowrap;
 }
 .scan-grade { font-size: 9.5px; color: var(--muted); }
+
+/* ------------------------------------------------- 기대값 판정 */
+
+.verdict {
+  border: 1px solid var(--line); border-left-width: 3px; border-radius: 10px;
+  padding: 11px 14px; margin-bottom: 12px;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px;
+  background: var(--panel);
+}
+.verdict.act { border-left-color: var(--up); }
+.verdict.wait { border-left-color: var(--warn); }
+.verdict.avoid { border-left-color: var(--down); }
+.verdict-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.verdict-main strong { font-size: 14px; }
+.verdict.act .verdict-main strong { color: var(--up); }
+.verdict.wait .verdict-main strong { color: var(--warn); }
+.verdict.avoid .verdict-main strong { color: var(--down); }
+.verdict-main span { font-size: 11.5px; color: var(--muted); line-height: 1.5; }
+.verdict-counts { display: flex; gap: 6px; }
+.vc {
+  font-size: 11px; padding: 2px 8px; border-radius: 999px;
+  border: 1px solid var(--line); font-variant-numeric: tabular-nums;
+}
+.vc.take { color: var(--up); border-color: var(--up); }
+.vc.hold { color: var(--muted); }
+.vc.reject { color: var(--down); border-color: var(--down); }
+
+.drop-note { flex-basis: 100%; font-size: 11px; color: var(--muted); }
+.drop-note summary { cursor: pointer; }
+.drop-note ul { margin: 6px 0 0; padding-left: 18px; line-height: 1.7; }
+
+/* 카드 안 기대값 */
+.edge-box {
+  border: 1px solid var(--line); border-radius: 9px; padding: 9px 11px;
+  margin: 0 0 10px; background: var(--panel-2);
+}
+.edge-box.take { border-color: color-mix(in srgb, var(--up) 45%, var(--line)); }
+.edge-box.reject { border-color: color-mix(in srgb, var(--down) 45%, var(--line)); }
+.edge-head { font-size: 11.5px; color: var(--muted); line-height: 1.6; }
+.edge-verdict {
+  display: inline-block; margin-right: 7px; padding: 1px 7px; border-radius: 999px;
+  font-size: 10.5px; font-weight: 600; border: 1px solid var(--line); color: var(--fg);
+}
+.edge-box.take .edge-verdict { color: var(--up); border-color: var(--up); }
+.edge-box.reject .edge-verdict { color: var(--down); border-color: var(--down); }
+.edge-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(108px, 1fr));
+  gap: 6px 12px; margin-top: 8px;
+}
+.edge-grid div { display: flex; flex-direction: column; gap: 1px; }
+.edge-grid span { font-size: 10px; color: var(--muted); }
+.edge-grid b { font-size: 12.5px; font-variant-numeric: tabular-nums; }
+
+.pill.verdict-take { color: var(--up); border-color: var(--up); }
+.pill.verdict-reject { color: var(--down); border-color: var(--down); }
+
+.invalidation {
+  font-size: 11.5px; color: var(--muted); line-height: 1.6;
+  border-left: 2px solid var(--warn); padding-left: 9px; margin: 0 0 10px;
+}
+.invalidation span { color: var(--warn); font-weight: 600; margin-right: 4px; }
+
+.empty-state.no-pick { line-height: 1.8; }

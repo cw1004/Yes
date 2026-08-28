@@ -87,7 +87,9 @@ async function analyze(ctx) {
 
     messages.push({ role: 'assistant', content: response.content });
     if (response.stop_reason === 'pause_turn') continue;  // 서버 도구 진행 중
-    messages.push({ role: 'user', content: `${S.TOOL_NAME} 도구를 호출해 최종 3종목을 제출해 주세요.` });
+    messages.push({ role: 'user', content:
+      `${S.TOOL_NAME} 도구를 호출해 결과를 제출해 주세요. `
+      + '기준을 넘는 종목이 없으면 picks 를 빈 배열로 두고 passReason 에 이유를 적으면 됩니다.' });
   }
 
   if (!submitted) throw new Error('Claude 가 추천 결과를 제출하지 않았습니다.');
@@ -97,6 +99,7 @@ async function analyze(ctx) {
     label: 'Claude',
     model: servedModel,
     marketContext: submitted.marketContext || '',
+    passReason: submitted.passReason || '',
     picks: submitted.picks || [],
     webSearches: searches,
     usage: {

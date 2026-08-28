@@ -9,6 +9,8 @@
 const recommender = require('./recommender');
 const screener = require('./screener');
 const scanner = require('./scanner');
+const budget = require('./budget');
+const reliability = require('./reliability');
 const providers = require('./providers');
 const tracker = require('./tracker');
 const news = require('./news');
@@ -52,6 +54,9 @@ async function handle(req, res, url, sendJSON) {
           providers: status,
           configured: status.some((s) => s.ready),
           newsEnabled: process.env.NEWS_ENABLED !== '0',
+          budget: budget.status(),
+          reliability: reliability.status(),
+          calibration: safeCalibration(),
           feeds: news.configuredFeeds().length,
           markets: MARKETS,
           horizons: HORIZONS,
@@ -142,6 +147,16 @@ async function handle(req, res, url, sendJSON) {
         return true;
       }
 
+      case '/api/ai/budget': {
+        sendJSON(res, 200, budget.status());
+        return true;
+      }
+
+      case '/api/ai/calibration': {
+        sendJSON(res, 200, tracker.calibration());
+        return true;
+      }
+
       case '/api/ai/performance': {
         if (params.get('score') !== '0') {
           // 열려 있는 추천을 현재가로 채점한 뒤 성적표를 낸다
@@ -159,6 +174,10 @@ async function handle(req, res, url, sendJSON) {
     sendJSON(res, 500, { error: err.message || String(err) });
     return true;
   }
+}
+
+function safeCalibration() {
+  try { return tracker.calibration(); } catch (_) { return null; }
 }
 
 function parseSymbols(raw) {
