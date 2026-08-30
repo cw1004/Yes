@@ -191,6 +191,16 @@
       <label>진입 점수 <input type="number" id="cfgEntryScore" value="45" min="10" max="100" /></label>
       <label>청산 점수 <input type="number" id="cfgExitScore" value="-15" min="-100" max="50" /></label>
 
+      <div class="lab-block">
+        <div class="lab-head">
+          <b>🔬 실전 준비</b>
+          <button id="preflightBtn" class="mini-btn">실전 점검</button>
+          <button id="optimizeBtn" class="mini-btn">수익 구간 찾기</button>
+        </div>
+        <div id="preflightBox" class="preflight" hidden></div>
+        <div id="optimizeBox" class="optimize" hidden></div>
+      </div>
+
       <div class="exit-block">
         <label>수량 결정
           <select id="cfgSizingMode">

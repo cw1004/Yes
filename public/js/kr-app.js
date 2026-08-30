@@ -366,6 +366,153 @@
     } catch (_) {}
   }
 
+
+  /* --------------------------------------------- 실전 준비: 점검·수익 구간 */
+
+  /**
+   * 확산형 배색 — 손실(빨강) ↔ 0(회색) ↔ 수익(파랑).
+   * 빨강↔초록 대신 빨강↔파랑을 쓴 것은 색각 이상에서도 구별되기 때문이다.
+   * 각 칸에 숫자를 함께 찍으므로 색이 유일한 단서가 아니다.
+   */
+  const HEAT = {
+    loss: ['#7a3330', '#b8443c', '#ef7a70'],   // 약 → 강
+    zero: '#2b3040',
+    gain: ['#25547f', '#2f7fc9', '#6fadf0'],
+    // 밝은 칸에는 어두운 글자를 얹어야 읽힌다 (대비 4.4:1 이상 확보)
+    darkInkOn: new Set(['#ef7a70', '#2f7fc9', '#6fadf0']),
+  };
+
+  /** 기대값(원) → 칸 색. scale 은 그 격자에서 관측된 최대 절댓값 */
+  function heatColor(value, scale) {
+    if (!isFinite(value) || !scale) return HEAT.zero;
+    const m = Math.min(1, Math.abs(value) / scale);
+    if (m < 0.06) return HEAT.zero;                 // 사실상 0
+    const arm = value > 0 ? HEAT.gain : HEAT.loss;
+    return arm[m < 0.35 ? 0 : m < 0.7 ? 1 : 2];
+  }
+
+  const heatInk = (bg) => (HEAT.darkInkOn.has(bg) ? '#0b0d12' : '#e6eaf2');
+
+  /** 원 단위를 짧게 (칸이 좁다) */
+  function shortWon(v) {
+    if (v == null || !isFinite(v)) return '—';
+    const a = Math.abs(v);
+    const sign = v < 0 ? '-' : '';
+    if (a >= 10000) return sign + (a / 10000).toFixed(a >= 100000 ? 0 : 1) + '만';
+    if (a >= 1000) return sign + (a / 1000).toFixed(1) + '천';
+    return String(Math.round(v));
+  }
+
+  async function runPreflight() {
+    const box = $('#preflightBox');
+    box.hidden = false;
+    box.innerHTML = '<div class="muted" style="font-size:11px">점검 중…</div>';
+    try {
+      const r = await api('/api/kr/preflight');
+      const mark = { pass: '✔', warn: '!', fail: '✘' };
+      box.innerHTML =
+        `<div class="pf-verdict ${r.ready ? 'ready' : 'blocked'}">
+           <b>${r.ready ? '실행 가능' : '실전 준비 안 됨'}</b> · ${esc(r.verdict)}
+         </div>` +
+        r.items.map((i) => `<div class="pf-item ${esc(i.level)}">
+          <span class="pf-mark">${mark[i.level]}</span>
+          <span>
+            <span class="pf-title">${esc(i.title)}</span> —
+            <span class="pf-detail">${esc(i.detail)}</span>
+            ${i.action ? `<br><span class="pf-action">→ ${esc(i.action)}</span>` : ''}
+          </span>
+        </div>`).join('');
+    } catch (err) {
+      box.innerHTML = `<div class="pf-verdict blocked">점검 실패: ${esc(err.message)}</div>`;
+    }
+  }
+
+  async function runOptimize() {
+    const box = $('#optimizeBox');
+    box.hidden = false;
+    box.innerHTML = '<div class="muted" style="font-size:11px">과거 봉으로 전 조합을 돌리는 중… (몇 초)</div>';
+    try {
+      const qty = Math.max(1, Math.floor(Number($('#ordQty').value) || 100));
+      const r = await api(`/api/kr/optimize?code=${encodeURIComponent(state.code)}&bars=600&qty=${qty}`);
+      box.innerHTML = renderOptimize(r);
+    } catch (err) {
+      box.innerHTML = `<div class="opt-verdict none">탐색 실패: ${esc(err.message)}</div>`;
+    }
+  }
+
+  function renderOptimize(r) {
+    const stops = [...new Set(r.cells.map((c) => c.stopPct))].sort((a, b) => a - b);
+    const targets = [...new Set(r.cells.map((c) => c.targetPct))].sort((a, b) => a - b);
+    // 진입 점수는 격자에서 가장 좋았던 값 하나로 고정해 2차원으로 본다
+    const es = r.best ? r.best.entryScore : stops.length && r.cells[0].entryScore;
+    const grid = r.cells.filter((c) => c.entryScore === es);
+    const scale = Math.max(...grid.map((c) => Math.abs(c.train.expectancy || 0)), 1);
+
+    const cell = (c) => {
+      if (!c) return '<div class="hm-cell" style="background:var(--panel)"></div>';
+      const bg = heatColor(c.train.expectancy, scale);
+      const tip = `손절 -${c.stopPct}% / 목표 +${c.targetPct}%\n`
+        + `학습: 거래 ${c.train.trades}건 · 1회 기대값 ${Math.round(c.train.expectancy).toLocaleString()}원 · 승률 ${c.train.winRate}%\n`
+        + (c.test ? `검증: 거래 ${c.test.trades}건 · 기대값 ${Math.round(c.test.expectancy).toLocaleString()}원\n` : '')
+        + (c.survives ? '→ 학습·검증 모두 통과' : '→ 통과 못 함');
+      return `<div class="hm-cell ${c.survives ? 'survives' : ''}"
+        style="background:${bg};color:${heatInk(bg)}" title="${esc(tip)}">
+        <span>${shortWon(c.train.expectancy)}</span>
+        ${c.survives ? '<span class="chk">✔ 검증</span>' : `<span class="chk" style="opacity:.55">${c.train.trades}건</span>`}
+      </div>`;
+    };
+
+    const rows = stops.map((sp) =>
+      `<div class="hm-ylabel">-${sp}%</div>` +
+      targets.map((tp) => cell(grid.find((c) => c.stopPct === sp && c.targetPct === tp))).join('')
+    ).join('');
+
+    const legend = `<div class="hm-legend">
+      <span>손실</span>
+      ${HEAT.loss.slice().reverse().map((c) => `<span class="sw" style="background:${c}"></span>`).join('')}
+      <span class="sw" style="background:${HEAT.zero}"></span>
+      ${HEAT.gain.map((c) => `<span class="sw" style="background:${c}"></span>`).join('')}
+      <span>수익</span>
+      <span class="sep">·</span>
+      <span class="sw" style="background:transparent;box-shadow:inset 0 0 0 2px var(--text)"></span>
+      <span>테두리 = 학습·검증 모두 통과</span>
+    </div>`;
+
+    const table = r.ranked.length ? `<table class="opt-table">
+      <thead><tr><th>설정</th><th>거래</th><th>1회 기대값</th><th>승률</th><th>검증</th></tr></thead>
+      <tbody>${r.ranked.slice(0, 6).map((c) => `<tr class="${c.survives ? 'survives' : ''}">
+        <td>-${c.stopPct}% / +${c.targetPct}% <span class="muted">(${c.entryScore}점)</span></td>
+        <td>${c.train.trades}</td>
+        <td class="${c.train.expectancy > 0 ? 'up' : 'down'}">${Math.round(c.train.expectancy).toLocaleString()}원</td>
+        <td>${c.train.winRate}%</td>
+        <td>${c.test ? `<span class="${c.test.expectancy > 0 ? 'up' : 'down'}">${Math.round(c.test.expectancy).toLocaleString()}</span>` : '—'}</td>
+      </tr>`).join('')}</tbody></table>` : '';
+
+    const apply = r.best && r.best.survives
+      ? `<button class="mini-btn" id="applyBest">이 설정 적용 (-${r.best.stopPct}% / +${r.best.targetPct}%)</button>`
+      : '';
+
+    return `
+      <div class="opt-verdict ${esc(r.verdict.level)}">${r.verdict.text.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')}</div>
+      <div class="hm-wrap">
+        <div class="hm" style="grid-template-columns:auto repeat(${targets.length}, minmax(42px, 1fr))">
+          <div class="hm-corner">손절↓ / 목표→</div>
+          ${targets.map((t) => `<div class="hm-xlabel">+${t}%</div>`).join('')}
+          ${rows}
+        </div>
+      </div>
+      ${legend}
+      ${table}
+      ${apply}
+      <div class="opt-note">
+        ${r.name ? esc(r.name) + ' · ' : ''}${r.barsAvailable}봉 · 조합 ${r.tested}개 중 ${r.survivors}개 통과
+        ${r.split ? ` · 학습 ${r.split.trainBars}봉 / 검증 ${r.split.testBars}봉` : ''}
+        <br>칸의 숫자는 <b>학습 구간의 1회 거래당 기대 손익</b>입니다(수수료·세금 포함).
+        진입 점수 ${es}점 기준으로 그렸습니다.
+        <br>⚠️ 과거 기록일 뿐 미래를 보장하지 않습니다. 조합을 많이 돌려 고른 1등은 우연일 수 있습니다.
+      </div>`;
+  }
+
   /* ------------------------------------------------------------- 주문 */
 
   function updateOrderEstimate() {
@@ -702,6 +849,19 @@
     $('#cfgSave').addEventListener('click', saveTraderConfig);
     $('#cfgExitBasis').addEventListener('change', () => { syncExitFields(); updateBracketPreview(); });
     $('#cfgSizingMode').addEventListener('change', syncSizingFields);
+    $('#preflightBtn').addEventListener('click', runPreflight);
+    $('#optimizeBtn').addEventListener('click', runOptimize);
+    // 탐색 결과에서 바로 설정에 반영할 수 있게 (위임 — 버튼이 나중에 생긴다)
+    $('#optimizeBox').addEventListener('click', async (ev) => {
+      if (ev.target.id !== 'applyBest') return;
+      const m = /-([\d.]+)% \/ \+([\d.]+)%/.exec(ev.target.textContent);
+      if (!m) return;
+      $('#cfgExitBasis').value = 'percent';
+      $('#cfgStopPct').value = m[1];
+      $('#cfgTpPct').value = m[2];
+      syncExitFields();
+      await saveTraderConfig();
+    });
     $('#ordBracket').addEventListener('change', updateBracketPreview);
     $$('.exit-fields input').forEach((el) => el.addEventListener('input', updateBracketPreview));
     $('#resumeBtn').addEventListener('click', async () => {

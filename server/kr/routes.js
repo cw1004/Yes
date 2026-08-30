@@ -203,6 +203,55 @@ async function handle(req, res, url, sendJSON) {
         return true;
       }
 
+      case '/api/kr/preflight': {
+        // 실전 점검 — 실계좌에 주문이 나가기 전에 확인할 것들
+        const preflight = require('../preflight');
+        sendJSON(res, 200, await preflight.check({ client, trader }));
+        return true;
+      }
+
+      case '/api/kr/backtest': {
+        // 과거 봉으로 지금 설정을 돌려 본다
+        if (!CODE_RE.test(code)) return bad(res, sendJSON, '종목코드 형식이 올바르지 않습니다.');
+        const backtest = require('../backtest');
+        const bars = await client.minuteCandles(code, clampNum(params.get('bars'), 400, 120, 900));
+        const quote = await client.price(code).catch(() => ({}));
+        sendJSON(res, 200, Object.assign(
+          backtest.run(bars, {
+            market: quote.market || 'KOSPI',
+            isEtf: C.isEtfName(quote.name),
+            qty: clampNum(params.get('qty'), 100, 1, 100000),
+            entryScore: clampNum(params.get('entryScore'), trader.config.entryScore, 5, 100),
+            stopPct: clampNum(params.get('stopPct'), trader.config.stopLossPct, 0.05, 30),
+            targetPct: clampNum(params.get('targetPct'), trader.config.takeProfitPct, 0.05, 50),
+          }),
+          { code, name: quote.name, barsAvailable: bars.length }
+        ));
+        return true;
+      }
+
+      case '/api/kr/optimize': {
+        // 수익 구간 탐색 — 어떤 손절·목표 조합이 실제로 돈이 됐는지 전수 조사
+        if (!CODE_RE.test(code)) return bad(res, sendJSON, '종목코드 형식이 올바르지 않습니다.');
+        const optimize = require('../optimize');
+        const bars = await client.minuteCandles(code, clampNum(params.get('bars'), 600, 200, 900));
+        const quote = await client.price(code).catch(() => ({}));
+        const result = optimize.sweep(bars, {
+          base: {
+            market: quote.market || 'KOSPI',
+            isEtf: C.isEtfName(quote.name),
+            qty: clampNum(params.get('qty'), 100, 1, 100000),
+          },
+        });
+        sendJSON(res, 200, Object.assign(result, {
+          code, name: quote.name, price: quote.price,
+          isEtf: C.isEtfName(quote.name),
+          barsAvailable: bars.length,
+          envelope: optimize.envelope(result),
+        }));
+        return true;
+      }
+
       case '/api/kr/order': {
         // 수동 주문: 화면에서 확인을 거친 뒤에만 호출된다
         const body = await readBody(req);
@@ -255,6 +304,13 @@ async function handle(req, res, url, sendJSON) {
     sendJSON(res, 500, { error: err.message || String(err) });
     return true;
   }
+}
+
+/** 쿼리 숫자 파라미터를 범위 안으로 정리한다 */
+function clampNum(raw, fallback, lo, hi) {
+  const v = Number(raw);
+  if (!Number.isFinite(v)) return fallback;
+  return Math.max(lo, Math.min(hi, v));
 }
 
 function bad(res, sendJSON, message, status = 400) {

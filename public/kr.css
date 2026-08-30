@@ -121,3 +121,84 @@
   background: var(--warn-soft, rgba(240,180,41,.15)); color: var(--warn); border: 1px solid var(--warn);
 }
 .pos-levels { font-size: 10.5px; color: var(--muted); padding: 2px 8px 5px; font-variant-numeric: tabular-nums; }
+
+/* ------------------------------------------------- 실전 준비 (점검·최적화) */
+
+.lab-block {
+  background: var(--panel-2); border: 1px solid var(--line); border-radius: 9px;
+  padding: 9px 10px; display: flex; flex-direction: column; gap: 8px;
+}
+.lab-head { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+.lab-head b { margin-right: auto; }
+
+/* ── 실전 점검 ── */
+.preflight { display: flex; flex-direction: column; gap: 5px; }
+.pf-verdict {
+  font-size: 11.5px; line-height: 1.5; padding: 6px 9px; border-radius: 7px;
+  border-left: 2px solid var(--line); background: var(--panel);
+}
+.pf-verdict.ready { border-left-color: var(--up); color: var(--up); }
+.pf-verdict.blocked { border-left-color: var(--down); color: var(--down); }
+.pf-item {
+  display: grid; grid-template-columns: 14px 1fr; gap: 6px;
+  font-size: 11px; line-height: 1.5; padding: 4px 0;
+  border-bottom: 1px solid var(--line);
+}
+.pf-item:last-child { border-bottom: 0; }
+.pf-mark { font-size: 11px; text-align: center; }
+.pf-item.pass .pf-mark { color: var(--up); }
+.pf-item.warn .pf-mark { color: var(--warn); }
+.pf-item.fail .pf-mark { color: var(--down); }
+.pf-title { font-weight: 600; }
+.pf-detail { color: var(--muted); }
+.pf-action { color: var(--warn); }
+
+/* ── 수익 구간 히트맵 ──
+   확산형(diverging) 배색: 손실(빨강) ↔ 0(회색) ↔ 수익(파랑).
+   빨강↔초록이 아니라 빨강↔파랑을 쓴 이유는 색각 이상에서도 구별되기 때문이다
+   (검증기 결과 protan ΔE 12.5 통과). 각 칸에는 숫자도 함께 찍어 색만으로
+   의미를 전달하지 않는다. */
+.optimize { display: flex; flex-direction: column; gap: 9px; }
+.opt-verdict {
+  font-size: 11.5px; line-height: 1.55; padding: 7px 9px; border-radius: 7px;
+  background: var(--panel); border-left: 2px solid var(--line);
+}
+.opt-verdict.ok { border-left-color: var(--up); }
+.opt-verdict.fragile { border-left-color: var(--warn); }
+.opt-verdict.none, .opt-verdict.insufficient, .opt-verdict.no-trades { border-left-color: var(--down); }
+.opt-verdict b { color: var(--text); }
+
+.hm-wrap { overflow-x: auto; }
+.hm {
+  display: grid; gap: 2px;                 /* 칸 사이 2px 여백 — 마크 규격 */
+  font-variant-numeric: tabular-nums;
+  min-width: max-content;
+}
+.hm-corner, .hm-xlabel, .hm-ylabel {
+  font-size: 9.5px; color: var(--muted); display: flex;
+  align-items: center; justify-content: center; padding: 2px;
+}
+.hm-ylabel { justify-content: flex-end; padding-right: 5px; white-space: nowrap; }
+.hm-cell {
+  min-width: 42px; height: 30px; border-radius: 4px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  font-size: 9.5px; line-height: 1.15; cursor: default; position: relative;
+}
+/* 검증까지 통과한 조합 — 색이 아니라 테두리와 기호로 표시한다 */
+.hm-cell.survives { box-shadow: inset 0 0 0 2px var(--text); }
+.hm-cell .chk { font-size: 8px; opacity: .9; }
+
+.hm-legend {
+  display: flex; align-items: center; gap: 5px; font-size: 9.5px; color: var(--muted);
+  flex-wrap: wrap;
+}
+.hm-legend .sw { width: 15px; height: 10px; border-radius: 2px; }
+.hm-legend .sep { margin: 0 4px; }
+
+.opt-table { width: 100%; border-collapse: collapse; font-size: 10.5px; }
+.opt-table th, .opt-table td { padding: 3px 5px; text-align: right; border-bottom: 1px solid var(--line); }
+.opt-table th { font-size: 9px; color: var(--muted); font-weight: 500; }
+.opt-table td:first-child, .opt-table th:first-child { text-align: left; }
+.opt-table tr.survives td { color: var(--text); }
+.opt-table tr:not(.survives) td { color: var(--muted); }
+.opt-note { font-size: 10px; color: var(--muted); line-height: 1.6; }
