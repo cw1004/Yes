@@ -25,10 +25,10 @@ const HORIZON = ['당일', '2~3일', '1~2주'];
 
 /* --------------------------------------------------------------- 비용 */
 
-/** 주당 왕복 매매비용 */
-function roundTripCostPerShare(price, market) {
+/** 주당 왕복 매매비용. 국내 ETF 는 증권거래세가 면제되어 훨씬 싸다. */
+function roundTripCostPerShare(price, market, isEtf = false) {
   if (!price || !isFinite(price)) return 0;
-  if (market === 'KR') return KRC.roundTripCost(price, 1);
+  if (market === 'KR') return KRC.roundTripCost(price, 1, KRC.COST, isEtf);
   return price * (US_COST_BPS / 10000);
 }
 
@@ -59,7 +59,7 @@ function edgeOf(plan, hit) {
     };
   }
 
-  const cost = roundTripCostPerShare(entry, market);
+  const cost = roundTripCostPerShare(entry, market, plan.isEtf === true);
   const rewardNet = rewardRaw - cost;
 
   // ① 확실한 관문 — 목표를 맞혀도 비용을 못 넘으면 100% 맞혀도 손해다

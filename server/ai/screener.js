@@ -156,6 +156,12 @@ async function screenKR(opts = {}) {
         strength: round(quote.strength, 0),
         tickSize: KRC.tickSize(quote.price, quote.market || 'KOSPI'),
         breakevenTicks: st.breakevenTicks,
+        isEtf: KRC.isEtfName(quote.name),
+        // 거래세 면제 여부까지 반영한 실제 본전 매도가
+        breakevenPrice: KRC.breakevenPrice({
+          buyPrice: quote.price, qty: 1,
+          market: quote.market || 'KOSPI', isEtf: KRC.isEtfName(quote.name),
+        }).price,
         upperLimit: quote.upperLimit,
         lowerLimit: quote.lowerLimit,
         dayHigh: quote.high, dayLow: quote.low,

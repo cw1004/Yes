@@ -47,10 +47,122 @@ test('매매비용: 매수 수수료 + 매도 수수료·거래세', () => {
   const expected = price * qty * C.COST.commissionRate
     + price * qty * (C.COST.commissionRate + C.COST.taxSellRate);
   close(C.roundTripCost(price, qty), expected, 1e-6);
-  // 본전 호가: 비용률 × 가격 ÷ 호가단위 올림
   const be = C.breakevenTicks(price);
   assert.ok(be >= 1 && be <= 5, '7만원대 코스피 본전은 1~5호가');
   assert.ok(be * C.tickSize(price) >= C.roundTripCost(price, 1) - 1e-9, '본전 호가는 비용 이상');
+});
+
+test('매매비용: 2026년 증권거래세는 0.20% (코스피 0.05%+농특세 0.15%, 코스닥 0.20%)', () => {
+  assert.strictEqual(C.COST.taxSellRate, 0.0020);
+  assert.strictEqual(C.sellTaxRate(false), 0.0020, '일반 주식');
+  assert.strictEqual(C.sellTaxRate(true), 0, '국내 상장 ETF 는 거래세 면제');
+});
+
+test('ETF 판별: 운용사 브랜드로 국내 ETF 를 가려낸다', () => {
+  ['KODEX 200', 'TIGER 미국나스닥100', 'KBSTAR 200', 'ACE 미국S&P500', 'HANARO 200']
+    .forEach((n) => assert.strictEqual(C.isEtfName(n), true, n));
+  ['삼성전자', 'SK하이닉스', 'NAVER', '카카오', 'POSCO홀딩스']
+    .forEach((n) => assert.strictEqual(C.isEtfName(n), false, n));
+  assert.strictEqual(C.isEtfName(''), false);
+  assert.strictEqual(C.isEtfName(null), false);
+});
+
+test('브라우저 번들: process 가 없는 환경에서도 그대로 동작한다', () => {
+  // public/js/kr-config.js 는 브라우저에서 로드된다. 서버 코드에 process.env 를 쓰면
+  // 이 파일 전체가 던져서 KR 화면이 통째로 죽는다 — 실제로 한 번 그렇게 깨졌다.
+  const vm = require('vm');
+  const src = require('fs').readFileSync(
+    require('path').join(__dirname, '..', 'public', 'js', 'kr-config.js'), 'utf8');
+
+  const win = {};
+  const sandbox = { window: win };              // process 를 일부러 넣지 않는다
+  sandbox.globalThis = sandbox;
+  vm.createContext(sandbox);
+  vm.runInContext(src, sandbox);                // 던지면 여기서 실패한다
+
+  const C = win.KRConfig;
+  assert.ok(C, 'window.KRConfig 가 만들어져야 한다');
+  // 서버와 같은 값을 내는지까지 확인
+  assert.strictEqual(
+    C.settlement({ buyPrice: 10000, qty: 1000, sellPrice: 10025 }).netProfit,
+    require('../server/kr/config.js').settlement({ buyPrice: 10000, qty: 1000, sellPrice: 10025 }).netProfit);
+  assert.strictEqual(C.breakevenPrice({ buyPrice: 10000, qty: 1000, market: 'KOSPI' }).price, 10030);
+  assert.strictEqual(C.isEtfName('KODEX 200'), true);
+});
+
+/* ----------------------------------------------- 실제 결제 기준 손익 */
+
+test('결제: 증권사와 같은 방식으로 계산한다 (매수·매도 각각 원 미만 절사)', () => {
+  // 10,000원 × 1,000주 → 10,025원
+  const r = C.settlement({ buyPrice: 10000, qty: 1000, sellPrice: 10025 });
+  assert.strictEqual(r.buyFee, 363, 'floor(10,000,000 × 0.000036396) = 363');
+  assert.strictEqual(r.totalBuyCost, 10000363);
+  assert.strictEqual(r.sellFee, 364, 'floor(10,025,000 × 0.000036396) = 364');
+  assert.strictEqual(r.sellTax, 20050, 'floor(10,025,000 × 0.0020) = 20,050');
+  assert.strictEqual(r.totalSellSettle, 10004586);
+  assert.strictEqual(r.netProfit, 4223);
+  close(r.netReturnRate, 0.04223, 1e-4);
+  assert.strictEqual(r.isProfitable, true);
+});
+
+test('결제: ETF 는 거래세가 없어 같은 폭에서 순수익이 훨씬 크다', () => {
+  const stock = C.settlement({ buyPrice: 10000, qty: 1000, sellPrice: 10025, isEtf: false });
+  const etf = C.settlement({ buyPrice: 10000, qty: 1000, sellPrice: 10025, isEtf: true });
+  assert.strictEqual(etf.sellTax, 0);
+  assert.strictEqual(etf.netProfit - stock.netProfit, 20050, '차이는 딱 거래세만큼');
+  assert.ok(etf.netProfit > stock.netProfit * 5);
+});
+
+test('결제: 오르고 팔아도 비용 때문에 손해일 수 있다', () => {
+  // +0.20% 상승은 왕복 비용(약 0.207%)을 못 넘는다
+  const r = C.settlement({ buyPrice: 10000, qty: 1000, sellPrice: 10020 });
+  assert.strictEqual(r.isProfitable, false, '올랐는데도 손실');
+  assert.ok(r.netProfit < 0);
+});
+
+test('결제: 수량 0이면 0으로 떨어지고 나눗셈이 터지지 않는다', () => {
+  const r = C.settlement({ buyPrice: 10000, qty: 0, sellPrice: 20000 });
+  assert.strictEqual(r.netProfit, 0);
+  assert.strictEqual(r.netReturnRate, 0);
+});
+
+/* ------------------------------------------------------- 본전 매도가 */
+
+test('본전가: 호가 단위에 맞춘 "얼마에 팔아야 본전인가"를 낸다', () => {
+  const be = C.breakevenPrice({ buyPrice: 10000, qty: 1000, market: 'KOSPI' });
+  // 비율만 보면 10,020.x 이지만 1만원대 호가단위는 10원이라 10,020 은 아직 손실이다
+  assert.strictEqual(C.tickSize(10000, 'KOSPI'), 10);
+  assert.strictEqual(C.settlement({ buyPrice: 10000, qty: 1000, sellPrice: 10020 }).isProfitable, false);
+  assert.strictEqual(be.price, 10030, '실제 본전가는 10,030원');
+  assert.strictEqual(be.ticks, 3);
+  close(be.movePct, 0.3, 1e-9);
+  assert.ok(be.net >= 0, '본전가에서는 손해가 아니다');
+});
+
+test('본전가: 본전가보다 한 호가 아래는 반드시 손실이다', () => {
+  for (const price of [3000, 10000, 74800, 240000]) {
+    const be = C.breakevenPrice({ buyPrice: price, qty: 100, market: 'KOSPI' });
+    const below = be.price - C.tickSize(be.price, 'KOSPI');
+    assert.ok(C.settlement({ buyPrice: price, qty: 100, sellPrice: be.price }).netProfit >= 0,
+      price + ': 본전가는 수익 이상');
+    assert.ok(C.settlement({ buyPrice: price, qty: 100, sellPrice: below }).netProfit < 0,
+      price + ': 한 호가 아래는 손실');
+  }
+});
+
+test('본전가: ETF 는 거래세가 없어 본전가가 훨씬 낮다', () => {
+  const stock = C.breakevenPrice({ buyPrice: 10000, qty: 1000, market: 'KOSPI', isEtf: false });
+  const etf = C.breakevenPrice({ buyPrice: 10000, qty: 1000, market: 'KOSPI', isEtf: true });
+  assert.ok(etf.price < stock.price, `ETF ${etf.price} < 일반 ${stock.price}`);
+  assert.strictEqual(etf.ticks, 1, 'ETF 는 1호가만 올라도 본전을 넘는다');
+});
+
+test('본전가: 수수료율을 낮추면 본전가도 내려간다', () => {
+  const cheap = { commissionRate: 0.000036396, taxSellRate: 0.0020, etfTaxSellRate: 0 };
+  const pricey = { commissionRate: 0.0015, taxSellRate: 0.0020, etfTaxSellRate: 0 };
+  const a = C.breakevenPrice({ buyPrice: 50000, qty: 100, market: 'KOSPI', cost: cheap });
+  const b = C.breakevenPrice({ buyPrice: 50000, qty: 100, market: 'KOSPI', cost: pricey });
+  assert.ok(a.price < b.price, `우대 ${a.price} < 일반 ${b.price}`);
 });
 
 test('장 운영 시간 판정 (KST)', () => {

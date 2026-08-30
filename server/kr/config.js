@@ -115,22 +115,137 @@ function tickDistance(from, to, market = 'KOSPI') {
  * 매매비용(왕복). 기본값은 KIS 온라인 수수료와 2025년 세율 기준이며,
  * 실제 요율은 계좌·이벤트에 따라 다르므로 UI에서 수정할 수 있다.
  */
+/**
+ * 매매비용.
+ *
+ * ▶ 수수료는 **계좌마다 다르다.** 기본값은 한국투자증권 비대면(온라인) 우대 요율이며,
+ *   본인 계좌 요율은 HTS/MTS 의 수수료 안내에서 확인해 KR_COMMISSION_RATE 로 바꾼다.
+ * ▶ 증권거래세는 2026년부터 **0.20%로 환원**됐다 (금융투자소득세 도입 전제로 0.15%까지
+ *   내렸던 것을 되돌린 것). 코스피는 거래세 0.05% + 농특세 0.15%,
+ *   코스닥은 거래세 0.20% 로 합계는 같다.
+ * ▶ **국내 상장 ETF 는 증권거래세가 면제**된다. 그래서 같은 폭을 먹어도 ETF 가 훨씬 유리하다.
+ *   (매매차익 과세는 ETF 종류에 따라 다르지만, 그건 결제 시점 비용이 아니라 연말정산 문제다.)
+ */
+// 이 파일은 브라우저용(public/js/kr-config.js)으로도 그대로 생성되므로
+// process 가 없는 환경에서도 안전하게 읽어야 한다.
+function envNum(name, fallback) {
+  if (typeof process === 'undefined' || !process.env) return fallback;
+  const v = Number(process.env[name]);
+  return Number.isFinite(v) && v >= 0 ? v : fallback;
+}
+
 const COST = {
-  commissionRate: 0.00014527,  // 매수·매도 각각 (KIS 영업점/온라인 요율 확인 필요)
-  taxSellRate: 0.0015,         // 매도 시 증권거래세+농특세 (코스피/코스닥 0.15%)
-  // 유관기관 제비용은 수수료에 포함된 것으로 본다
+  // 한국투자증권 비대면 우대 요율. 본인 계좌 요율로 바꿔 쓸 것
+  commissionRate: envNum('KR_COMMISSION_RATE', 0.000036396),
+  // 매도 시 증권거래세 + 농어촌특별세 (2026년 기준 합계 0.20%)
+  taxSellRate: envNum('KR_TAX_SELL_RATE', 0.0020),
+  // 국내 상장 ETF 는 증권거래세 면제
+  etfTaxSellRate: 0,
 };
 
+/**
+ * 국내 상장 ETF/ETN 인지 종목명으로 판별한다.
+ *
+ * 거래세 면제 여부가 본전가를 크게 바꾸므로(1만원 기준 3호가 → 1호가) 중요한 구분이다.
+ * 국내 ETF 는 운용사 브랜드가 이름 앞에 붙는 규칙이라 이름만으로 꽤 정확히 갈린다.
+ * KIS 응답에 상품유형 코드가 있으면 그쪽이 우선이고, 이건 없을 때 쓰는 판별이다.
+ */
+const ETF_BRANDS = [
+  'KODEX', 'TIGER', 'KBSTAR', 'ARIRANG', 'HANARO', 'ACE', 'SOL', 'PLUS', 'RISE',
+  'KOSEF', 'TIMEFOLIO', 'BNK', 'WOORI', 'DAISHIN', 'HK', 'UNICORN', 'ITF',
+];
+function isEtfName(name) {
+  if (!name) return false;
+  const up = String(name).trim().toUpperCase();
+  if (/^Q?V?\s*ETN\b/.test(up) || up.includes('ETN')) return true;
+  return ETF_BRANDS.some((b) => up.startsWith(b + ' ') || up.startsWith(b));
+}
+
+/** 증권사는 원 미만을 절사한다 */
+const truncate = (v) => Math.floor(v);
+
+/** 이 종목에 붙는 매도 세율 */
+const sellTaxRate = (isEtf = false, cost = COST) => (isEtf ? cost.etfTaxSellRate : cost.taxSellRate);
+
+/**
+ * 실제 결제 기준 손익 계산.
+ *
+ * 비율로 대충 곱하는 것과 달리, 증권사가 실제로 하는 대로
+ * **매수·매도 각각 원 미만을 절사**해서 계산한다.
+ *
+ * @param {{buyPrice:number, qty:number, sellPrice:number, isEtf?:boolean, cost?:object}} o
+ * @returns {{buyAmount:number, buyFee:number, totalBuyCost:number,
+ *            sellAmount:number, sellFee:number, sellTax:number, totalSellSettle:number,
+ *            netProfit:number, netReturnRate:number, isProfitable:boolean, totalCost:number}}
+ */
+function settlement({ buyPrice, qty, sellPrice, isEtf = false, cost = COST }) {
+  const q = Math.max(0, Math.floor(qty || 0));
+  const f = cost.commissionRate;
+  const t = sellTaxRate(isEtf, cost);
+
+  // 매수: 내 계좌에서 나간 돈
+  const buyAmount = buyPrice * q;
+  const buyFee = truncate(buyAmount * f);
+  const totalBuyCost = buyAmount + buyFee;
+
+  // 매도: 내 계좌로 들어올 돈
+  const sellAmount = sellPrice * q;
+  const sellFee = truncate(sellAmount * f);
+  const sellTax = truncate(sellAmount * t);
+  const totalSellSettle = sellAmount - sellFee - sellTax;
+
+  const netProfit = totalSellSettle - totalBuyCost;
+  return {
+    buyAmount, buyFee, totalBuyCost,
+    sellAmount, sellFee, sellTax, totalSellSettle,
+    totalCost: buyFee + sellFee + sellTax,
+    netProfit,
+    netReturnRate: totalBuyCost > 0 ? (netProfit / totalBuyCost) * 100 : 0,
+    isProfitable: netProfit > 0,
+  };
+}
+
+/**
+ * 본전 매도가 — "얼마에 팔아야 손해를 안 보나".
+ * 호가 단위에 맞춰 올림한 뒤, 절사 때문에 1호가 모자라는 경우가 없도록 실제 계산으로 확인한다.
+ *
+ * @returns {{price:number, ticks:number, movePct:number, net:number}}
+ */
+function breakevenPrice({ buyPrice, qty, market = 'KOSPI', isEtf = false, cost = COST }) {
+  const q = Math.max(1, Math.floor(qty || 1));
+  const f = cost.commissionRate;
+  const t = sellTaxRate(isEtf, cost);
+  const buyCost = buyPrice * q + truncate(buyPrice * q * f);
+
+  // 근사식: sellAmount × (1 − 수수료 − 세금) ≥ 매수원가
+  const approx = buyCost / (q * (1 - f - t));
+  let price = alignPrice(approx, market, 'up');
+
+  // 절사 때문에 한두 호가 모자랄 수 있으므로 실제 계산으로 확인해 올린다
+  const tick = tickSize(price, market);
+  for (let i = 0; i < 5; i++) {
+    if (settlement({ buyPrice, qty: q, sellPrice: price, isEtf, cost }).netProfit >= 0) break;
+    price = alignPrice(price + tickSize(price, market), market, 'up');
+  }
+  const net = settlement({ buyPrice, qty: q, sellPrice: price, isEtf, cost }).netProfit;
+  return {
+    price,
+    ticks: Math.max(1, Math.round((price - buyPrice) / tick)),
+    movePct: ((price - buyPrice) / buyPrice) * 100,
+    net,
+  };
+}
+
 /** 왕복 매매비용(원). 초단타는 이 비용이 수익의 대부분을 갉아먹는다. */
-function roundTripCost(price, qty, cost = COST) {
+function roundTripCost(price, qty, cost = COST, isEtf = false) {
   const buy = price * qty * cost.commissionRate;
-  const sell = price * qty * (cost.commissionRate + cost.taxSellRate);
+  const sell = price * qty * (cost.commissionRate + sellTaxRate(isEtf, cost));
   return buy + sell;
 }
 
 /** 비용을 덮으려면 최소 몇 호가가 필요한지 */
-function breakevenTicks(price, market = 'KOSPI', cost = COST) {
-  const rate = cost.commissionRate * 2 + cost.taxSellRate;
+function breakevenTicks(price, market = 'KOSPI', cost = COST, isEtf = false) {
+  const rate = cost.commissionRate * 2 + sellTaxRate(isEtf, cost);
   return Math.ceil((price * rate) / tickSize(price, market));
 }
 
@@ -170,6 +285,6 @@ const TIMEFRAMES = {
 module.exports = {
   REAL, PAPER, TR, PATH, ORD_DVSN,
   tickSize, alignPrice, tickDistance,
-  COST, roundTripCost, breakevenTicks,
+  COST, roundTripCost, breakevenTicks, settlement, breakevenPrice, sellTaxRate, isEtfName, ETF_BRANDS,
   SESSION, LIMIT_PCT, STATIC_VI_PCT, marketPhase, TIMEFRAMES,
 };

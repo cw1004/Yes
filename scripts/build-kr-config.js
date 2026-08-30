@@ -28,7 +28,7 @@ ${body}
   root.KRConfig = {
     REAL, PAPER, TR, PATH, ORD_DVSN,
     tickSize, alignPrice, tickDistance,
-    COST, roundTripCost, breakevenTicks,
+    COST, roundTripCost, breakevenTicks, settlement, breakevenPrice, sellTaxRate, isEtfName, ETF_BRANDS,
     SESSION, LIMIT_PCT, STATIC_VI_PCT, marketPhase, TIMEFRAMES,
   };
 })(window);

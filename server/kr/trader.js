@@ -211,6 +211,13 @@ class Trader extends EventEmitter {
     pos.low = Math.min(pos.low, tick.price);
     pos.pnl = (tick.price - pos.entry) * pos.qty;
     pos.pnlPct = ((tick.price - pos.entry) / pos.entry) * 100;
+    // 초단타는 비용이 수익의 대부분을 먹는다. 지금 팔면 실제로 손에 남는 돈을 같이 보여 준다.
+    const bill = C.settlement({
+      buyPrice: pos.entry, qty: pos.qty, sellPrice: tick.price, isEtf: pos.isEtf === true,
+    });
+    pos.netPnl = bill.netProfit;
+    pos.netPnlPct = bill.netReturnRate;
+    pos.costs = bill.totalCost;
 
     const market = pos.market || st.market || 'KOSPI';
     const tickSize = pos.tick || C.tickSize(pos.entry, market);
@@ -239,10 +246,11 @@ class Trader extends EventEmitter {
    *
    * ⚠️ 이 감시는 이 앱이 켜져 있는 동안에만 동작한다. 증권사 서버에 걸어 두는 예약주문이 아니다.
    */
-  async attachManualPosition({ code, qty, entry, market = 'KOSPI', name, simulated }) {
+  async attachManualPosition({ code, qty, entry, market = 'KOSPI', name, simulated, isEtf }) {
     if (!code || !(qty > 0) || !(entry > 0)) throw new Error('수량·가격이 올바르지 않습니다.');
     if (this.positions.has(code)) throw new Error('이미 감시 중인 종목입니다.');
 
+    const etf = isEtf != null ? Boolean(isEtf) : C.isEtfName(name);
     const levels = this.resolveExitLevels({ entry, qty, market });
     this.positions.set(code, {
       code, name, qty, entry, market,
@@ -250,6 +258,8 @@ class Trader extends EventEmitter {
       target: levels.target,
       exitBasis: levels.basis,
       tick: C.tickSize(entry, market),
+      isEtf: etf,
+      breakeven: C.breakevenPrice({ buyPrice: entry, qty, market, isEtf: etf }),
       entryTime: Date.now(),
       high: entry, low: entry, last: entry,
       pnl: 0, pnlPct: 0,
@@ -269,6 +279,7 @@ class Trader extends EventEmitter {
 
     this._log('trade', 'MANUAL_WATCH',
       `[수동] ${code} ${qty}주 @ ${entry.toLocaleString()} 자동 청산 감시 시작 · ` +
+      `본전가 ${C.breakevenPrice({ buyPrice: entry, qty, market, isEtf: etf }).price.toLocaleString()}${etf ? ' (ETF)' : ''} · ` +
       `손절 ${levels.stop.toLocaleString()}(${levels.stopPct.toFixed(2)}%) / ` +
       `목표 ${levels.target.toLocaleString()}(+${levels.targetPct.toFixed(2)}%) · ${levels.basis}`);
     this.emit('changed');
@@ -473,6 +484,12 @@ class Trader extends EventEmitter {
       exitBasis: levels.basis,
       tick: C.tickSize(entry, market),
       market,
+      isEtf: st.isEtf != null ? Boolean(st.isEtf) : C.isEtfName(st.quote && st.quote.name),
+      // "얼마에 팔아야 손해가 아닌가" — 호가 단위까지 반영한 실제 본전가
+      breakeven: C.breakevenPrice({
+        buyPrice: entry, qty: sizing.qty, market,
+        isEtf: st.isEtf != null ? Boolean(st.isEtf) : C.isEtfName(st.quote && st.quote.name),
+      }),
       entryTime: Date.now(),
       high: entry, low: entry, last: entry,
       status: 'open',                 // 실주문도 즉시 관리 시작(체결통보로 정정)
@@ -506,9 +523,13 @@ class Trader extends EventEmitter {
     });
 
     const exitPrice = result.filledPrice || price;
+    // 비율로 어림하지 않고, 증권사가 실제로 정산하는 대로 계산한다 (원 미만 절사 포함)
+    const bill = C.settlement({
+      buyPrice: pos.entry, qty: pos.qty, sellPrice: exitPrice, isEtf: pos.isEtf === true,
+    });
     const gross = (exitPrice - pos.entry) * pos.qty;
-    const fees = C.roundTripCost((pos.entry + exitPrice) / 2, pos.qty);
-    const net = gross - fees;
+    const fees = bill.totalCost;
+    const net = bill.netProfit;
 
     this.daily.realizedPnl += net;
     this.daily.fees += fees;
@@ -516,7 +537,10 @@ class Trader extends EventEmitter {
     this.positions.delete(code);
     this.cooldowns.set(code, Date.now() + this.config.cooldownSeconds * 1000);
 
-    this._log('trade', 'EXIT', `${code} ${pos.qty}주 @ ${Math.round(exitPrice).toLocaleString()} · ${reason} · 순손익 ${Math.round(net).toLocaleString()}원`);
+    this._log('trade', 'EXIT',
+      `${code} ${pos.qty}주 @ ${Math.round(exitPrice).toLocaleString()} · ${reason} · ` +
+      `순손익 ${Math.round(net).toLocaleString()}원 (${bill.netReturnRate.toFixed(3)}%) · ` +
+      `비용 ${Math.round(fees).toLocaleString()}원`);
     this._save();
     this.emit('changed');
 

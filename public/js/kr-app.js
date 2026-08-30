@@ -289,7 +289,16 @@
     $('#pEntry').textContent = won(p.entry);
     $('#pStop').innerHTML = `<span class="down">${won(p.stop)}</span> <small class="muted">(${p.stopTicks}호가)</small>`;
     $('#pTarget').innerHTML = `<span class="up">${won(p.target)}</span> <small class="muted">(${p.targetTicks}호가)</small>`;
-    $('#pBreakeven').innerHTML = `${p.breakevenTicks}호가 <small class="muted">수수료+세금</small>`;
+    // 호가 개수보다 "얼마에 팔아야 본전인가"가 훨씬 읽기 쉽다
+    const snap = state.snapshot;
+    const bq = Math.max(1, Math.floor(Number($('#ordQty').value) || 1));
+    const be = C.breakevenPrice({
+      buyPrice: p.entry, qty: bq,
+      market: (snap && snap.market) || 'KOSPI',
+      isEtf: snap && snap.quote ? C.isEtfName(snap.quote.name) : false,
+    });
+    $('#pBreakeven').innerHTML =
+      `<b>${won(be.price)}</b> <small class="muted">${be.ticks}호가 · +${be.movePct.toFixed(2)}%</small>`;
     $('#pCost').textContent = won(p.costPerShare) + '원';
     $('#pNet').innerHTML = `<span class="${p.netPerShare > 0 ? 'up' : 'down'}">${won(p.netPerShare)}원</span>`;
     $('#pRR').innerHTML = p.rr == null ? '—'
@@ -364,11 +373,13 @@
     if (!snap || !snap.quote) return;
     const price = Number($('#ordPrice').value) || snap.quote.price;
     const qty = Math.max(1, Math.floor(Number($('#ordQty').value) || 1));
-    const amount = price * qty;
-    const cost = C.roundTripCost(price, qty);
-    const be = C.breakevenTicks(price, snap.market);
+    const isEtf = snap.isEtf != null ? Boolean(snap.isEtf) : C.isEtfName(snap.quote.name);
+    const be = C.breakevenPrice({ buyPrice: price, qty, market: snap.market, isEtf });
+    const bill = C.settlement({ buyPrice: price, qty, sellPrice: be.price, isEtf });
     $('#ordEst').innerHTML =
-      `투입 <b>${won(amount)}원</b> · 왕복비용 <b>${won(cost)}원</b> · 본전까지 <b>${be}호가</b>`;
+      `투입 <b>${won(bill.totalBuyCost)}원</b> <span class="muted">(수수료 ${won(bill.buyFee)}원 포함)</span><br>` +
+      `<b>본전가 ${won(be.price)}원</b> — ${be.ticks}호가 위 (+${be.movePct.toFixed(2)}%)` +
+      `<span class="muted"> · 왕복비용 ${won(bill.totalCost)}원${isEtf ? ' · ETF 거래세 면제' : ''}</span>`;
   }
 
   function confirmOrder(side) {
@@ -477,15 +488,23 @@
 
     $('#positions').innerHTML = t.positions.length
       ? '<div class="pos-head">보유 포지션 · 실시간 감시 중</div>' + t.positions.map((p) => {
-        const pnl = (p.last - p.entry) * p.qty;
-        const pct = p.entry ? ((p.last - p.entry) / p.entry) * 100 : 0;
+        // 화면에는 비용을 뺀 '실제로 손에 남는' 금액을 앞세운다
+        const net = p.netPnl != null ? p.netPnl : (p.last - p.entry) * p.qty;
+        const netPct = p.netPnlPct != null ? p.netPnlPct
+          : (p.entry ? ((p.last - p.entry) / p.entry) * 100 : 0);
+        const gross = (p.last - p.entry) * p.qty;
+        const beAbove = p.breakeven && p.last < p.breakeven.price;
         return `<div class="pos-row ${p.manual ? 'manual' : ''}">
           <span>${esc(p.name || p.code)} ${p.manual ? '<span class="pos-badge">수동</span>' : ''}</span>
           <span>${p.qty}주 @ ${won(p.entry)}</span>
-          <span class="${cls(pnl)}">${won(pnl)}원 (${pct > 0 ? '+' : ''}${pct.toFixed(2)}%)</span>
+          <span class="${cls(net)}">${won(net)}원 (${netPct > 0 ? '+' : ''}${netPct.toFixed(2)}%)
+            <small class="muted">세후</small></span>
           <button class="mini-btn" data-close="${p.code}">청산</button>
         </div>
-        <div class="pos-levels">손절 <b class="down">${won(p.stop)}</b> · 목표 <b class="up">${won(p.target)}</b>${p.exitBasis ? ` <span class="muted">· ${esc(p.exitBasis)}</span>` : ''}</div>`;
+        <div class="pos-levels">손절 <b class="down">${won(p.stop)}</b> · 목표 <b class="up">${won(p.target)}</b>${
+          p.breakeven ? ` · 본전 <b class="${beAbove ? 'down' : 'up'}">${won(p.breakeven.price)}</b>` : ''
+        }${p.costs != null ? ` <span class="muted">· 비용 ${won(p.costs)}원 (총액 ${won(gross)}원)</span>` : ''}${
+          p.exitBasis ? ` <span class="muted">· ${esc(p.exitBasis)}</span>` : ''}</div>`;
       }).join('')
       : '<div class="muted" style="font-size:11px;padding:4px 0">보유 포지션 없음</div>';
     $('#positions').querySelectorAll('[data-close]').forEach((b) =>
