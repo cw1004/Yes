@@ -11,10 +11,10 @@
   "scripts": {
     "start": "node server/server.js",
     "dev": "node server/server.js",
-    "demo": "MOCK=1 node server/server.js",
+    "demo": "node server/server.js --demo",
     "test": "node test/env.test.js && node test/access.test.js && node test/indicators.test.js && node test/kr.test.js && node test/ai.test.js && node test/backtest.test.js && node test/replay.test.js && node scripts/build-kr-config.js --check",
     "build:krconfig": "node scripts/build-kr-config.js",
-    "mobile": "HOST=0.0.0.0 node server/server.js"
+    "mobile": "node server/server.js --mobile"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.120.0"

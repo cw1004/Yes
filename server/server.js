@@ -23,9 +23,34 @@ const marketdata = require('./marketdata');
 const krRoutes = require('./kr/routes');
 const aiRoutes = require('./ai/routes');
 
-const PORT = Number(process.env.PORT || 5173);
-const HOST = process.env.HOST || '127.0.0.1';
-const FORCE_MOCK = process.env.MOCK === '1' || process.env.MOCK === 'true';
+/**
+ * 실행 옵션.
+ *
+ * 환경변수 문법은 운영체제마다 달라서(윈도우 CMD 는 `set X=1`, 파워셸은 `$env:X="1"`,
+ * 맥·리눅스는 `X=1 명령`) 초보자가 가장 많이 막히는 지점이다.
+ * 그래서 **어느 운영체제에서나 똑같이 쓰는 명령줄 옵션**을 함께 받는다.
+ *
+ *   node server/server.js --mobile        휴대폰에서도 접속 허용
+ *   node server/server.js --port 8080     포트 바꾸기
+ *   node server/server.js --demo          데모 데이터로 실행
+ *
+ * 환경변수를 쓰던 방식(HOST=0.0.0.0 등)도 그대로 동작한다. 옵션이 우선이다.
+ */
+const argv = process.argv.slice(2);
+const hasFlag = (...names) => names.some((n) => argv.includes(n));
+function flagValue(name, fallback) {
+  const i = argv.indexOf(name);
+  if (i >= 0 && argv[i + 1] && !argv[i + 1].startsWith('-')) return argv[i + 1];
+  const eq = argv.find((a) => a.startsWith(name + '='));
+  return eq ? eq.slice(name.length + 1) : fallback;
+}
+
+const PORT = Number(flagValue('--port', process.env.PORT || 5173));
+const HOST = hasFlag('--mobile', '--lan')
+  ? '0.0.0.0'
+  : flagValue('--host', process.env.HOST || '127.0.0.1');
+const FORCE_MOCK = hasFlag('--demo', '--mock')
+  || process.env.MOCK === '1' || process.env.MOCK === 'true';
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
 
 const SYMBOL_RE = marketdata.SYMBOL_RE;
@@ -221,7 +246,8 @@ server.listen(PORT, HOST, () => {
       console.warn('      필요하면 .env 에 KIS_UI_TOKEN=원하는_암호 를 넣고 다시 실행하세요.');
     }
   } else {
-    console.log(`\n  ⓘ  휴대폰에서도 보려면: HOST=0.0.0.0 으로 실행하세요 (같은 와이파이 필요)`);
+    console.log('\n  ⓘ  휴대폰에서도 보려면 이렇게 실행하세요 (같은 와이파이 필요)');
+  console.log('        npm run mobile');
   }
   console.log('');
 });

@@ -364,13 +364,24 @@ C.settlement({ buyPrice: 10000, qty: 1000, sellPrice: 10025 })
 node server/server.js          # http://127.0.0.1:5173
 ```
 
+실행 옵션은 **환경변수 대신 명령줄 플래그**로 받습니다. 환경변수 문법은 운영체제마다 달라
+(윈도우 CMD `set X=1` / 파워셸 `$env:X="1"` / 맥·리눅스 `X=1 명령`) 가장 많이 막히는 지점이기 때문입니다.
+
+```bash
+node server/server.js --mobile        # 같은 와이파이의 휴대폰에서도 접속
+node server/server.js --port 8080     # 포트 변경
+node server/server.js --demo          # 데모 데이터로 실행
+```
+
+기존 환경변수 방식(`HOST` · `PORT` · `MOCK`)도 그대로 동작하며, 플래그가 우선합니다.
+
 | 명령 | 설명 |
 | --- | --- |
 | `npm start` | 실시간 시세(Yahoo Finance) 사용, 실패 시 데모 데이터로 자동 전환 |
 | `npm run demo` | 항상 데모 데이터 (오프라인·사내망 등 외부 접속이 막힌 환경) |
 | `npm test` | 지표·신호·초단타·AI 엔진 단위 테스트 |
 | `PORT=8080 node server/server.js` | 포트 변경 |
-| `npm run mobile` | 같은 와이파이의 휴대폰에서도 접속 (`HOST=0.0.0.0`) |
+| `npm run mobile` | 같은 와이파이의 휴대폰에서도 접속 (`--mobile`, 운영체제 무관) |
 
 ### 앱처럼 설치하기
 

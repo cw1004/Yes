@@ -106,6 +106,31 @@ test('.env.example 은 실제 키가 아닌 주석 처리된 예시만 담는다
   assert.ok(!/sk-ant-[A-Za-z0-9_-]{20,}/.test(example), '진짜 키처럼 보이는 값이 없어야 한다');
 });
 
+/* --------------------------------------------- 실행 옵션 (운영체제 무관) */
+
+test('실행 옵션: mobile/demo 스크립트가 운영체제에 상관없이 동작하는 형태다', () => {
+  const pkg = require('../package.json');
+  // `HOST=0.0.0.0 node ...` 는 윈도우 명령프롬프트에서 동작하지 않는다.
+  // 어느 운영체제에서나 같은 명령이 되도록 플래그를 쓴다.
+  for (const [name, cmd] of Object.entries(pkg.scripts)) {
+    assert.ok(!/^[A-Z_]+=/.test(cmd),
+      `scripts.${name} 이 유닉스 전용 환경변수 문법으로 시작합니다: ${cmd}`);
+  }
+  assert.match(pkg.scripts.mobile, /--mobile/);
+  assert.match(pkg.scripts.demo, /--demo/);
+});
+
+test('실행 옵션: --mobile 은 모든 주소에서 받도록 연다', () => {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'server', 'server.js'), 'utf8');
+  assert.match(src, /hasFlag\('--mobile', '--lan'\)/, '--mobile / --lan 을 함께 받는다');
+  assert.match(src, /\? '0\.0\.0\.0'/, '켜면 0.0.0.0 으로 바인딩');
+  // 환경변수 방식도 계속 동작해야 한다 (기존 사용자를 깨뜨리지 않는다)
+  assert.match(src, /process\.env\.HOST/);
+  assert.match(src, /process\.env\.PORT/);
+});
+
+
+
 for (const [name, fn] of cases) {
   try {
     fn();
