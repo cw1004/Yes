@@ -252,6 +252,54 @@ async function handle(req, res, url, sendJSON) {
         return true;
       }
 
+      /* ---------------------------------------------- 과거 장 재생 연습 */
+
+      case '/api/kr/replay/start': {
+        if (!CODE_RE.test(code)) return bad(res, sendJSON, '종목코드 형식이 올바르지 않습니다.');
+        const replay = require('../replay');
+        const bars = await client.minuteCandles(code, clampNum(params.get('bars'), 400, 120, 900));
+        const quote = await client.price(code).catch(() => ({}));
+        sendJSON(res, 200, replay.start({
+          code,
+          name: quote.name || code,
+          market: quote.market || 'KOSPI',
+          isEtf: C.isEtfName(quote.name),
+          bars,
+          cash: clampNum(params.get('cash'), 10000000, 100000, 1000000000),
+        }));
+        return true;
+      }
+
+      case '/api/kr/replay/step': {
+        const replay = require('../replay');
+        const body = await readBody(req);
+        sendJSON(res, 200, replay.step(body.id, body.n || 1));
+        return true;
+      }
+
+      case '/api/kr/replay/order': {
+        const replay = require('../replay');
+        const body = await readBody(req);
+        try {
+          sendJSON(res, 200, replay.order(body.id, { side: body.side, qty: body.qty }));
+        } catch (err) {
+          return bad(res, sendJSON, err.message);
+        }
+        return true;
+      }
+
+      case '/api/kr/replay/score': {
+        const replay = require('../replay');
+        sendJSON(res, 200, replay.score(params.get('id')));
+        return true;
+      }
+
+      case '/api/kr/replay/end': {
+        const replay = require('../replay');
+        sendJSON(res, 200, replay.end(params.get('id')));
+        return true;
+      }
+
       case '/api/kr/order': {
         // 수동 주문: 화면에서 확인을 거친 뒤에만 호출된다
         const body = await readBody(req);

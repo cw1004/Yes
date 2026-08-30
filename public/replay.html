@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>ScalpDesk 연습 · 과거 장 재생</title>
+<meta name="description" content="지나간 장을 빨리감기로 틀어 놓고 직접 사고팔며 연습합니다. 다음 봉은 서버가 쥐고 있어 미리 볼 수 없습니다." />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='26' font-size='26'%3E%F0%9F%8E%AE%3C/text%3E%3C/svg%3E" />
+<link rel="manifest" href="/manifest.webmanifest" />
+<meta name="theme-color" content="#0b0d12" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-title" content="ScalpDesk" />
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+<link rel="stylesheet" href="/styles.css" />
+<link rel="stylesheet" href="/kr.css" />
+<link rel="stylesheet" href="/replay.css" />
+</head>
+<body class="replay">
+
+<header class="topbar">
+  <div class="brand">
+    <span class="logo">🎮</span>
+    <div>
+      <strong>연습 모드</strong>
+      <small id="sessBadge" class="badge">준비</small>
+    </div>
+  </div>
+
+  <div class="tf-group market-switch">
+    <a href="/" class="market-btn">🇺🇸 미국</a>
+    <a href="/kr.html" class="market-btn">🇰🇷 한국</a>
+    <a href="/ai.html" class="market-btn">🧠 AI</a>
+    <a href="/replay.html" class="market-btn active">🎮 연습</a>
+  </div>
+
+  <label class="ai-select">종목
+    <input type="text" id="rpCode" value="005930" maxlength="6" size="7" />
+  </label>
+  <label class="ai-select">시작 자금
+    <select id="rpCash">
+      <option value="1000000">100만원</option>
+      <option value="10000000" selected>1,000만원</option>
+      <option value="50000000">5,000만원</option>
+    </select>
+  </label>
+  <button id="rpStart" class="run-btn">▶ 연습 시작</button>
+</header>
+
+<main class="rp-main">
+
+  <section class="rp-intro" id="rpIntro">
+    <h2>지나간 장을 다시 틀어 놓고 직접 사고팔아 봅니다</h2>
+    <ul>
+      <li><b>다음 봉은 서버가 쥐고 있습니다.</b> 개발자도구를 열어도 미리 볼 수 없습니다 — 그게 이 모드의 전부입니다.</li>
+      <li><b>지금 보는 봉의 종가로는 못 삽니다.</b> 버튼을 누르면 <b>다음 봉 시가</b>에 체결됩니다. 실제와 같습니다.</li>
+      <li><b>수수료·증권거래세가 그대로 빠집니다.</b> 원 미만 절사까지 실제 정산과 같게 계산합니다.</li>
+      <li>끝나면 <b>그냥 사서 들고 있었을 때</b>와 비교해 채점합니다.</li>
+    </ul>
+    <p class="muted">위에서 종목과 자금을 고르고 <b>연습 시작</b>을 누르세요.</p>
+  </section>
+
+  <section class="rp-board" id="rpBoard" hidden>
+    <div class="rp-chartwrap">
+      <div class="rp-chart-head">
+        <b id="rpName">—</b>
+        <span id="rpPrice" class="rp-price">—</span>
+        <span id="rpProgress" class="muted"></span>
+      </div>
+      <div class="canvas-wrap rp-canvas"><canvas id="chart"></canvas></div>
+      <div class="rp-controls">
+        <button class="mini-btn" data-step="1">▶ 1봉</button>
+        <button class="mini-btn" data-step="5">▶▶ 5봉</button>
+        <button id="rpPlay" class="mini-btn">⏵ 자동</button>
+        <label class="rp-speed">속도
+          <select id="rpSpeed">
+            <option value="1000">느리게 (1초/봉)</option>
+            <option value="400" selected>보통</option>
+            <option value="150">빠르게</option>
+            <option value="40">아주 빠르게</option>
+          </select>
+        </label>
+        <button id="rpFinish" class="mini-btn">■ 끝내고 채점</button>
+      </div>
+    </div>
+
+    <aside class="rp-side">
+      <div class="rp-acct" id="rpAcct"></div>
+
+      <div class="rp-order">
+        <label>수량 <input type="number" id="rpQty" value="100" min="1" step="10" /></label>
+        <div id="rpMaxQty" class="muted"></div>
+        <div class="rp-btns">
+          <button id="rpBuy" class="buy-btn">매수</button>
+          <button id="rpSell" class="sell-btn">매도</button>
+        </div>
+        <div class="rp-hint">체결은 <b>다음 봉 시가</b> · 슬리피지 1호가</div>
+      </div>
+
+      <div class="rp-log" id="rpLog"></div>
+    </aside>
+  </section>
+
+  <section class="rp-score" id="rpScore" hidden></section>
+</main>
+
+<div id="toasts" class="toasts"></div>
+
+<script src="/js/indicators.js"></script>
+<script src="/js/signals.js"></script>
+<script src="/js/kr-config.js"></script>
+<script src="/js/kr-signal.js"></script>
+<script src="/js/chart.js"></script>
+<script src="/js/replay-app.js"></script>
+</body>
+</html>
