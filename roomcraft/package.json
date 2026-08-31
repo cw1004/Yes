@@ -19,11 +19,12 @@
     "check:contrast": "node scripts/contrast.mjs",
     "sim": "API_BASE=${API_BASE:-http://localhost:8787/api} node scripts/simulate.mjs",
     "shots": "BASE_URL=${BASE_URL:-http://localhost:5173} node scripts/screenshots.mjs",
-    "demo": "npm run build && node scripts/bundle-standalone.mjs",
+    "demo": "tsc -b && vite build --mode demo && node scripts/bundle-standalone.mjs",
     "test:sourcing": "API_BASE=${API_BASE:-http://localhost:8787/api} node e2e-sourcing.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.120.0",
+    "@types/three": "^0.185.4",
     "better-sqlite3": "^13.0.3",
     "cookie-parser": "^1.4.7",
     "express-rate-limit": "^8.6.2",
@@ -31,6 +32,7 @@
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "stripe": "^22.5.0",
+    "three": "^0.185.1",
     "zustand": "^5.0.3"
   },
   "devDependencies": {

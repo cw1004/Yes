@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { Suspense, lazy, useMemo, useRef, useState } from 'react'
 import { useStudio } from '../store/useStudio'
 import { CATALOG, productBySku } from '../data/catalog'
 import { COMMON_SPECS, generatePlan, planAreaSqm } from '../lib/plan/templates'
@@ -9,6 +9,12 @@ import { unitPrice } from '../lib/format'
 import { Button, Card, SectionTitle } from './ui/primitives'
 import { ProductThumb } from './ProductThumb'
 import { ShopCard } from './ShopCard'
+/*
+ * three.js 는 gzip 기준 130KB 를 더합니다. 대부분의 방문자는 3D 탭을 열지 않으므로
+ * 첫 로딩에 태우지 않고, 3D 로 전환할 때 가져옵니다.
+ */
+const Room3D = lazy(() => import('./Room3D').then((m) => ({ default: m.Room3D })))
+import { styleById } from '../data/styles'
 
 /**
  * 평면 배치 편집기.
@@ -24,7 +30,8 @@ const GRID = 50
 const WALL_SNAP = 250
 
 export function FloorPlanner() {
-  const { showToast } = useStudio()
+  const { showToast, styleId } = useStudio()
+  const [view, setView] = useState<'2d' | '3d'>('2d')
   const [specIndex, setSpecIndex] = useState(3)
   const [items, setItems] = useState<PlacedItem[]>([])
   const [selected, setSelected] = useState<string | null>(null)
@@ -132,6 +139,20 @@ export function FloorPlanner() {
           desc="가구를 드래그해 배치하면 통로 폭·문 열림·의자 빼는 공간을 실시간으로 검사합니다."
           right={
             <div className="flex flex-wrap items-center gap-2">
+              <div className="flex overflow-hidden rounded-lg border border-line">
+                {(['2d', '3d'] as const).map((v) => (
+                  <button
+                    key={v}
+                    onClick={() => setView(v)}
+                    aria-pressed={view === v}
+                    className={`min-h-[36px] px-3 text-xs font-bold transition ${
+                      view === v ? 'bg-amber-brand text-on-brand' : 'bg-ink-850 text-mist-300 hover:text-mist-200'
+                    }`}
+                  >
+                    {v === '2d' ? '▦ 평면' : '⬢ 3D'}
+                  </button>
+                ))}
+              </div>
               <select
                 value={specIndex}
                 onChange={(e) => {
@@ -158,6 +179,29 @@ export function FloorPlanner() {
           제공사의 저작물이라 임의로 불러올 수 없습니다. 치수는 대략의 배치 감각을 잡는 용도로 쓰세요.
         </p>
 
+        {view === '3d' ? (
+          <div className="mt-3">
+            <Suspense
+              fallback={
+                <div
+                  className="grid place-items-center rounded-xl border border-line-soft bg-ink-850 text-xs text-mist-400"
+                  style={{ aspectRatio: '16 / 10' }}
+                >
+                  3D 엔진을 불러오는 중…
+                </div>
+              }
+            >
+              <Room3D
+                plan={plan}
+                items={items}
+                style={styleById(styleId)}
+                productBySku={productBySku}
+                selected={selected}
+                onSelect={setSelected}
+              />
+            </Suspense>
+          </div>
+        ) : (
         <div
           className="mt-3 overflow-hidden rounded-xl border border-line-soft bg-ink-850"
           onPointerMove={(e) => {
@@ -336,6 +380,7 @@ export function FloorPlanner() {
             ))}
           </svg>
         </div>
+        )}
 
         {selectedItem && selectedProduct ? (
           <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-line-soft bg-ink-900 p-2.5">

@@ -15,7 +15,9 @@ export const STYLES: DesignStyle[] = [
       'mid-century modern interior: warm walnut and teak wood tones, tapered legs, architectural furniture silhouettes, ' +
       'muted olive and burnt-orange accents, brass hardware, low-profile seating, geometric textiles',
     lighting: '2700K 웜톤 무드 조명 및 브라스 스탠드 조명',
-    palette: ['#c96f4a', '#3f6f52', '#d8a03a', '#7a6a5c', '#f2ede4'],
+    // palette[0] 은 그 스타일의 지배색(벽에 칠할 수 있는 색)이어야 합니다.
+    // 원래 강조색인 번트오렌지가 앞에 있어서 3D 에서 벽까지 주황색이 됐습니다.
+    palette: ['#f2ede4', '#7a6a5c', '#c96f4a', '#3f6f52', '#d8a03a'],
     signatureItems: ['임스 스타일 라운지 체어', '월넛 텐바보드 사이드보드'],
     curatedSkus: ['hm-eames-lounge', 'usm-haller-2x2', 'flos-arco', 'hm-noguchi-table', 'gubi-beetle', 'ch24-wishbone'],
     previewGradient: 'linear-gradient(135deg,#4a3728,#8a5230 55%,#c96f4a)',

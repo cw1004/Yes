@@ -2,8 +2,19 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [react(), tailwindcss()],
+  build: {
+    /*
+     * 기본 빌드는 코드 분할을 씁니다 — 3D(three.js) 는 대부분의 방문자가 열지 않으므로
+     * 첫 로딩에 태우지 않습니다.
+     *
+     * demo 모드는 단일 HTML 파일로 묶기 위한 빌드입니다. 파일 하나 안에서는 동적
+     * import 가 가리킬 경로가 없으므로 전부 인라인해 한 덩어리로 만듭니다.
+     */
+    rollupOptions: mode === 'demo' ? { output: { inlineDynamicImports: true } } : {},
+    chunkSizeWarningLimit: 1200,
+  },
   server: {
     port: 5173,
     proxy: {
@@ -14,4 +25,4 @@ export default defineConfig({
       '/r': { target: 'http://localhost:8787', changeOrigin: true },
     },
   },
-})
+}))
