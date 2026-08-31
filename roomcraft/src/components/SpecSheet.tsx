@@ -1,15 +1,37 @@
 import { useMoodboardTotals, useStudio } from '../store/useStudio'
 import { CATALOG, productsBySkus } from '../data/catalog'
 import { styleById } from '../data/styles'
-import { usd } from '../lib/format'
+import { usd, usdFine } from '../lib/format'
 import { Button } from './ui/primitives'
+import { ProductThumb } from './ProductThumb'
+import { TIER_LABEL, rankByRevenue, tierOf } from '../lib/revenue'
 
 export function SpecSheet() {
-  const { styleId, addToMoodboard, removeFromMoodboard, syncStyleToMoodboard, openModal, showToast } =
-    useStudio()
+  const {
+    styleId,
+    addToMoodboard,
+    removeFromMoodboard,
+    syncStyleToMoodboard,
+    openModal,
+    showToast,
+    enabledMalls,
+    affiliateIds,
+  } = useStudio()
   const { rows, total, count } = useMoodboardTotals()
   const style = styleById(styleId)
-  const curated = productsBySkus(style.curatedSkus)
+
+  /*
+   * 큐레이션을 카탈로그 순서대로 두면 무엇부터 밀어야 할지 알 수 없습니다.
+   * 클릭당 기대 정산액이 큰 순으로 세워 상위 항목에 배지를 답니다.
+   * (기대값은 가정에 기반하므로 절대 금액이 아니라 순서로 읽어야 합니다 — lib/revenue.ts)
+   */
+  const ranked = rankByRevenue(productsBySkus(style.curatedSkus), enabledMalls, affiliateIds)
+  const curated = ranked.length ? ranked : productsBySkus(style.curatedSkus).map((product) => ({
+    product,
+    best: null,
+    runnersUp: [],
+    liftVsFirst: 1,
+  }))
 
   return (
     <div className="flex h-full flex-col">
@@ -55,7 +77,7 @@ export function SpecSheet() {
                 key={product.sku}
                 className="flex items-center gap-2.5 rounded-lg border border-line-soft bg-ink-900 p-2.5"
               >
-                <span className="h-10 w-10 shrink-0 rounded-md" style={{ background: product.swatch }} />
+                <ProductThumb product={product} className="h-10 w-10" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold text-mist-200">{product.name}</p>
                   <p className="text-xs">
@@ -95,17 +117,39 @@ export function SpecSheet() {
         <p className="pt-3 text-xs font-semibold text-mist-400">
           {style.name} 큐레이션 ({curated.length})
         </p>
-        {curated.map((p) => (
+        {curated.map(({ product: p, best }, i) => {
+          const tier = TIER_LABEL[tierOf(i, curated.length)]
+          return (
           <div key={p.sku} className="rounded-lg border border-line-soft bg-ink-900 p-2.5">
             <div className="flex items-start gap-2.5">
-              <span className="mt-0.5 h-10 w-10 shrink-0 rounded-md" style={{ background: p.swatch }} />
+              <ProductThumb product={p} className="mt-0.5 h-10 w-10" />
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold text-mist-200">{p.name}</p>
+                <div className="flex items-start gap-1.5">
+                  <p className="min-w-0 flex-1 truncate text-sm font-semibold text-mist-200">{p.name}</p>
+                  {tier.label ? (
+                    <span
+                      title={tier.hint}
+                      className="shrink-0 whitespace-nowrap rounded-md border border-emerald-brand bg-emerald-brand/10 px-1.5 py-0.5 text-xs font-bold text-emerald-brand"
+                    >
+                      {tier.label}
+                    </span>
+                  ) : null}
+                </div>
                 <p className="mt-0.5 text-xs">
                   <span className="font-bold text-amber-brand">{usd(p.price)} USD</span>
                   <span className="text-mist-500"> · {p.vendor}</span>
                   <span className="ml-1 text-amber-brand">★{p.rating}</span>
                 </p>
+                {best ? (
+                  <p
+                    className="mt-0.5 text-xs text-mist-500"
+                    title="가격·수수료율·전환 가정으로 계산한 값입니다. 실측이 아니라 채널 간 순위 판단용입니다."
+                  >
+                    최적 채널 <span className="font-semibold text-mist-300">{best.mall.icon} {best.mall.label}</span>
+                    {' · '}수수료 {(best.rate * 100).toFixed(1)}%
+                    {' · '}<span className="tabular-nums">{usdFine(best.perClick)}</span>/클릭(가정)
+                  </p>
+                ) : null}
                 <p className="mt-1 line-clamp-2 text-xs text-mist-400">스타일 추천 이유: {p.reason}</p>
                 <p className="mt-0.5 line-clamp-1 text-xs text-mist-500">소재/마감: {p.materials}</p>
                 <div className="mt-2 flex gap-1.5">
@@ -127,7 +171,8 @@ export function SpecSheet() {
               </div>
             </div>
           </div>
-        ))}
+          )
+        })}
       </div>
 
       <div className="border-t border-line-soft p-3">

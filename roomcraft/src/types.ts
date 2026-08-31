@@ -94,8 +94,39 @@ export interface Product {
   officialUrl: string
   /** 실제 커머스 딥링크 생성 시 사용하는 검색 키워드 */
   searchTerm: string
+  /** 주 재질 색 */
   swatch: string
+  /** 보조 재질 색 (다리·프레임·쿠션 등). 없으면 swatch 에서 파생합니다. */
+  swatch2?: string
+  /** 썸네일로 그릴 형태. 단색 사각형만으로는 무엇을 파는지 알 수 없습니다. */
+  silhouette: Silhouette
 }
+
+/**
+ * 제품 썸네일 형태.
+ * 실제 제품 사진은 소매점 CDN 을 그대로 가져다 쓸 수 없어(약관·핫링크),
+ * 카테고리보다 한 단계 구체적인 형태를 벡터로 그립니다.
+ */
+export type Silhouette =
+  | 'sofa'
+  | 'lounge'
+  | 'dining-chair'
+  | 'stool'
+  | 'bench'
+  | 'coffee-table'
+  | 'dining-table'
+  | 'sideboard'
+  | 'shelf'
+  | 'floor-lamp'
+  | 'pendant'
+  | 'table-lamp'
+  | 'rug'
+  | 'vase'
+  | 'mirror'
+  | 'art'
+  | 'plant'
+  | 'bed'
+  | 'appliance'
 
 /** 무드보드에 담긴 항목 = 수익화 단위 */
 export interface MoodboardItem {

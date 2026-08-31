@@ -4,6 +4,7 @@ import { productBySku } from '../data/catalog'
 import { styleById } from '../data/styles'
 import { usd, relativeTime } from '../lib/format'
 import { Badge, Button } from './ui/primitives'
+import { ProductThumb } from './ProductThumb'
 
 const QUICK = [
   '구조는 유지하고 러그를 네이비 울 텍스처로 변경해줘',
@@ -94,10 +95,7 @@ export function DesignerChat() {
                         className="rounded-lg border border-line-soft bg-ink-900 p-2.5 text-left"
                       >
                         <div className="flex items-start gap-2.5">
-                          <span
-                            className="mt-0.5 h-9 w-9 shrink-0 rounded-md"
-                            style={{ background: p.swatch }}
-                          />
+                          <ProductThumb product={p} className="mt-0.5 h-9 w-9" />
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-sm font-semibold text-mist-200">{p.name}</p>
                             <p className="mt-0.5 text-xs">

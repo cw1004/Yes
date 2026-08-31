@@ -31,7 +31,7 @@ await step('태그가 기본 슬라이더 위치에서 전부 클릭 가능', as
 
 await step('태그 클릭 → 구매 링크 카드', async () => {
   await tags.first().click({ timeout: 8000 })
-  await page.getByText(/구매 링크 \(/).waitFor({ timeout: 5000 })
+  await page.getByText(/구매 링크 ·/).waitFor({ timeout: 5000 })
 })
 
 await step('카드에 활성 채널 링크가 실제 URL', async () => {
@@ -41,7 +41,7 @@ await step('카드에 활성 채널 링크가 실제 URL', async () => {
 
 const closeCard = async () => {
   // 카드는 같은 태그를 다시 누르면 토글로 닫히므로, 열기 전에 항상 비워둡니다.
-  if (await page.getByText(/구매 링크 \(/).count()) {
+  if (await page.getByText(/구매 링크 ·/).count()) {
     await page.locator('button[aria-label="닫기"]').last().click()
     await page.waitForTimeout(200)
   }
@@ -55,7 +55,7 @@ await step('제휴 ID 입력이 이미지 링크에 반영', async () => {
   await page.waitForTimeout(400)
   await closeCard()
   await tags.first().click({ timeout: 8000 })
-  await page.getByText(/구매 링크 \(/).waitFor({ timeout: 5000 })
+  await page.getByText(/구매 링크 ·/).waitFor({ timeout: 5000 })
   const hrefs = await page.locator('a[rel*="sponsored"]').evaluateAll((els) => els.map((e) => e.getAttribute('href')))
   if (!hrefs.some((h) => h?.includes('subId=AF_IMG_TEST'))) throw new Error(`추적 ID 미반영: ${hrefs[0]}`)
 })
@@ -102,7 +102,7 @@ await step('드래그 중 태그 DOM 노드가 유지됨 (재마운트 회귀 �
 })
 
 await step('드래그 후에는 카드가 열리지 않음', async () => {
-  const open = await page.getByText(/구매 링크 \(/).count()
+  const open = await page.getByText(/구매 링크 ·/).count()
   if (open > 0) throw new Error('드래그가 클릭으로 처리됨')
 })
 

@@ -8,6 +8,7 @@ import { usd } from '../lib/format'
 import { Modal } from './ui/Modal'
 import { Badge, Button, inputClass } from './ui/primitives'
 import type { ProductCategory } from '../types'
+import { ProductThumb } from './ProductThumb'
 
 const CATEGORIES: (ProductCategory | 'All')[] = [
   'All',
@@ -112,7 +113,7 @@ export function MoodboardModal() {
               return (
                 <div key={p.sku} className="rounded-lg border border-line-soft bg-ink-850 p-3">
                   <div className="flex items-start gap-2.5">
-                    <span className="h-12 w-12 shrink-0 rounded-md" style={{ background: p.swatch }} />
+                    <ProductThumb product={p} className="h-12 w-12" />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-start justify-between gap-2">
                         <p className="text-sm font-semibold leading-snug text-mist-200">{p.name}</p>
@@ -159,7 +160,7 @@ export function MoodboardModal() {
               rows.map(({ product, qty }) => (
                 <div key={product.sku} className="rounded-lg border border-line-soft bg-ink-850 p-2.5">
                   <div className="flex items-start gap-2.5">
-                    <span className="h-9 w-9 shrink-0 rounded-md" style={{ background: product.swatch }} />
+                    <ProductThumb product={product} className="h-9 w-9" />
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-semibold text-mist-200">{product.name}</p>
                       <p className="text-xs text-amber-brand">{usd(product.price * qty)}</p>

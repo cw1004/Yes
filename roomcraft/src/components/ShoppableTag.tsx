@@ -1,10 +1,12 @@
 import { useMemo } from 'react'
 import { useStudio } from '../store/useStudio'
 import { productBySku } from '../data/catalog'
-import { MALLS, buildDeeplink, isMallLinked, mallById } from '../lib/affiliate'
+import { MALLS, buildDeeplink } from '../lib/affiliate'
+import { channelPicks } from '../lib/revenue'
 import { copyToClipboard } from '../lib/exporters'
-import { usd } from '../lib/format'
+import { usd, usdFine } from '../lib/format'
 import type { Hotspot } from '../types'
+import { ProductThumb } from './ProductThumb'
 
 /**
  * 이미지 위 태그를 눌렀을 때 뜨는 상품 카드.
@@ -22,13 +24,17 @@ export function ShoppableCard({
   const { affiliateIds, enabledMalls, addToMoodboard, removeHotspot, moodboard, showToast } = useStudio()
   const product = productBySku(hotspot.sku)
 
+  /*
+   * 채널을 몰 정의 순서대로 늘어놓으면 맨 위(대개 쿠팡, 수수료 1~3%로 최저)를
+   * 누르게 됩니다. 같은 클릭인데 채널만 바꿔도 정산액이 몇 배 달라지므로
+   * 이 제품에서 기대 정산액이 큰 순서로 정렬하고 1위를 표시합니다.
+   */
   const links = useMemo(() => {
     if (!product) return []
     const ids = enabledMalls.length ? enabledMalls : MALLS.slice(0, 4).map((m) => m.id)
-    return ids.map(mallById).map((mall) => ({
-      mall,
-      url: buildDeeplink(mall.id, product.searchTerm, affiliateIds),
-      linked: isMallLinked(mall, affiliateIds),
+    return channelPicks(product, ids, affiliateIds).map((pick) => ({
+      ...pick,
+      url: buildDeeplink(pick.mall.id, product.searchTerm, affiliateIds),
     }))
   }, [product, enabledMalls, affiliateIds])
 
@@ -52,7 +58,7 @@ export function ShoppableCard({
       className="rc-fade-up absolute z-30 w-[290px] overflow-hidden rounded-xl border border-line bg-ink-900/97 shadow-2xl backdrop-blur"
     >
       <div className="flex items-start gap-2.5 border-b border-line-soft p-3">
-        <span className="mt-0.5 h-11 w-11 shrink-0 rounded-lg" style={{ background: product.swatch }} />
+        <ProductThumb product={product} className="mt-0.5 h-11 w-11" />
         <div className="min-w-0 flex-1">
           <p className="text-sm font-bold leading-snug text-mist-200">{product.name}</p>
           <p className="mt-0.5 text-xs">
@@ -71,22 +77,27 @@ export function ShoppableCard({
 
       <div className="max-h-[168px] overflow-y-auto p-2">
         <p className="px-1 pb-1.5 text-xs font-semibold text-mist-400">
-          추천 제품 구매 링크 ({links.length}개 채널)
+          구매 링크 · 기대 정산액 순 ({links.length}개 채널)
         </p>
         <div className="space-y-1">
-          {links.map(({ mall, url, linked }) => (
+          {links.map(({ mall, url, linked, perClick, rate }, i) => (
             <div key={mall.id} className="flex items-center gap-1">
               <a
                 href={url}
                 target="_blank"
                 rel="noreferrer noopener sponsored"
-                className="flex flex-1 items-center justify-between gap-2 rounded-md border border-line-soft bg-ink-850 px-2 py-1.5 text-xs text-mist-300 transition hover:border-amber-brand/50 hover:text-amber-brand"
+                className={`flex flex-1 items-center justify-between gap-2 rounded-md border px-2 py-1.5 text-xs transition ${
+                  i === 0
+                    ? 'border-emerald-brand bg-emerald-brand/10 text-emerald-brand hover:bg-emerald-brand/20'
+                    : 'border-line-soft bg-ink-850 text-mist-300 hover:border-amber-brand hover:text-amber-brand'
+                }`}
               >
                 <span className="truncate">
+                  {i === 0 ? '★ ' : ''}
                   {mall.icon} {mall.label}
                 </span>
-                <span className={linked ? 'text-emerald-brand' : 'text-mist-500'}>
-                  {linked ? '추적 ✓' : '추적 ✗'}
+                <span className="shrink-0 tabular-nums" title={`수수료 ${(rate * 100).toFixed(1)}% · 클릭당 기대 정산액(가정)`}>
+                  {usdFine(perClick)}/클릭 {linked ? '✓' : '✗'}
                 </span>
               </a>
               <button

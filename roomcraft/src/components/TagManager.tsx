@@ -8,6 +8,7 @@ import { useAuth } from '../store/useAuth'
 import { productsBySkus } from '../data/catalog'
 import { usd } from '../lib/format'
 import { Badge, Button, inputClass } from './ui/primitives'
+import { ProductThumb } from './ProductThumb'
 
 /**
  * 이미지 위 태그 관리 바.
@@ -167,7 +168,7 @@ export function TagManager() {
                 }}
                 className="flex items-center gap-2 rounded-lg border border-line-soft bg-ink-900 px-2.5 py-2 text-left transition hover:border-amber-brand/50"
               >
-                <span className="h-7 w-7 shrink-0 rounded-md" style={{ background: p.swatch }} />
+                <ProductThumb product={p} className="h-7 w-7" />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-xs font-semibold text-mist-200">{p.name}</span>
                   <span className="block text-xs text-mist-500">

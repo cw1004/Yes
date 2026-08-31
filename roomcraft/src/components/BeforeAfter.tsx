@@ -4,6 +4,7 @@ import { productBySku } from '../data/catalog'
 import { ShoppableCard } from './ShoppableTag'
 import { usd } from '../lib/format'
 import type { DesignStyle, Hotspot } from '../types'
+import { ProductThumb } from './ProductThumb'
 
 /** 드래그로 간주할 최소 이동 거리(px). 이보다 작으면 클릭으로 처리합니다. */
 const DRAG_THRESHOLD = 4
@@ -210,12 +211,7 @@ function Tag({
         active ? 'bg-amber-brand text-on-brand' : 'bg-ink-950/85 text-mist-200 hover:bg-amber-brand hover:text-on-brand'
       } ${dragging ? 'scale-110 cursor-grabbing' : 'cursor-grab'}`}
     >
-      <span
-        className="grid h-5 w-5 place-items-center rounded-full text-xs"
-        style={{ background: product.swatch }}
-      >
-        🏷
-      </span>
+      <ProductThumb product={product} className="h-5 w-5 rounded-full" />
       <span className="max-w-[92px] truncate text-xs font-semibold">{product.brand}</span>
     </button>
   )

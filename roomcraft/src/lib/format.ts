@@ -7,6 +7,12 @@ export const usd = (n: number, opts: { cents?: boolean } = {}): string =>
     maximumFractionDigits: opts.cents ? 2 : 0,
   })}`
 
+/**
+ * 클릭당 정산액처럼 센트 미만이 의미 있는 금액.
+ * usd() 의 소수 0~2자리로는 $0.003 이 전부 $0.00 으로 뭉개집니다.
+ */
+export const usdFine = (n: number): string => (n >= 1 ? `$${n.toFixed(2)}` : `$${n.toFixed(3)}`)
+
 export const krw = (usdAmount: number): string =>
   `₩${Math.round(usdAmount * USD_TO_KRW).toLocaleString('ko-KR')}`
 
