@@ -16,6 +16,12 @@ export interface Space {
   labelEn: string
   /** 해당 공간에서 우선 배치되는 가구 카테고리 */
   focus: ProductCategory[]
+  /**
+   * 기준 바닥 면적(m²).
+   * 자재는 개수가 아니라 면적으로 삽니다 — 마루 한 장이 아니라 "34m² 분량"입니다.
+   * 이 값이 자재를 담을 때의 기본 수량 근거가 됩니다.
+   */
+  areaSqm: number
 }
 
 export type StyleFamily = 'modern' | 'minimal' | 'luxury' | 'eclectic' | 'natural'
@@ -38,6 +44,7 @@ export interface DesignStyle {
 }
 
 export type ProductCategory =
+  // 가구·소품
   | 'Seating'
   | 'Table'
   | 'Storage'
@@ -46,6 +53,41 @@ export type ProductCategory =
   | 'Decor'
   | 'Appliance'
   | 'Bed'
+  // 건축·건설 자재
+  | 'Flooring'
+  | 'Wall'
+  | 'Tile'
+  | 'Door'
+  | 'Window'
+  | 'Countertop'
+  | 'Plumbing'
+  | 'Hardware'
+  | 'Trim'
+
+/** 자재로 분류되는 카테고리 — 시공이 필요하고 면적/길이로 견적합니다. */
+export const MATERIAL_CATEGORIES: ProductCategory[] = [
+  'Flooring', 'Wall', 'Tile', 'Door', 'Window', 'Countertop', 'Plumbing', 'Hardware', 'Trim',
+]
+
+export const isMaterial = (c: ProductCategory): boolean => MATERIAL_CATEGORIES.includes(c)
+
+/**
+ * 판매 단위.
+ *
+ * 가구는 1개 단위지만 자재는 다릅니다. 마루는 m², 몰딩은 m(연장), 페인트는 통,
+ * 벽지는 롤입니다. 단위를 구분하지 않으면 "$80 짜리 마루"처럼 보여서 견적이
+ * 실제의 30분의 1로 나옵니다.
+ */
+export type PriceUnit = 'ea' | 'm2' | 'lm' | 'roll' | 'can' | 'set'
+
+export const UNIT_LABEL: Record<PriceUnit, string> = {
+  ea: '개',
+  m2: 'm²',
+  lm: 'm',
+  roll: '롤',
+  can: '통',
+  set: '세트',
+}
 
 /** 제휴 커머스 채널 (링크를 거는 쇼핑몰) */
 export type MallId =
@@ -98,6 +140,13 @@ export interface Product {
   swatch: string
   /** 보조 재질 색 (다리·프레임·쿠션 등). 없으면 swatch 에서 파생합니다. */
   swatch2?: string
+  /** price 가 무엇 하나당 가격인지. 없으면 'ea'. */
+  unit?: PriceUnit
+  /**
+   * 한 단위가 덮는 면적(m²). 페인트 한 통, 벽지 한 롤처럼
+   * 면적을 덮지만 단위는 개수인 자재의 필요 수량을 계산할 때 씁니다.
+   */
+  coversSqm?: number
   /** 썸네일로 그릴 형태. 단색 사각형만으로는 무엇을 파는지 알 수 없습니다. */
   silhouette: Silhouette
 }
@@ -127,6 +176,17 @@ export type Silhouette =
   | 'plant'
   | 'bed'
   | 'appliance'
+  // 자재
+  | 'flooring'
+  | 'tile'
+  | 'paint'
+  | 'wallpaper'
+  | 'door'
+  | 'window'
+  | 'countertop'
+  | 'faucet'
+  | 'moulding'
+  | 'hardware'
 
 /** 무드보드에 담긴 항목 = 수익화 단위 */
 export interface MoodboardItem {

@@ -3,8 +3,9 @@ import { useStudio } from '../store/useStudio'
 import { productBySku } from '../data/catalog'
 import { MALLS, buildDeeplink } from '../lib/affiliate'
 import { channelPicks } from '../lib/revenue'
+import { defaultQtyFor, spaceById } from '../data/spaces'
 import { copyToClipboard } from '../lib/exporters'
-import { usd, usdFine } from '../lib/format'
+import { usdFine, unitPrice } from '../lib/format'
 import type { Hotspot } from '../types'
 import { ProductThumb } from './ProductThumb'
 
@@ -21,7 +22,7 @@ export function ShoppableCard({
   hotspot: Hotspot
   onClose: () => void
 }) {
-  const { affiliateIds, enabledMalls, addToMoodboard, removeHotspot, moodboard, showToast } = useStudio()
+  const { affiliateIds, enabledMalls, addToMoodboard, removeHotspot, moodboard, showToast, spaceId } = useStudio()
   const product = productBySku(hotspot.sku)
 
   /*
@@ -32,11 +33,12 @@ export function ShoppableCard({
   const links = useMemo(() => {
     if (!product) return []
     const ids = enabledMalls.length ? enabledMalls : MALLS.slice(0, 4).map((m) => m.id)
-    return channelPicks(product, ids, affiliateIds).map((pick) => ({
+    const qty = defaultQtyFor(product, spaceById(spaceId))
+    return channelPicks(product, ids, affiliateIds, { qtyBySku: { [product.sku]: qty } }).map((pick) => ({
       ...pick,
       url: buildDeeplink(pick.mall.id, product.searchTerm, affiliateIds),
     }))
-  }, [product, enabledMalls, affiliateIds])
+  }, [product, enabledMalls, affiliateIds, spaceId])
 
   if (!product) return null
 
@@ -62,7 +64,7 @@ export function ShoppableCard({
         <div className="min-w-0 flex-1">
           <p className="text-sm font-bold leading-snug text-mist-200">{product.name}</p>
           <p className="mt-0.5 text-xs">
-            <span className="font-bold text-amber-brand">{usd(product.price)}</span>
+            <span className="font-bold text-amber-brand">{unitPrice(product.price, product.unit)}</span>
             <span className="text-mist-500"> · {product.brand}</span>
           </p>
         </div>

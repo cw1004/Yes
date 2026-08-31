@@ -16,7 +16,7 @@ import type {
 } from '../types'
 import { productBySku } from '../data/catalog'
 import { styleById } from '../data/styles'
-import { spaceById } from '../data/spaces'
+import { defaultQtyFor, spaceById } from '../data/spaces'
 import { CREDIT_COST, planById } from '../data/plans'
 import { DEFAULT_ENABLED_MALLS, EMPTY_AFFILIATE_IDS } from '../lib/affiliate'
 import { DEFAULT_QUOTE } from '../lib/quote'
@@ -331,7 +331,8 @@ export const useStudio = create<StudioState>()(
 
       addToMoodboard: (sku) =>
         set((s) => {
-          if (!productBySku(sku)) return s
+          const product = productBySku(sku)
+          if (!product) return s
           const existing = s.moodboard.find((m) => m.sku === sku)
           if (existing) {
             return {
@@ -340,7 +341,16 @@ export const useStudio = create<StudioState>()(
             }
           }
           return {
-            moodboard: [...s.moodboard, { sku, qty: 1, addedAt: Date.now(), fromStyleId: s.styleId }],
+            moodboard: [
+              ...s.moodboard,
+              {
+                sku,
+                // 자재는 개수가 아니라 면적으로 삽니다. 1 로 담으면 견적이 수십 분의 1이 됩니다.
+                qty: product ? defaultQtyFor(product, spaceById(s.spaceId)) : 1,
+                addedAt: Date.now(),
+                fromStyleId: s.styleId,
+              },
+            ],
             toast: '무드보드에 담았습니다.',
           }
         }),

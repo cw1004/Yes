@@ -14,6 +14,17 @@ import type { Product, Silhouette } from '../types'
  * 좌표계는 24×24 로 통일해 어느 크기로 써도 같은 비율이 나옵니다.
  */
 
+/** 밝게 — 슬래브 윗면처럼 빛을 더 받는 면에 씁니다. */
+function lighten(hex: string, amount = 0.18): string {
+  const m = /^#([0-9a-f]{6})$/i.exec(hex)
+  if (!m) return hex
+  const n = parseInt(m[1], 16)
+  const c = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) =>
+    Math.min(255, Math.round(v + (255 - v) * amount)),
+  )
+  return `#${c.map((v) => v.toString(16).padStart(2, '0')).join('')}`
+}
+
 /** 보조색이 없으면 주색을 어둡게 만들어 씁니다. */
 function darken(hex: string, amount = 0.32): string {
   const m = /^#([0-9a-f]{6})$/i.exec(hex)
@@ -176,6 +187,101 @@ function shapes(kind: Silhouette, a: string, b: string) {
           <rect x="5.6" y="11.5" width="16.4" height="5.5" rx="1.2" fill={a} />
           <rect x="6.6" y="8.4" width="6" height="3.6" rx="1.4" fill={a} opacity="0.7" />
           <path d="M6.5 17v3.4M21 17v3.4" stroke={b} strokeWidth="1.5" strokeLinecap="round" />
+        </>
+      )
+    // ── 건축·건설 자재 ────────────────────────────────────────────────
+    case 'flooring':
+      // 널결이 겹쳐 깔린 단면. 마루/데크 공통.
+      return (
+        <>
+          <rect x="1.5" y="7" width="21" height="4.2" rx="0.6" fill={a} />
+          <rect x="1.5" y="11.6" width="21" height="4.2" rx="0.6" fill={darken(a, 0.12)} />
+          <rect x="1.5" y="16.2" width="21" height="4.2" rx="0.6" fill={a} />
+          <path d="M9 7v4.2M16.5 11.6v4.2M6 16.2v4.2M18 16.2v4.2" stroke={b} strokeWidth="0.9" />
+          <path d="M1.5 4.6h21l-2.4 2.4H3.9z" fill={b} opacity="0.75" />
+        </>
+      )
+    case 'tile':
+      return (
+        <>
+          <rect x="2" y="2.5" width="20" height="19" rx="1" fill={a} />
+          <path d="M12 2.5v19M2 12h20" stroke={b} strokeWidth="1.4" />
+          <path d="M7 2.5v19M17 2.5v19M2 7.2h20M2 16.8h20" stroke={b} strokeWidth="0.7" opacity="0.55" />
+        </>
+      )
+    case 'paint':
+      return (
+        <>
+          <path d="M5.5 8h13l-1 12.5a1 1 0 0 1-1 .9H7.5a1 1 0 0 1-1-.9z" fill={a} />
+          <rect x="4.6" y="5.6" width="14.8" height="2.6" rx="0.8" fill={b} />
+          <path d="M7.5 5.6a4.5 3 0 0 1 9 0" fill="none" stroke={b} strokeWidth="1.1" />
+          <rect x="8.5" y="12" width="7" height="4.6" rx="0.6" fill={b} opacity="0.6" />
+        </>
+      )
+    case 'wallpaper':
+      // 한쪽이 말려 있는 롤 — 벽지/시트지.
+      return (
+        <>
+          <rect x="6" y="3" width="12" height="18" rx="1" fill={a} />
+          <path d="M6 3c-2.6 0-3.4 2-3.4 4.5S3.4 12 6 12z" fill={b} />
+          <path d="M9 7h6M9 11h6M9 15h6" stroke={b} strokeWidth="1" opacity="0.7" />
+        </>
+      )
+    case 'door':
+      return (
+        <>
+          <rect x="4.5" y="2" width="15" height="20" rx="0.8" fill={b} />
+          <rect x="6.2" y="3.6" width="11.6" height="16.8" rx="0.5" fill={a} />
+          <rect x="7.6" y="5" width="8.8" height="6" rx="0.4" fill="none" stroke={b} strokeWidth="0.9" />
+          <rect x="7.6" y="12.6" width="8.8" height="6.2" rx="0.4" fill="none" stroke={b} strokeWidth="0.9" />
+          <circle cx="16.4" cy="12" r="0.95" fill={b} />
+        </>
+      )
+    case 'window':
+      return (
+        <>
+          <rect x="2.5" y="4" width="19" height="16" rx="0.8" fill={b} />
+          <rect x="4.2" y="5.6" width="15.6" height="12.8" rx="0.4" fill="#dbe7ee" />
+          <path d="M12 5.6v12.8M4.2 12h15.6" stroke={b} strokeWidth="1.3" />
+          <path d="M5.6 7 9 10.4" stroke="#ffffff" strokeWidth="1" opacity="0.85" />
+        </>
+      )
+    case 'countertop':
+      // 두꺼운 상판 슬래브의 단면 — 대리석/엔지니어드 스톤.
+      return (
+        <>
+          <path d="M2 9h20v3.4H2z" fill={a} />
+          <path d="M2 12.4h20v2.2H2z" fill={b} />
+          <path d="M2 9h20l-1.6-1.6H3.6z" fill={lighten(a)} />
+          <path d="M5 10.2c2 .8 3.6-.6 5.6.2s3.4-.8 5.4 0" stroke={b} strokeWidth="0.7" fill="none" opacity="0.8" />
+        </>
+      )
+    case 'faucet':
+      return (
+        <>
+          <path d="M8 20V12c0-3.4 2.4-6 5.6-6H17" fill="none" stroke={a} strokeWidth="2.2" strokeLinecap="round" />
+          <rect x="5.4" y="19.4" width="5.2" height="2.2" rx="1" fill={b} />
+          <path d="M17 6v3.2" stroke={a} strokeWidth="2" strokeLinecap="round" />
+          <path d="M11.6 9.6h4.6" stroke={b} strokeWidth="1.4" strokeLinecap="round" />
+        </>
+      )
+    case 'moulding':
+      // 몰딩 단면 프로파일 — 걸레받이/천장 몰딩.
+      return (
+        <>
+          <path d="M3 20V8c2.2 0 2.2-2.4 4.4-2.4S9.6 8 11.8 8 14 4.6 16.2 4.6 18.4 8 21 8v12z" fill={a} />
+          <path d="M3 20h18" stroke={b} strokeWidth="1.4" />
+          <path d="M3 8c2.2 0 2.2-2.4 4.4-2.4S9.6 8 11.8 8 14 4.6 16.2 4.6 18.4 8 21 8" fill="none" stroke={b} strokeWidth="0.9" />
+        </>
+      )
+    case 'hardware':
+      // 손잡이·경첩 등 철물.
+      return (
+        <>
+          <rect x="3" y="10.4" width="18" height="3.2" rx="1.6" fill={a} />
+          <rect x="4.4" y="7.6" width="2.6" height="8.8" rx="1.2" fill={b} />
+          <rect x="17" y="7.6" width="2.6" height="8.8" rx="1.2" fill={b} />
+          <circle cx="12" cy="12" r="1.5" fill={b} opacity="0.6" />
         </>
       )
     case 'appliance':

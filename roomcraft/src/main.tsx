@@ -21,4 +21,7 @@ if (import.meta.env.DEV) {
   void import('./dev/roomPreview').then(({ renderRooms }) => {
     ;(window as unknown as Record<string, unknown>).__renderRooms = renderRooms
   })
+  void import('./dev/materialCheck').then(({ materialCheck }) => {
+    ;(window as unknown as Record<string, unknown>).__materialCheck = materialCheck
+  })
 }

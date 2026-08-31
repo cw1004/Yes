@@ -1,8 +1,9 @@
 import { useCallback, useState } from 'react'
 import { useStudio } from '../store/useStudio'
-import { usd, usdFine } from '../lib/format'
+import { usdFine, unitPrice } from '../lib/format'
 import { buildDeeplink } from '../lib/affiliate'
 import { bestChannel } from '../lib/revenue'
+import { defaultQtyFor, spaceById } from '../data/spaces'
 import { ProductThumb } from './ProductThumb'
 import type { Product } from '../types'
 
@@ -22,14 +23,16 @@ export function ShopCard({
   product: Product
   badge?: string
 }) {
-  const { affiliateIds, enabledMalls, addToMoodboard, moodboard, showToast } = useStudio()
+  const { affiliateIds, enabledMalls, addToMoodboard, moodboard, showToast, spaceId } = useStudio()
   const inBoard = moodboard.some((m) => m.sku === product.sku)
 
   // 폴백된 벡터 실루엣에 "AI 이미지" 라벨을 붙이면 사실과 다릅니다.
   const [isPhoto, setIsPhoto] = useState(false)
   const onPhotoResolved = useCallback((v: boolean) => setIsPhoto(v), [])
 
-  const pick = bestChannel(product, enabledMalls, affiliateIds)
+  // 자재는 면적으로 사므로 단가가 아니라 주문액으로 채널을 골라야 합니다.
+  const qty = defaultQtyFor(product, spaceById(spaceId))
+  const pick = bestChannel(product, enabledMalls, affiliateIds, { qtyBySku: { [product.sku]: qty } })
   const href = pick ? buildDeeplink(pick.mall.id, product.searchTerm, affiliateIds) : product.officialUrl
 
   return (
@@ -57,7 +60,7 @@ export function ShopCard({
           {product.brand} · ★{product.rating}
         </p>
         <p className="mt-auto pt-1">
-          <span className="text-base font-bold text-amber-brand">{usd(product.price)}</span>
+          <span className="text-base font-bold text-amber-brand">{unitPrice(product.price, product.unit)}</span>
           {pick ? (
             <span className="ml-1.5 text-xs text-mist-500" title="가정에 기반한 클릭당 기대 정산액입니다.">
               {pick.mall.icon} {usdFine(pick.perClick)}/클릭

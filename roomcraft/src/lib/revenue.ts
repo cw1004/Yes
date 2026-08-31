@@ -95,6 +95,11 @@ export interface RevenueOptions {
   audience?: Region
   /** 제휴 콘솔에서 가져온 채널별 실측 전환율 */
   measured?: MeasuredConversion
+  /**
+   * sku 별 실제 구매 수량. 자재는 면적으로 사기 때문에 이 값이 없으면
+   * 주문액이 단가로 잡혀 채널 선택과 순위가 전부 틀어집니다.
+   */
+  qtyBySku?: Record<string, number>
 }
 
 /** 이 제품을 이 채널로 보냈을 때의 기대 성과 */
@@ -122,15 +127,27 @@ export interface ProductRevenue {
   liftVsFirst: number
 }
 
+/**
+ * 이 제품을 실제로 살 때의 주문 금액.
+ *
+ * 자재는 단가로 팔지 않습니다. 마루는 m²당 $78 이고 34m² 를 삽니다.
+ * product.price 를 그대로 쓰면 주문액이 $78 로 잡혀서, 가격대에 따라 채널을 고르는
+ * 로직이 마루를 "저가 소품"으로 분류합니다. 실제로는 $2,900 짜리 주문입니다.
+ */
+export function orderValue(product: Product, typicalQty = 1): number {
+  return product.price * Math.max(1, typicalQty)
+}
+
 function conversionFor(product: Product, mall: Mall, opts: RevenueOptions): { p: number; measured: boolean } {
   const m = opts.measured?.[mall.id]
   if (typeof m === 'number' && m > 0) return { p: m, measured: true }
+  const value = orderValue(product, opts.qtyBySku?.[product.sku] ?? 1)
   const p =
     BASE_CONVERSION *
-    priceFactor(product.price) *
+    priceFactor(value) *
     STRENGTH_FACTOR[mall.strength] *
     regionFactor(mall, opts.audience ?? 'KR') *
-    priceFit(mall, product.price)
+    priceFit(mall, value)
   // 전환율은 확률이므로 상한을 둡니다. 계수가 곱해지며 1을 넘는 일이 없게 합니다.
   return { p: Math.min(p, 0.25), measured: false }
 }
@@ -147,7 +164,7 @@ export function channelPicks(product: Product, mallIds: MallId[], ids: Affiliate
         rate,
         conversion: p,
         measured,
-        perClick: product.price * rate * p,
+        perClick: orderValue(product, opts.qtyBySku?.[product.sku] ?? 1) * rate * p,
         linked: isMallLinked(mall, ids),
       }
     })
@@ -156,6 +173,19 @@ export function channelPicks(product: Product, mallIds: MallId[], ids: Affiliate
       if (a.linked !== b.linked) return a.linked ? -1 : 1
       return b.perClick - a.perClick
     })
+}
+
+/**
+ * sku → 실제 구매 수량 맵.
+ *
+ * 이걸 넘기지 않으면 자재의 주문액이 단가로 잡혀 채널 선택이 틀어집니다.
+ * 거실 자재 33종을 검사했을 때 22종의 최적 채널이 바뀌었습니다.
+ */
+export function quantityMap(
+  products: Product[],
+  qtyOf: (p: Product) => number,
+): Record<string, number> {
+  return Object.fromEntries(products.map((p) => [p.sku, qtyOf(p)]))
 }
 
 /** 제품별 최적 채널. mallIds 가 비어 있으면 null. */

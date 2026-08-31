@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useStudio } from '../store/useStudio'
 import { productBySku } from '../data/catalog'
 import { styleById } from '../data/styles'
-import { usd, relativeTime } from '../lib/format'
+import { relativeTime, unitPrice } from '../lib/format'
 import { Badge, Button } from './ui/primitives'
 import { ProductThumb } from './ProductThumb'
 
@@ -99,7 +99,7 @@ export function DesignerChat() {
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-sm font-semibold text-mist-200">{p.name}</p>
                             <p className="mt-0.5 text-xs">
-                              <span className="font-bold text-amber-brand">{usd(p.price)}</span>
+                              <span className="font-bold text-amber-brand">{unitPrice(p.price, p.unit)}</span>
                               <span className="text-mist-500"> · {p.vendor}</span>
                               <span className="ml-1 text-amber-brand">{'★'.repeat(p.rating)}</span>
                             </p>

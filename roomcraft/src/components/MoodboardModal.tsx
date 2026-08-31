@@ -4,15 +4,21 @@ import { CATALOG } from '../data/catalog'
 import { styleById } from '../data/styles'
 import { estimateCommission } from '../lib/affiliate'
 import { downloadText, toCsv } from '../lib/exporters'
-import { usd } from '../lib/format'
+import { usd, unitPrice } from '../lib/format'
 import { Modal } from './ui/Modal'
 import { Badge, Button, inputClass } from './ui/primitives'
-import type { ProductCategory } from '../types'
+import { isMaterial, type ProductCategory } from '../types'
 import { ProductThumb } from './ProductThumb'
 import { SourcingPanel } from './SourcingPanel'
 
-const CATEGORIES: (ProductCategory | 'All')[] = [
+/**
+ * 카테고리 필터.
+ * '자재' 는 개별 카테고리가 아니라 묶음입니다 — 시공이 필요한 품목만 한 번에 보려는
+ * 용도가 실제로 가장 잦습니다(가구는 배송, 자재는 공사 일정이 따로 잡힙니다).
+ */
+const CATEGORIES: (ProductCategory | 'All' | '자재')[] = [
   'All',
+  '자재',
   'Seating',
   'Table',
   'Storage',
@@ -21,6 +27,15 @@ const CATEGORIES: (ProductCategory | 'All')[] = [
   'Decor',
   'Appliance',
   'Bed',
+  'Flooring',
+  'Wall',
+  'Tile',
+  'Countertop',
+  'Door',
+  'Window',
+  'Plumbing',
+  'Trim',
+  'Hardware',
 ]
 
 export function MoodboardModal() {
@@ -48,7 +63,9 @@ export function MoodboardModal() {
   const results = useMemo(() => {
     const needle = q.trim().toLowerCase()
     return CATALOG.filter((p) => {
-      if (cat !== 'All' && p.category !== cat) return false
+      if (cat === '자재') {
+        if (!isMaterial(p.category)) return false
+      } else if (cat !== 'All' && p.category !== cat) return false
       if (!needle) return true
       return (
         p.name.toLowerCase().includes(needle) ||
@@ -125,7 +142,7 @@ export function MoodboardModal() {
                         {recommended ? <Badge tone="amber">추천</Badge> : null}
                       </div>
                       <p className="mt-1 text-xs">
-                        <span className="font-bold text-amber-brand">{usd(p.price)}</span>
+                        <span className="font-bold text-amber-brand">{unitPrice(p.price, p.unit)}</span>
                         <span className="text-mist-500"> · {p.brand}</span>
                       </p>
                       <p className="mt-1 line-clamp-2 text-xs text-mist-500">{p.reason}</p>

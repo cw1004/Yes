@@ -2,9 +2,9 @@ import { useState } from 'react'
 import { useStudio } from '../store/useStudio'
 import { useAuth } from '../store/useAuth'
 import { styleById } from '../data/styles'
-import { spaceById } from '../data/spaces'
+import { defaultQtyFor, spaceById } from '../data/spaces'
 import { api, ApiError, type SourcedProduct } from '../lib/api'
-import { TIER_LABEL, rankByRevenue, tierOf } from '../lib/revenue'
+import { TIER_LABEL, quantityMap, rankByRevenue, tierOf } from '../lib/revenue'
 import { Button, inputClass } from './ui/primitives'
 import { ShopCard } from './ShopCard'
 
@@ -70,7 +70,11 @@ export function SourcingPanel() {
   }
 
   // 찾아온 제품도 기대 정산액 순으로 세웁니다.
-  const ranked = items ? rankByRevenue(items, enabledMalls, affiliateIds) : []
+  const ranked = items
+    ? rankByRevenue(items, enabledMalls, affiliateIds, {
+        qtyBySku: quantityMap(items, (p) => defaultQtyFor(p, space)),
+      })
+    : []
 
   return (
     <div className="rounded-xl border border-line-soft bg-ink-850 p-4">

@@ -1,14 +1,16 @@
 import { useMoodboardTotals, useStudio } from '../store/useStudio'
 import { CATALOG, productsBySkus } from '../data/catalog'
 import { styleById } from '../data/styles'
-import { usd, usdFine } from '../lib/format'
+import { defaultQtyFor, spaceById } from '../data/spaces'
+import { usd, usdFine, unitPrice } from '../lib/format'
 import { Button } from './ui/primitives'
 import { ProductThumb } from './ProductThumb'
-import { TIER_LABEL, rankByRevenue, tierOf } from '../lib/revenue'
+import { TIER_LABEL, quantityMap, rankByRevenue, tierOf } from '../lib/revenue'
 
 export function SpecSheet() {
   const {
     styleId,
+    spaceId,
     addToMoodboard,
     removeFromMoodboard,
     syncStyleToMoodboard,
@@ -25,7 +27,12 @@ export function SpecSheet() {
    * 클릭당 기대 정산액이 큰 순으로 세워 상위 항목에 배지를 답니다.
    * (기대값은 가정에 기반하므로 절대 금액이 아니라 순서로 읽어야 합니다 — lib/revenue.ts)
    */
-  const ranked = rankByRevenue(productsBySkus(style.curatedSkus), enabledMalls, affiliateIds)
+  const space = spaceById(spaceId)
+  const curatedProducts = productsBySkus(style.curatedSkus)
+  const ranked = rankByRevenue(curatedProducts, enabledMalls, affiliateIds, {
+    // 자재는 면적으로 사므로 단가가 아니라 주문액으로 채널을 골라야 합니다.
+    qtyBySku: quantityMap(curatedProducts, (p) => defaultQtyFor(p, space)),
+  })
   const curated = ranked.length ? ranked : productsBySkus(style.curatedSkus).map((product) => ({
     product,
     best: null,
@@ -81,7 +88,7 @@ export function SpecSheet() {
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold text-mist-200">{product.name}</p>
                   <p className="text-xs">
-                    <span className="font-bold text-amber-brand">{usd(product.price)}</span>
+                    <span className="font-bold text-amber-brand">{unitPrice(product.price, product.unit)}</span>
                     <span className="text-mist-500">
                       {' '}
                       · {product.vendor}
@@ -136,7 +143,7 @@ export function SpecSheet() {
                   ) : null}
                 </div>
                 <p className="mt-0.5 text-xs">
-                  <span className="font-bold text-amber-brand">{usd(p.price)} USD</span>
+                  <span className="font-bold text-amber-brand">{unitPrice(p.price, p.unit)}</span>
                   <span className="text-mist-500"> · {p.vendor}</span>
                   <span className="ml-1 text-amber-brand">★{p.rating}</span>
                 </p>
