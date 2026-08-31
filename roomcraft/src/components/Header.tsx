@@ -105,16 +105,24 @@ export function Header() {
           ☁ 클라우드 저장
         </HeaderCell>
 
-        <HeaderCell
-          onClick={() => openModal('plans')}
-          title={isServer ? '서버에 저장된 크레딧 잔액' : '로컬 데모 크레딧 (로그인하면 서버에 저장됩니다)'}
-        >
-          <span className="text-amber-brand">♛</span>
-          <span className="font-bold tabular-nums text-mist-200">{credits}</span>
-          <span className="text-mist-500">크레딧</span>
-          <Badge tone="amber">{plan.name.toUpperCase()}</Badge>
-          {!isServer ? <Badge>로컬</Badge> : null}
-        </HeaderCell>
+        {/*
+          * 크레딧은 렌더 API 실비가 실제로 나가는 서버 모드에서만 의미가 있습니다.
+          * 목 모드에서는 차감하지 않으므로 잔액을 띄우면 처음 온 사람에게
+          * 있지도 않은 제약을 보여주는 셈이 됩니다.
+          */}
+        {isServer ? (
+          <HeaderCell onClick={() => openModal('plans')} title="서버에 저장된 크레딧 잔액">
+            <span className="text-amber-brand">♛</span>
+            <span className="font-bold tabular-nums text-mist-200">{credits}</span>
+            <span className="text-mist-500">크레딧</span>
+            <Badge tone="amber">{plan.name.toUpperCase()}</Badge>
+          </HeaderCell>
+        ) : (
+          <HeaderCell onClick={() => openModal('plans')} title="가입 없이 바로 사용할 수 있습니다">
+            <span className="text-emerald-brand">✓</span>
+            <span className="font-semibold text-mist-200">가입 없이 무료</span>
+          </HeaderCell>
+        )}
       </div>
 
       <div className="flex items-center gap-2">

@@ -40,7 +40,8 @@ export function AffiliateTab() {
     showToast,
   } = useStudio()
   const { rows, total, count } = useMoodboardTotals()
-  const signedIn = Boolean(useAuth((s) => s.user))
+  // 가입 없이도 서버가 게스트 세션으로 추적 링크를 발급합니다.
+  const serverAvailable = useAuth((s) => s.serverAvailable)
   const [primaryMall, setPrimaryMall] = useState<MallId>('coupang')
   const [exporting, setExporting] = useState(false)
   const [term, setTerm] = useState('')
@@ -77,7 +78,7 @@ export function AffiliateTab() {
         mallIds,
         affiliateIds,
         source,
-        signedIn,
+        enabled: serverAvailable,
       })
       await run(resolver, tracked)
     } finally {
@@ -350,9 +351,9 @@ export function AffiliateTab() {
           </Button>
         </div>
         <p className="mt-2 text-xs leading-relaxed text-mist-500">
-          {signedIn
-            ? '내보내는 링크는 클릭 추적 링크(/r/…)로 발급되어, 아래 수익 대시보드에 클릭 수가 집계됩니다.'
-            : '⚠ 비로그인 상태에서는 원본 딥링크로 내보내집니다. 클릭 수가 집계되지 않아 어떤 채널이 돈이 되는지 알 수 없습니다.'}
+          {serverAvailable
+            ? '내보내는 링크는 클릭 추적 링크(/r/…)로 발급되어, 아래 수익 대시보드에 클릭 수가 집계됩니다. 가입은 필요 없습니다.'
+            : '⚠ 서버에 연결되지 않아 원본 딥링크로 내보내집니다. 클릭 수가 집계되지 않아 어떤 채널이 돈이 되는지 알 수 없습니다.'}
         </p>
         {!rows.length ? (
           <p className="mt-3 text-xs text-mist-500">무드보드에 가구를 먼저 담아주세요.</p>

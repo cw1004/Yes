@@ -25,8 +25,10 @@ const step = async (label, fn) => {
 const email = `e2e${Date.now()}@example.com`
 await page.goto(BASE_URL + '/', { waitUntil: 'networkidle' })
 
-await step('비로그인: 로컬 크레딧 배지 표시', async () => {
-  await page.getByText('로컬', { exact: true }).first().waitFor({ timeout: 5000 })
+await step('비로그인: 가입 없이 바로 쓸 수 있음을 안내', async () => {
+  // 크레딧은 실비가 나가는 서버 모드에서만 표시합니다. 목 모드에서 잔액을 띄우면
+  // 처음 온 사람에게 있지도 않은 제약을 보여주게 됩니다.
+  await page.getByText('가입 없이 무료').first().waitFor({ timeout: 5000 })
 })
 
 await step('회원가입', async () => {

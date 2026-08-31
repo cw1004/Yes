@@ -296,7 +296,21 @@ check('비로그인 결제내역 → 401', r.status === 401)
 const { InsufficientCredits, addLedger, getBalance, spendCredits } = await import('./credits.js')
 const { db } = await import('./db.js')
 
-const uid = db.prepare('SELECT id FROM users ORDER BY created_at DESC LIMIT 1').get().id
+/*
+ * 이 테스트는 API 를 두드리는 동시에 DB 를 직접 열어 원장을 검증합니다.
+ * db.js 는 DATABASE_PATH 를 읽으므로, 서버가 다른 경로를 쓰면 여기서 빈 DB 를 열게 됩니다.
+ * 그대로 두면 알 수 없는 TypeError 로 죽어서 원인을 찾는 데 시간이 걸립니다.
+ */
+const lastUser = db.prepare('SELECT id FROM users ORDER BY created_at DESC LIMIT 1').get()
+if (!lastUser) {
+  console.error(
+    '\n✗ DB 에 사용자가 없습니다. 서버와 다른 DB 를 열었을 가능성이 높습니다.\n' +
+      `  이 테스트가 연 경로: ${process.env.DATABASE_PATH ?? '(기본) data/roomcraft.db'}\n` +
+      '  서버와 같은 DATABASE_PATH 를 넘겨서 실행하세요.\n',
+  )
+  process.exit(1)
+}
+const uid = lastUser.id
 const start = getBalance(uid)
 // ref 는 (reason, ref) 유니크 인덱스에 걸리므로 실행마다 새로 만듭니다.
 const runRef = `unit-${Date.now()}`

@@ -28,19 +28,21 @@ export async function resolveLinks({
   mallIds,
   affiliateIds,
   source,
-  signedIn,
+  // 서버가 게스트 세션을 자동으로 만들어 주므로 로그인 여부로 막지 않습니다.
+  // 서버가 아예 없을 때(정적 데모)만 원본 딥링크로 폴백합니다.
+  enabled = true,
 }: {
   rows: ExportRow[]
   mallIds: MallId[]
   affiliateIds: AffiliateIds
   source: string
-  signedIn: boolean
+  enabled?: boolean
 }): Promise<TrackedLinks> {
   const searchTermOf = (sku: string) =>
     rows.find((r) => r.product.sku === sku)?.product.searchTerm ?? sku
   const fallback = rawResolver(affiliateIds, searchTermOf)
 
-  if (!signedIn || !rows.length || !mallIds.length) {
+  if (!enabled || !rows.length || !mallIds.length) {
     return { resolver: fallback, tracked: false, rejected: 0 }
   }
 

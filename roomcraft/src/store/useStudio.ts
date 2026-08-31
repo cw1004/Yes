@@ -186,13 +186,13 @@ export const useStudio = create<StudioState>()(
           return
         }
 
-        // 로그인 상태면 크레딧의 권한은 서버에 있습니다. 여기서 미리 막지 않고,
-        // 서버가 402 로 거절하면 그 메시지를 그대로 보여줍니다.
-        const signedIn = Boolean(useAuth.getState().user)
-        if (!signedIn && s.credits < CREDIT_COST.render) {
-          set({ renderError: '크레딧이 부족합니다. 플랜을 업그레이드하거나 크레딧을 충전해 주세요.', modal: 'plans' })
-          return
-        }
+        /*
+         * 여기서 미리 막지 않습니다.
+         *
+         * 크레딧의 권한은 서버에 있고(로그인이든 게스트든), 서버가 402 로 거절하면
+         * 그 메시지를 그대로 보여줍니다. 서버가 없는 목 모드는 API 실비가 들지 않으므로
+         * 아예 차감하지 않습니다 — 처음 써보는 사람을 요금제 모달로 막을 이유가 없습니다.
+         */
 
         const style = styleById(s.styleId)
         const space = spaceById(s.spaceId)
@@ -211,8 +211,8 @@ export const useStudio = create<StudioState>()(
 
           set((prev) => ({
             isRendering: false,
-            // 서버 렌더는 서버가 이미 차감했습니다. 목 렌더만 로컬 잔액을 줄입니다.
-            credits: result.provider === 'server' ? prev.credits : prev.credits - CREDIT_COST.render,
+            // 크레딧 차감은 서버가 합니다. 목 렌더는 API 실비가 들지 않으므로 차감하지 않습니다.
+            credits: prev.credits,
             // 큐레이션 상품으로 태그를 미리 찍어둡니다. 위치는 드래그로 조정합니다.
             hotspots: seedHotspots(style.curatedSkus),
             render: {

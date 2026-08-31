@@ -10,7 +10,7 @@
 import { Router } from 'express'
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { db, now } from './db.js'
-import { requireAuth } from './auth.js'
+import { requireUserOrGuest } from './auth.js'
 import { linkLimiter } from './limits.js'
 
 /**
@@ -74,7 +74,7 @@ export const linksRouter = Router()
  * 같은 (사용자, 제품, 몰, 채널) 조합은 기존 토큰을 재사용합니다 —
  * 내보내기를 다시 해도 통계가 새 토큰으로 흩어지지 않게.
  */
-linksRouter.post('/', requireAuth, linkLimiter, (req, res) => {
+linksRouter.post('/', requireUserOrGuest, linkLimiter, (req, res) => {
   const items = Array.isArray(req.body?.items) ? req.body.items : []
   const source = String(req.body?.source ?? 'app').slice(0, 32)
   if (!items.length) return res.status(400).json({ error: 'items 가 필요합니다.' })
@@ -121,7 +121,7 @@ linksRouter.post('/', requireAuth, linkLimiter, (req, res) => {
 })
 
 /** 링크별 클릭 통계 */
-linksRouter.get('/stats', requireAuth, (req, res) => {
+linksRouter.get('/stats', requireUserOrGuest, (req, res) => {
   const rows = db
     .prepare(
       `SELECT l.id, l.sku, l.mall_id, l.label, l.source, l.created_at,

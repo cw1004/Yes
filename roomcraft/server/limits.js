@@ -27,6 +27,7 @@ const envInt = (name, fallback) => {
 export const LIMITS = {
   globalPer15Min: envInt('RATE_LIMIT_GLOBAL_PER_15MIN', 600),
   signupPerHour: envInt('RATE_LIMIT_SIGNUP_PER_HOUR', 5),
+  guestPerHour: envInt('RATE_LIMIT_GUEST_PER_HOUR', 8),
   loginPer15Min: envInt('RATE_LIMIT_LOGIN_PER_15MIN', 10),
   verifyMailPerHour: envInt('RATE_LIMIT_VERIFY_MAIL_PER_HOUR', 3),
   passwordResetPerHour: envInt('RATE_LIMIT_PASSWORD_RESET_PER_HOUR', 5),
@@ -72,6 +73,21 @@ export const globalLimiter = rateLimit({
 })
 
 /** 가입 — 무료 크레딧 남용의 진입점이라 가장 빡빡하게 잡습니다. */
+/**
+ * 게스트 생성 상한.
+ *
+ * 가입을 없앤 대신 익명 요청이 그대로 렌더 크레딧을 받습니다. 쿠키를 지우고 다시
+ * 요청하면 새 게스트가 생기므로, 그 재발급 자체를 IP 단위로 막지 않으면 한도가
+ * 아무 의미가 없어집니다(렌더 API 실비가 직접 새는 지점입니다).
+ */
+export const guestLimiter = rateLimit({
+  ...base,
+  windowMs: HOUR,
+  limit: LIMITS.guestPerHour,
+  keyGenerator: ipKey,
+  message: message('무료 사용 한도를 넘었습니다. 계정을 만들면 계속 사용할 수 있습니다.'),
+})
+
 export const signupLimiter = rateLimit({
   ...base,
   windowMs: HOUR,

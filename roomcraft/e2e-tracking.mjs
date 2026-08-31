@@ -114,16 +114,20 @@ await step('구독 갱신 크레딧 지급 (dev 시뮬레이터)', async () => {
   if (renewed !== afterFirst + 200) throw new Error(`갱신 지급 실패: ${afterFirst} → ${renewed}`)
 })
 
-await step('비로그인은 원본 딥링크로 폴백', async () => {
+await step('로그아웃해도 게스트 세션으로 클릭 추적이 이어짐', async () => {
+  /*
+   * 가입을 없앤 뒤의 기대 동작입니다. 예전에는 비로그인이면 원본 딥링크로 폴백해
+   * 클릭이 집계되지 않았습니다 — 어떤 채널이 돈이 되는지 알 수 없다는 뜻이라,
+   * 수익화 앱에서는 가장 아까운 구멍이었습니다.
+   */
   await page.getByRole('button', { name: new RegExp(email.split('@')[0]) }).first().click()
   await page.getByRole('button', { name: '로그아웃' }).click()
   await page.waitForTimeout(800)
   await page.getByRole('button', { name: /수익 허브/ }).first().click()
   await page.getByRole('button', { name: /블로그 포스팅용 복사/ }).click()
-  await page.waitForTimeout(1200)
+  await page.waitForTimeout(1500)
   const html = await page.evaluate(() => navigator.clipboard.readText())
-  if (/\/r\/[A-Za-z0-9_-]+/.test(html)) throw new Error('비로그인인데 추적 링크가 생성됨')
-  if (!html.includes('coupang.com')) throw new Error('원본 딥링크 폴백 실패')
+  if (!/\/r\/[A-Za-z0-9_-]+/.test(html)) throw new Error('게스트인데 추적 링크가 발급되지 않음')
 })
 
 if (process.argv[2]) await page.screenshot({ path: process.argv[2] })

@@ -12,7 +12,7 @@ import { Router } from 'express'
 import Anthropic from '@anthropic-ai/sdk'
 import { randomUUID } from 'node:crypto'
 import { CREDIT_COST, InsufficientCredits, addLedger, getBalance, spendCredits } from './credits.js'
-import { requireAuth } from './auth.js'
+import { requireUserOrGuest } from './auth.js'
 import { chatLimiter, renderLimiter } from './limits.js'
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || ''
@@ -33,7 +33,7 @@ function parseDataUrl(dataUrl) {
 
 export const aiRouter = Router()
 
-aiRouter.post('/render', requireAuth, renderLimiter, async (req, res) => {
+aiRouter.post('/render', requireUserOrGuest, renderLimiter, async (req, res) => {
   if (!GEMINI_API_KEY) return res.status(503).json({ error: 'GEMINI_API_KEY 가 설정되지 않았습니다.' })
 
   const requestId = randomUUID()
@@ -103,7 +103,7 @@ Return ONLY a JSON object, no prose outside it, with this shape:
 }
 Never invent SKU ids that are not in the catalog list.`
 
-aiRouter.post('/chat', requireAuth, chatLimiter, async (req, res) => {
+aiRouter.post('/chat', requireUserOrGuest, chatLimiter, async (req, res) => {
   if (!anthropic) return res.status(503).json({ error: 'ANTHROPIC_API_KEY 가 설정되지 않았습니다.' })
 
   const requestId = randomUUID()

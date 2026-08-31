@@ -138,6 +138,19 @@ const MIGRATIONS = [
   );
   CREATE INDEX idx_email_tokens_user ON email_tokens(user_id, purpose, created_at);
   `,
+
+  // v4 — 게스트 세션.
+  //
+  // 가입을 없애되 렌더 API 실비가 무한정 새면 안 되므로, 이메일 없이 만들어지는
+  // 사용자 행을 둡니다. 이렇게 하면 세션·크레딧 원장·레이트 리밋 경로를 그대로 쓰고
+  // 게스트 전용 분기를 새로 만들지 않아도 됩니다.
+  //
+  // email 이 NOT NULL UNIQUE 라 합성 주소를 넣습니다. 실제 메일 주소가 아니라는 것은
+  // is_guest 로 구분하며, 인증 메일·비밀번호 재설정 경로는 이 값을 보고 건너뜁니다.
+  `
+  ALTER TABLE users ADD COLUMN is_guest INTEGER NOT NULL DEFAULT 0;
+  CREATE INDEX idx_users_guest ON users(is_guest, created_at);
+  `,
 ]
 
 function migrate() {

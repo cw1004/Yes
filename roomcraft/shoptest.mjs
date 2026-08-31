@@ -125,7 +125,15 @@ await step('쇼퍼블 HTML 내보내기 (링크 포함)', async () => {
   const html = await page.evaluate(() => navigator.clipboard.readText())
   if (!html.includes('<figure')) throw new Error('figure 없음')
   if (!html.includes('position:absolute')) throw new Error('태그 절대 위치 없음')
-  if (!html.includes('subId=AF_IMG_TEST')) throw new Error('제휴 추적 ID 없음')
+  /*
+   * 게스트도 추적 링크를 받게 되면서 내보낸 HTML 에는 /r/<token> 이 들어갑니다.
+   * 제휴 ID 는 서버가 보관하는 대상 URL 쪽에 붙으므로 HTML 에서는 보이지 않습니다.
+   * 서버가 없을 때만 원본 딥링크(subId=…)로 폴백합니다.
+   */
+  const tracked = /\/r\/[A-Za-z0-9_-]+/.test(html)
+  if (!tracked && !html.includes('subId=AF_IMG_TEST')) {
+    throw new Error('추적 링크도 제휴 딥링크도 아님')
+  }
   if (!html.includes('sponsored')) throw new Error('sponsored rel 없음')
   if (!html.includes('제휴 마케팅 링크를 포함')) throw new Error('대가성 문구 없음')
 })

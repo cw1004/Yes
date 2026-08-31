@@ -29,7 +29,8 @@ export function TagManager() {
   const [picking, setPicking] = useState(false)
   const [q, setQ] = useState('')
   const [exporting, setExporting] = useState(false)
-  const signedIn = Boolean(useAuth((s) => s.user))
+  // 가입 없이도 서버가 게스트 세션으로 추적 링크를 발급합니다.
+  const serverAvailable = useAuth((s) => s.serverAvailable)
 
   const style = styleById(styleId)
   const tagged = new Set(hotspots.map((h) => h.sku))
@@ -58,7 +59,7 @@ export function TagManager() {
       mallIds: [mallId],
       affiliateIds,
       source: 'shoppable',
-      signedIn,
+      enabled: serverAvailable,
     })
 
     return {
@@ -189,7 +190,7 @@ export function TagManager() {
       <p className="mt-2 text-xs leading-relaxed text-mist-500">
         내보낸 HTML은 이미지와 태그 위치를 그대로 담고 있어 블로그에서도 클릭하면 제휴 링크로 이동합니다.
         일부 에디터는 인라인 스타일을 제한하므로, 붙여넣은 뒤 미리보기로 확인하세요.
-        {signedIn ? ' 링크는 클릭 추적용으로 발급됩니다.' : ' 로그인하면 클릭 수가 집계됩니다.'}
+        {serverAvailable ? ' 링크는 클릭 추적용으로 발급됩니다.' : ' 서버에 연결되면 클릭 수가 집계됩니다.'}
       </p>
     </div>
   )

@@ -7,9 +7,9 @@
 import { Router } from 'express'
 import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto'
 import { db, now } from './db.js'
-import { grantMonthlyCredits, getBalance } from './credits.js'
+import { addLedger, grantMonthlyCredits, getBalance } from './credits.js'
 import { exposesLinks, passwordResetEmail, sendMail, verificationEmail } from './mailer.js'
-import { signupLimiter, loginLimiter, passwordResetLimiter, verifyMailLimiter } from './limits.js'
+import { signupLimiter, loginLimiter, passwordResetLimiter, verifyMailLimiter, guestLimiter } from './limits.js'
 
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000
 const VERIFY_TTL_MS = 24 * 60 * 60 * 1000
@@ -58,6 +58,56 @@ export function userFromToken(token) {
   return db.prepare('SELECT * FROM users WHERE id = ?').get(session.user_id) ?? null
 }
 
+/**
+ * 게스트 크레딧.
+ *
+ * 가입을 강제하지 않는 대신 렌더 API 실비가 무한정 새지 않도록 한도를 둡니다.
+ * 계정을 만들고 메일을 인증하면 free 플랜(20)을 따로 받으므로, 가입에는 여전히 이득이 있습니다.
+ */
+const GUEST_CREDITS = 15
+
+/**
+ * 세션이 없으면 게스트 사용자를 만들어 붙입니다.
+ *
+ * 게스트도 users 행으로 두는 이유: 세션·크레딧 원장·레이트 리밋·결제 경로가
+ * user_id 를 기준으로 이미 완성돼 있어서, 별도의 게스트 체계를 만들면 같은 로직을
+ * 두 벌 유지하게 됩니다. email 이 NOT NULL UNIQUE 라 합성 주소를 넣고 is_guest 로 구분합니다.
+ *
+ * 비밀번호는 로그인에 쓰이지 않아야 하므로 검증 불가능한 무작위 값을 넣습니다
+ * (빈 문자열을 넣으면 빈 비밀번호로 로그인이 뚫립니다).
+ */
+export function ensureGuest(req, res) {
+  if (req.user) return req.user
+
+  const id = randomUUID()
+  const { hash, salt } = hashPassword(randomBytes(32).toString('hex'))
+  db.prepare(
+    `INSERT INTO users (id, email, password_hash, salt, display_name, plan_id, created_at, is_guest)
+     VALUES (?, ?, ?, ?, '게스트', 'free', ?, 1)`,
+  ).run(id, `guest-${id}@guest.local`, hash, salt, now())
+
+  addLedger(id, GUEST_CREDITS, 'guest', `guest:${id}`)
+  setSessionCookie(res, createSession(id))
+  req.user = db.prepare('SELECT * FROM users WHERE id = ?').get(id)
+  return req.user
+}
+
+/**
+ * 로그인 또는 게스트를 요구하는 미들웨어.
+ * 가입 없이 바로 쓸 수 있게 하되, 익명 요청마다 새 게스트가 생겨 한도가 무의미해지지
+ * 않도록 게스트 생성 자체에 IP 단위 상한을 겁니다.
+ */
+export function requireUserOrGuest(req, res, next) {
+  if (req.user) return next()
+  guestLimiter(req, res, (err) => {
+    if (err) return next(err)
+    // 리밋에 걸리면 guestLimiter 가 이미 응답했습니다.
+    if (res.headersSent) return
+    ensureGuest(req, res)
+    next()
+  })
+}
+
 /** 로그인 여부만 붙이고 통과시키는 미들웨어 */
 export function attachUser(req, _res, next) {
   req.user = userFromToken(req.cookies?.[COOKIE])
@@ -79,6 +129,7 @@ export function publicUser(user) {
     credits: getBalance(user.id),
     createdAt: user.created_at,
     emailVerified: Boolean(user.email_verified_at),
+    isGuest: Boolean(user.is_guest),
   }
 }
 
@@ -198,6 +249,8 @@ authRouter.post('/verify', (req, res) => {
 
 authRouter.post('/resend-verification', verifyMailLimiter, async (req, res) => {
   if (!req.user) return res.status(401).json({ error: '로그인이 필요합니다.' })
+  // 게스트의 email 은 합성 주소라 실제로 발송되지 않습니다. 시도 자체가 메일 평판에 해롭습니다.
+  if (req.user.is_guest) return res.status(400).json({ error: '게스트 세션입니다. 계정을 먼저 만들어 주세요.' })
   if (req.user.email_verified_at) return res.status(400).json({ error: '이미 인증된 계정입니다.' })
 
   const verification = await issueVerification(req.user)
@@ -208,7 +261,8 @@ authRouter.post('/login', loginLimiter, (req, res) => {
   const email = String(req.body?.email ?? '').trim().toLowerCase()
   const password = String(req.body?.password ?? '')
 
-  const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email)
+  // 게스트 행은 로그인 대상이 아닙니다. 비밀번호가 무작위라 뚫리지는 않지만 경로를 아예 막습니다.
+  const user = db.prepare('SELECT * FROM users WHERE email = ? AND is_guest = 0').get(email)
   // 존재하지 않는 계정과 비밀번호 오류를 같은 메시지로 응답해 계정 존재 여부를 흘리지 않습니다.
   if (!user || !verifyPassword(password, user.salt, user.password_hash)) {
     return res.status(401).json({ error: '이메일 또는 비밀번호가 올바르지 않습니다.' })
@@ -226,7 +280,10 @@ authRouter.post('/login', loginLimiter, (req, res) => {
  */
 authRouter.post('/request-password-reset', passwordResetLimiter, async (req, res) => {
   const email = String(req.body?.email ?? '').trim().toLowerCase()
-  const user = EMAIL_RE.test(email) ? db.prepare('SELECT * FROM users WHERE email = ?').get(email) : null
+  // 게스트는 제외합니다 — guest-<uuid>@guest.local 은 계정 주소가 아닙니다.
+  const user = EMAIL_RE.test(email)
+    ? db.prepare('SELECT * FROM users WHERE email = ? AND is_guest = 0').get(email)
+    : null
 
   let devUrl
   if (user) {
