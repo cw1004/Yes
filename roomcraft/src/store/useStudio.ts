@@ -206,6 +206,7 @@ export const useStudio = create<StudioState>()(
             style,
             space,
             intensity: s.intensity,
+            sourceIsSample: Boolean(s.sourceName?.startsWith('sample-')),
           })
           if (result.credits !== undefined) useAuth.getState().setCredits(result.credits)
 

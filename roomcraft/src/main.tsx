@@ -18,4 +18,7 @@ if (import.meta.env.DEV) {
   void import('./dev/revenueCheck').then(({ revenueCheck }) => {
     ;(window as unknown as Record<string, unknown>).__revenueCheck = revenueCheck
   })
+  void import('./dev/roomPreview').then(({ renderRooms }) => {
+    ;(window as unknown as Record<string, unknown>).__renderRooms = renderRooms
+  })
 }

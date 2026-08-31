@@ -1,5 +1,6 @@
 import type { RenderRequest, RenderResponse, ChatRequest, ChatResponse } from './types'
 import { productBySku } from '../../data/catalog'
+import { renderScene } from '../room/scene'
 
 /**
  * API 키 없이도 앱 전체 흐름(렌더 -> 스펙시트 -> 무드보드 -> 수익화)을 확인할 수 있게 하는
@@ -7,6 +8,33 @@ import { productBySku } from '../../data/catalog'
  * "After" 프리뷰를 캔버스에서 합성합니다. 실제 가구 배치는 서버 프로바이더가 담당합니다.
  */
 export async function mockRender(req: RenderRequest): Promise<RenderResponse> {
+  /*
+   * Before 가 앱이 생성한 샘플 방이면 같은 기하 위에 스타일을 적용해 다시 그립니다.
+   * 벽·바닥 재질, 가구 색, 조명, 러그·식물·액자가 실제로 바뀌므로 Before/After 가
+   * 눈에 띄게 달라집니다. 컬러 그레이딩만으로는 두 장이 거의 같아 보였습니다.
+   *
+   * 사용자가 올린 사진에는 이렇게 할 수 없습니다 — 사진 속 가구를 실제로 바꾸려면
+   * 이미지 생성 모델이 필요하고, 그건 서버 프로바이더(GEMINI_API_KEY)의 몫입니다.
+   */
+  if (req.sourceIsSample) {
+    const imageUrl = renderScene({
+      space: req.space.id,
+      style: req.style,
+      intensity: req.intensity,
+      label: 'AI 시안 (목 프리뷰 · API 키 미설정)',
+    })
+    await delay(700)
+    return {
+      imageUrl,
+      provider: 'mock',
+      matchScore: Math.round(86 + (req.intensity / 100) * 12),
+      notes: [
+        '샘플 공간에 스타일을 적용해 다시 렌더했습니다. 실제 사진의 가구 배치 변경은 서버에 API 키를 설정하면 활성화됩니다.',
+        `적용 강도 ${req.intensity}% — ${req.style.nameEn}`,
+      ],
+    }
+  }
+
   const img = await loadImage(req.sourceImage)
   const maxW = 1280
   const scale = Math.min(1, maxW / img.width)

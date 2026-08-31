@@ -7,6 +7,12 @@ export interface RenderRequest {
   style: DesignStyle
   space: Space
   intensity: number
+  /**
+   * Before 가 앱이 생성한 샘플 방인지.
+   * 샘플이면 목 프로바이더가 같은 기하로 After 를 다시 그릴 수 있어서
+   * 실제로 달라진 방이 나옵니다. 사용자가 올린 사진은 그렇게 할 수 없습니다.
+   */
+  sourceIsSample?: boolean
 }
 
 export interface RenderResponse {
