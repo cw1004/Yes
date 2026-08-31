@@ -22,6 +22,13 @@ const call = async (path, { method = 'GET', body } = {}) => {
   return { status: res.status, json }
 }
 
+/*
+ * 캐시 키가 실행마다 달라야 합니다.
+ * 고정 값을 쓰면 첫 실행이 캐시를 채워서 두 번째 실행부터 "새로 소싱" 단정이 깨집니다
+ * (실제로 그렇게 실패했습니다). 스타일 이름에 실행 고유값을 섞습니다.
+ */
+const RUN = `run${Date.now().toString(36)}`
+
 let pass = 0
 let fail = 0
 const check = (label, ok, detail = '') => {
@@ -36,7 +43,7 @@ if (!health.json.sourcingReady) {
 }
 
 // ── 가입 없이 소싱 ────────────────────────────────────────────────────
-const first = await call('/sourcing', { method: 'POST', body: { style: 'Japandi', space: 'living', budgetUsd: 6000 } })
+const first = await call('/sourcing', { method: 'POST', body: { style: `Japandi ${RUN}`, space: 'living', budgetUsd: 6000 } })
 check('가입 없이 소싱 (게스트 자동 생성)', first.status === 200, `status=${first.status}`)
 check('제품을 돌려줌', (first.json.products?.length ?? 0) > 0)
 
@@ -49,11 +56,11 @@ check('http 가 아닌 officialUrl 은 비움', products.every((p) => p.official
 
 // ── 캐시 ──────────────────────────────────────────────────────────────
 const before = first.json.credits
-const again = await call('/sourcing', { method: 'POST', body: { style: 'Japandi', space: 'living', budgetUsd: 6000 } })
+const again = await call('/sourcing', { method: 'POST', body: { style: `Japandi ${RUN}`, space: 'living', budgetUsd: 6000 } })
 check('같은 조건은 캐시', again.json.cached === true)
 check('캐시 적중은 재과금 없음', again.json.credits === before, `${before} → ${again.json.credits}`)
 
-const other = await call('/sourcing', { method: 'POST', body: { style: 'Art Deco', space: 'bedroom', budgetUsd: 9000 } })
+const other = await call('/sourcing', { method: 'POST', body: { style: `Art Deco ${RUN}`, space: 'bedroom', budgetUsd: 9000 } })
 check('조건이 다르면 새로 소싱', other.json.cached === false)
 check('새 소싱은 과금됨', other.json.credits < before, `${before} → ${other.json.credits}`)
 

@@ -132,10 +132,20 @@ await step('AI 디자이너 챗 응답', async () => {
   await page.getByText(/요청을 반영했습니다/).first().waitFor({ timeout: 10000 })
 })
 
-await step('2D 스테이징 배치', async () => {
-  await page.getByRole('button', { name: /2D\/3D Furniture Staging/ }).click()
-  await page.getByRole('button', { name: '배치', exact: true }).first().click()
-  await page.waitForTimeout(300)
+await step('평면 배치 · 동선 검사', async () => {
+  await page.getByRole('button', { name: /평면 배치 & 동선/ }).click()
+  // 가구 칩은 "폭×깊이" 치수를 달고 있습니다.
+  const chips = page.locator('button').filter({ hasText: /\d+×\d+/ })
+  await chips.first().waitFor({ timeout: 8000 })
+  await chips.nth(0).click()
+  await chips.nth(1).click()
+  await page.waitForTimeout(500)
+
+  // 동선 검사가 실제 수치를 내놓는지 확인합니다.
+  const body = await page.locator('body').innerText()
+  if (!/최소 통로/.test(body)) throw new Error('동선 검사 패널 없음')
+  if (!/전체 점유율/.test(body)) throw new Error('부피감 패널 없음')
+  if (!/\d+×\d+×\d+mm/.test(body.replace(/\s/g, ''))) throw new Error('선택 가구의 치수 표시 없음')
 })
 
 await page.screenshot({ path: process.argv[3] || 'shot-studio.png', fullPage: false })

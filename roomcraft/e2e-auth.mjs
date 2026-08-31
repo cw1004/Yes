@@ -80,6 +80,12 @@ await step('계정 모달: 원장 · 결제 내역', async () => {
   await page.keyboard.press('Escape')
   await page.getByRole('button', { name: new RegExp(email.split('@')[0]) }).first().click()
   await page.getByText('크레딧 원장').waitFor({ timeout: 5000 })
+  /*
+   * 원장 제목이 뜬 직후에 innerText 를 읽으면 항목이 아직 없을 수 있습니다.
+   * 실제로 한 번 그렇게 실패했고(이후 재현되지 않음), 제목만 기다리는 것은
+   * 내용이 준비됐다는 보장이 아닙니다. 항목 자체를 기다립니다.
+   */
+  await page.getByText('크레딧 팩 충전').first().waitFor({ timeout: 8000 })
   const text = await page.locator('body').innerText()
   if (!text.includes('크레딧 팩 충전')) throw new Error('원장에 충전 기록 없음')
   if (!text.includes('Pro Creator 플랜 지급')) throw new Error('원장에 플랜 지급 기록 없음')

@@ -5,13 +5,13 @@ import { SpaceUploader } from './SpaceUploader'
 import { StyleSelector } from './StyleSelector'
 import { BeforeAfter } from './BeforeAfter'
 import { TagManager } from './TagManager'
-import { StagingBoard } from './StagingBoard'
+import { FloorPlanner } from './FloorPlanner'
 import { Badge, Button, Card } from './ui/primitives'
 import type { WorkspaceTab } from '../store/useStudio'
 
 const TABS: { id: WorkspaceTab; label: string; icon: string }[] = [
   { id: 'makeover', label: 'Before / After Makeover', icon: '👁' },
-  { id: 'staging', label: '2D/3D Furniture Staging', icon: '◎' },
+  { id: 'staging', label: '평면 배치 & 동선', icon: '◎' },
   { id: 'spaces', label: 'Spaces & Upload', icon: '🖼' },
 ]
 
@@ -103,7 +103,7 @@ export function CanvasStudio() {
               <StyleSelector />
             </div>
           ) : workspace === 'staging' ? (
-            <StagingBoard />
+            <FloorPlanner />
           ) : (
             <MakeoverView />
           )}

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useAuth } from '../store/useAuth'
 import type { Product, Silhouette } from '../types'
 
 /**
@@ -323,12 +324,18 @@ export function ProductThumb({
 }) {
   const a = product.swatch
   const b = product.swatch2 ?? darken(product.swatch)
+  /*
+   * 서버가 이미지 생성을 끈 상태면 요청 자체를 하지 않습니다.
+   * 없는 것을 매번 불러 404 를 쌓으면 콘솔이 오염되고, 목록을 스크롤할 때마다
+   * 헛된 요청이 나갑니다.
+   */
+  const imagesReady = useAuth((s) => Boolean(s.health?.productImagesReady))
   const [failed, setFailed] = useState(() => missing.has(product.sku))
 
   useEffect(() => setFailed(missing.has(product.sku)), [product.sku])
-  useEffect(() => onPhotoResolved?.(photo && !failed), [photo, failed, onPhotoResolved])
+  useEffect(() => onPhotoResolved?.(photo && imagesReady && !failed), [photo, imagesReady, failed, onPhotoResolved])
 
-  if (photo && !failed) {
+  if (photo && imagesReady && !failed) {
     return (
       <img
         src={`/api/product-image/${encodeURIComponent(product.sku)}`}
