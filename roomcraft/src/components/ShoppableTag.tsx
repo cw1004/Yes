@@ -1,0 +1,157 @@
+import { useMemo } from 'react'
+import { useStudio } from '../store/useStudio'
+import { productBySku } from '../data/catalog'
+import { MALLS, buildDeeplink } from '../lib/affiliate'
+import { channelPicks } from '../lib/revenue'
+import { defaultQtyFor, spaceById } from '../data/spaces'
+import { copyToClipboard } from '../lib/exporters'
+import { usdFine, unitPrice } from '../lib/format'
+import type { Hotspot } from '../types'
+import { ProductThumb } from './ProductThumb'
+
+/**
+ * 이미지 위 태그를 눌렀을 때 뜨는 상품 카드.
+ *
+ * 이 카드가 제휴 수익이 실제로 발생하는 지점입니다. 무드보드에 담기 전에도
+ * 바로 구매 링크로 넘어갈 수 있어야 하므로, 활성 채널 링크를 여기서 바로 노출합니다.
+ */
+export function ShoppableCard({
+  hotspot,
+  onClose,
+}: {
+  hotspot: Hotspot
+  onClose: () => void
+}) {
+  const { affiliateIds, enabledMalls, addToMoodboard, removeHotspot, moodboard, showToast, spaceId } = useStudio()
+  const product = productBySku(hotspot.sku)
+
+  /*
+   * 채널을 몰 정의 순서대로 늘어놓으면 맨 위(대개 쿠팡, 수수료 1~3%로 최저)를
+   * 누르게 됩니다. 같은 클릭인데 채널만 바꿔도 정산액이 몇 배 달라지므로
+   * 이 제품에서 기대 정산액이 큰 순서로 정렬하고 1위를 표시합니다.
+   */
+  const links = useMemo(() => {
+    if (!product) return []
+    const ids = enabledMalls.length ? enabledMalls : MALLS.slice(0, 4).map((m) => m.id)
+    const qty = defaultQtyFor(product, spaceById(spaceId))
+    return channelPicks(product, ids, affiliateIds, { qtyBySku: { [product.sku]: qty } }).map((pick) => ({
+      ...pick,
+      url: buildDeeplink(pick.mall.id, product.searchTerm, affiliateIds),
+    }))
+  }, [product, enabledMalls, affiliateIds, spaceId])
+
+  if (!product) return null
+
+  const inBoard = moodboard.some((m) => m.sku === product.sku)
+
+  // 오른쪽/아래 가장자리에서는 카드를 반대편으로 붙여 화면 밖으로 나가지 않게 합니다.
+  const flipX = hotspot.x > 0.58
+  const flipY = hotspot.y > 0.55
+
+  return (
+    <div
+      onPointerDown={(e) => e.stopPropagation()}
+      onClick={(e) => e.stopPropagation()}
+      style={{
+        left: `${hotspot.x * 100}%`,
+        top: `${hotspot.y * 100}%`,
+        transform: `translate(${flipX ? 'calc(-100% - 22px)' : '22px'}, ${flipY ? 'calc(-100% + 14px)' : '-14px'})`,
+      }}
+      className="rc-fade-up absolute z-30 w-[290px] overflow-hidden rounded-xl border border-line bg-ink-900/97 shadow-2xl backdrop-blur"
+    >
+      <div className="flex items-start gap-2.5 border-b border-line-soft p-3">
+        <ProductThumb product={product} className="mt-0.5 h-11 w-11" />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-bold leading-snug text-mist-200">{product.name}</p>
+          <p className="mt-0.5 text-xs">
+            <span className="font-bold text-amber-brand">{unitPrice(product.price, product.unit)}</span>
+            <span className="text-mist-500"> · {product.brand}</span>
+          </p>
+        </div>
+        <button
+          onClick={onClose}
+          aria-label="닫기"
+          className="grid h-5 w-5 shrink-0 place-items-center rounded text-xs text-mist-500 hover:bg-ink-800 hover:text-mist-200"
+        >
+          ✕
+        </button>
+      </div>
+
+      <div className="max-h-[168px] overflow-y-auto p-2">
+        <p className="px-1 pb-1.5 text-xs font-semibold text-mist-400">
+          구매 링크 · 기대 정산액 순 ({links.length}개 채널)
+        </p>
+        <div className="space-y-1">
+          {links.map(({ mall, url, linked, perClick, rate }, i) => (
+            <div key={mall.id} className="flex items-center gap-1">
+              <a
+                href={url}
+                target="_blank"
+                rel="noreferrer noopener sponsored"
+                className={`flex flex-1 items-center justify-between gap-2 rounded-md border px-2 py-1.5 text-xs transition ${
+                  i === 0
+                    ? 'border-emerald-brand bg-emerald-brand/10 text-emerald-brand hover:bg-emerald-brand/20'
+                    : 'border-line-soft bg-ink-850 text-mist-300 hover:border-amber-brand hover:text-amber-brand'
+                }`}
+              >
+                <span className="truncate">
+                  {i === 0 ? '★ ' : ''}
+                  {mall.icon} {mall.label}
+                </span>
+                <span className="shrink-0 tabular-nums" title={`수수료 ${(rate * 100).toFixed(1)}% · 클릭당 기대 정산액(가정)`}>
+                  {usdFine(perClick)}/클릭 {linked ? '✓' : '✗'}
+                </span>
+              </a>
+              <button
+                onClick={async () => {
+                  const ok = await copyToClipboard(url)
+                  showToast(ok ? `${mall.label} 링크를 복사했습니다.` : '복사에 실패했습니다.')
+                }}
+                title="링크 복사"
+                className="grid h-7 w-7 shrink-0 place-items-center rounded-md border border-line-soft text-xs text-mist-400 hover:text-amber-brand"
+              >
+                ⧉
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <p className="border-t border-line-soft px-3 py-1.5 text-xs leading-relaxed text-mist-500">
+        이미지는 AI 시안입니다. 이 제품은 스타일에 맞춰 고른 추천 상품으로, 이미지 속 가구와 동일한 제품이 아닐 수 있습니다.
+      </p>
+
+      <div className="flex gap-1.5 border-t border-line-soft p-2">
+        <button
+          onClick={() => addToMoodboard(product.sku)}
+          className={`flex-1 rounded-md px-2.5 py-2 text-xs font-semibold transition ${
+            inBoard
+              ? 'border border-line text-mist-400 hover:text-mist-200'
+              : 'border border-emerald-brand/40 bg-emerald-brand/10 text-emerald-brand hover:bg-emerald-brand/20'
+          }`}
+        >
+          {inBoard ? '＋ 수량 추가' : '✓ 무드보드에 담기'}
+        </button>
+        <a
+          href={product.officialUrl}
+          target="_blank"
+          rel="noreferrer noopener"
+          title="브랜드 공식몰"
+          className="grid h-7 w-7 place-items-center rounded-md border border-line text-xs text-mist-400 hover:text-amber-brand"
+        >
+          ↗
+        </a>
+        <button
+          onClick={() => {
+            removeHotspot(hotspot.id)
+            onClose()
+          }}
+          title="이미지에서 태그 제거"
+          className="grid h-7 w-7 place-items-center rounded-md border border-line text-xs text-mist-400 hover:border-red-500/50 hover:text-red-400"
+        >
+          🗑
+        </button>
+      </div>
+    </div>
+  )
+}

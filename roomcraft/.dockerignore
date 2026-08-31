@@ -1,0 +1,11 @@
+node_modules
+dist
+data
+.env
+.env.local
+.git
+*.log
+*.tsbuildinfo
+# 테스트 스크립트는 이미지에 넣지 않습니다.
+*.mjs
+!server/*.mjs

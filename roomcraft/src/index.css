@@ -1,0 +1,221 @@
+@import 'tailwindcss';
+
+@theme {
+  /*
+   * 표면 램프 — 어두운 쪽이 950, 밝은 쪽이 500.
+   * 라이트 테마에서는 이 램프가 통째로 뒤집힙니다(아래 [data-theme='light']).
+   * Tailwind v4 유틸리티는 값을 인라인하지 않고 var(--color-*) 를 그대로 참조하므로,
+   * 변수만 바꾸면 컴포넌트를 한 줄도 고치지 않고 테마가 바뀝니다.
+   */
+  --color-ink-950: #050508;
+  --color-ink-900: #111116;
+  --color-ink-850: #17171d;
+  --color-ink-800: #1e1e25;
+  --color-ink-700: #2a2a33;
+  --color-ink-600: #3a3a44;
+  --color-ink-500: #55555f;
+
+  /*
+   * 선 색은 표면 램프에서 떼어냈습니다.
+   * ink-700 하나로 카드 배경(bg-ink-700)과 버튼 테두리(border-ink-700)를 겸하고 있었는데,
+   * 테두리가 보이도록 값을 올리면 그 위에 얹힌 글자 대비가 같이 무너집니다.
+   *   line-soft  패널 구분선  — 장식이라 3:1 을 요구하지 않습니다
+   *   line       컨트롤 테두리 — 버튼/칩의 경계이므로 WCAG 비텍스트 3:1
+   *   line-strong 호버 강조
+   */
+  --color-line-soft: #34343e;
+  --color-line: #6a6a75;
+  --color-line-strong: #8b8b96;
+
+  /*
+   * mist-500 은 원래 정의 없이 76곳에서 쓰이고 있었습니다(클래스가 생성되지 않아
+   * 부모 색을 물려받던 상태). 배경 위에서 WCAG AA(4.5:1)를 통과하는 값으로 고정합니다.
+   */
+  --color-mist-500: #8a8a93;
+  --color-mist-400: #8b8b96;
+  --color-mist-300: #b6b6be;
+  --color-mist-200: #d8d8dd;
+
+  --color-amber-brand: #f0a437;
+  --color-amber-deep: #b9791f;
+  --color-emerald-brand: #22c58a;
+  --color-emerald-deep: #128a5d;
+
+  /*
+   * 브랜드 면 위에 얹는 글자색. 다크에서는 밝은 앰버 위의 검정,
+   * 라이트에서는 짙은 앰버 위의 흰색이 됩니다 — 두 테마에서 방향이 반대라
+   * ink-950 을 재활용하지 않고 따로 둡니다.
+   */
+  --color-on-brand: #050508;
+
+  --font-sans: 'Pretendard', 'Apple SD Gothic Neo', 'Noto Sans KR', system-ui, -apple-system, sans-serif;
+}
+
+/*
+ * 라이트 테마 — 표면과 글자 램프를 뒤집습니다.
+ * 950 이 가장 어두운 색에서 가장 밝은 배경이 되고, mist-200 이 가장 밝은 글자에서
+ * 가장 진한 글자가 됩니다. 램프의 '방향'만 뒤집으므로 각 유틸리티의 의미(배경/본문/흐린 글자)는
+ * 그대로 유지됩니다.
+ *
+ * 강조색은 뒤집는 것이 아니라 어둡게 내립니다. #f0a437 은 흰 배경 위에서 1.9:1 로
+ * 글자로 쓸 수 없기 때문입니다. 실제 대비는 scripts/contrast.mjs 로 검증합니다.
+ */
+:root[data-theme='light'] {
+  --color-ink-950: #edebe6;
+  --color-ink-900: #ffffff;
+  --color-ink-850: #f8f7f4;
+  --color-ink-800: #eceae5;
+  --color-ink-700: #ddd9d1;
+  --color-ink-600: #c9c4b9;
+  --color-ink-500: #a8a29a;
+
+  --color-line-soft: #dcd8d0;
+  --color-line: #948f86;
+  --color-line-strong: #6e6960;
+
+  --color-mist-500: #5f5f6a;
+  --color-mist-400: #4d4d58;
+  --color-mist-300: #33333c;
+  --color-mist-200: #14141a;
+
+  --color-amber-brand: #925d11;
+  --color-amber-deep: #6d460d;
+  --color-emerald-brand: #1a7c59;
+  --color-emerald-deep: #135a41;
+
+  --color-on-brand: #ffffff;
+
+  color-scheme: light;
+}
+
+
+/*
+ * 글자 크기 기준점.
+ *
+ * Tailwind 의 text-xs/sm/base 는 rem 기반이라, 루트 폰트 크기를 바꾸면
+ * 앱 전체 글자가 함께 커집니다. 사용자가 헤더에서 조절합니다.
+ */
+html {
+  font-size: var(--rc-root-size, 16px);
+
+  /*
+   * 헤더가 sticky 라, 요소로 스크롤하면 그 요소가 헤더 아래에 깔립니다.
+   * (앵커 이동, 포커스 이동, scrollIntoView 모두 해당)
+   * 헤더 높이만큼 여백을 두어 스크롤 대상이 항상 헤더 아래에 놓이게 합니다.
+   */
+  scroll-padding-top: 7rem;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background: var(--color-ink-950);
+  color: var(--color-mist-200);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 얇은 스크롤바 — 다크 패널 안에서 시각적 잡음을 줄입니다 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-ink-600) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--color-ink-600);
+  border-radius: 999px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/*
+ * 키보드 사용자를 위한 포커스 표시.
+ * 입력 요소에 outline-none 을 걸어 두었기 때문에, 대체 표시가 없으면
+ * 키보드만으로는 지금 어디에 있는지 알 수 없습니다.
+ */
+:focus-visible {
+  outline: 2px solid var(--color-amber-brand);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* 움직임에 민감한 사용자를 위해 애니메이션을 줄입니다. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@keyframes rc-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.rc-fade-up {
+  animation: rc-fade-up 0.28s ease-out both;
+}
+
+@keyframes rc-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+.rc-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--color-ink-800) 25%,
+    var(--color-ink-700) 50%,
+    var(--color-ink-800) 75%
+  );
+  background-size: 200% 100%;
+  animation: rc-shimmer 1.4s linear infinite;
+}
+
+input[type='range'].rc-range {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--color-amber-deep), var(--color-amber-brand));
+  outline: none;
+}
+input[type='range'].rc-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: var(--color-amber-brand);
+  border: 3px solid var(--color-ink-900);
+  box-shadow: 0 0 0 1px var(--color-amber-brand);
+  cursor: pointer;
+}
+input[type='range'].rc-range::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: var(--color-amber-brand);
+  border: 3px solid var(--color-ink-900);
+  cursor: pointer;
+}
