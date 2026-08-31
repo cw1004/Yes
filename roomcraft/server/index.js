@@ -30,6 +30,8 @@ const { paymentsRouter, stripeWebhook, paymentProvider } = await import('./payme
 const { aiRouter, aiReady, aiModels } = await import('./ai.js')
 const { syncRouter } = await import('./sync.js')
 const { linksRouter, redirectHandler } = await import('./links.js')
+const { sourcingRouter, sourcingReady, sourcingModel } = await import('./sourcing.js')
+const { productImagesRouter, productImagesReady } = await import('./productImages.js')
 const { listLedger } = await import('./credits.js')
 const { LIMITS, globalLimiter, TRUST_PROXY_HOPS } = await import('./limits.js')
 const { mailerReady } = await import('./mailer.js')
@@ -82,6 +84,8 @@ app.get('/api/health', (req, res) => {
     ok: true,
     schemaVersion,
     renderReady: aiReady.render,
+    sourcingReady,
+    productImagesReady,
     chatReady: aiReady.chat,
     renderModel: aiModels.render,
     chatModel: aiModels.chat,
@@ -96,6 +100,8 @@ app.use('/api/auth', authRouter)
 app.use('/api/payments', paymentsRouter)
 app.use('/api/sync', syncRouter)
 app.use('/api/links', linksRouter)
+app.use('/api/sourcing', sourcingRouter)
+app.use('/api/product-image', productImagesRouter)
 
 // 공개 리디렉트. 독자가 누르는 링크이므로 인증이 없고, 짧은 경로를 씁니다.
 app.get('/r/:id', redirectHandler)
@@ -119,6 +125,8 @@ app.listen(PORT, () => {
   console.log(`  DB 스키마    : v${schemaVersion}`)
   console.log(`  렌더(${aiModels.render}): ${aiReady.render ? '준비됨' : '키 없음 — 클라이언트가 목 모드'}`)
   console.log(`  챗(${aiModels.chat})   : ${aiReady.chat ? '준비됨' : '키 없음 — 클라이언트가 목 모드'}`)
+  console.log(`  제품 소싱(${sourcingModel}): ${sourcingReady ? '준비됨 (웹 검색)' : '키 없음 — 내장 카탈로그만'}`)
+  console.log(`  제품 이미지  : ${productImagesReady ? '준비됨 (생성)' : '키 없음 — 벡터 실루엣만'}`)
   console.log(`  결제         : ${paymentProvider}${paymentProvider === 'dev' ? ' (시뮬레이터)' : ''}`)
   console.log(`  메일         : ${mailerReady ? 'SMTP 설정됨' : '미설정 — 인증 링크를 콘솔에 출력합니다'}`)
   console.log(`  trust proxy  : ${TRUST_PROXY_HOPS} 홉`)

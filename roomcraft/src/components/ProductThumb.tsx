@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import type { Product, Silhouette } from '../types'
 
 /**
@@ -189,15 +190,54 @@ function shapes(kind: Silhouette, a: string, b: string) {
   }
 }
 
+/**
+ * 서버에 보관된 생성 이미지가 있으면 그것을, 없으면 벡터 실루엣을 씁니다.
+ *
+ * 없는 이미지를 매번 조회하면 목록을 스크롤할 때마다 404 가 쏟아지므로
+ * 실패한 sku 를 모듈 수준에 기억해 두고 다시 시도하지 않습니다.
+ */
+const missing = new Set<string>()
+
 export function ProductThumb({
   product,
   className = '',
+  /** 생성 이미지를 쓸지. 작은 아이콘 자리에서는 실루엣이 더 잘 읽힙니다. */
+  photo = false,
+  /**
+   * 실제로 생성 사진을 그렸는지 알려줍니다.
+   * 부모가 "AI 이미지" 라벨을 붙일지 정해야 하는데, 폴백된 벡터 실루엣에까지
+   * 그 라벨을 붙이면 사실과 다릅니다.
+   */
+  onPhotoResolved,
 }: {
   product: Product
   className?: string
+  photo?: boolean
+  onPhotoResolved?: (usingPhoto: boolean) => void
 }) {
   const a = product.swatch
   const b = product.swatch2 ?? darken(product.swatch)
+  const [failed, setFailed] = useState(() => missing.has(product.sku))
+
+  useEffect(() => setFailed(missing.has(product.sku)), [product.sku])
+  useEffect(() => onPhotoResolved?.(photo && !failed), [photo, failed, onPhotoResolved])
+
+  if (photo && !failed) {
+    return (
+      <img
+        src={`/api/product-image/${encodeURIComponent(product.sku)}`}
+        alt={product.name}
+        loading="lazy"
+        onError={() => {
+          missing.add(product.sku)
+          setFailed(true)
+        }}
+        onLoad={() => onPhotoResolved?.(true)}
+        className={`shrink-0 rounded-md bg-ink-800 object-cover ${className}`}
+      />
+    )
+  }
+
   return (
     <svg
       viewBox="0 0 24 24"

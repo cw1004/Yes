@@ -28,6 +28,8 @@ export const LIMITS = {
   globalPer15Min: envInt('RATE_LIMIT_GLOBAL_PER_15MIN', 600),
   signupPerHour: envInt('RATE_LIMIT_SIGNUP_PER_HOUR', 5),
   guestPerHour: envInt('RATE_LIMIT_GUEST_PER_HOUR', 8),
+  sourcingPerHour: envInt('RATE_LIMIT_SOURCING_PER_HOUR', 20),
+  imagePerHour: envInt('RATE_LIMIT_IMAGE_PER_HOUR', 30),
   loginPer15Min: envInt('RATE_LIMIT_LOGIN_PER_15MIN', 10),
   verifyMailPerHour: envInt('RATE_LIMIT_VERIFY_MAIL_PER_HOUR', 3),
   passwordResetPerHour: envInt('RATE_LIMIT_PASSWORD_RESET_PER_HOUR', 5),
@@ -80,6 +82,28 @@ export const globalLimiter = rateLimit({
  * 요청하면 새 게스트가 생기므로, 그 재발급 자체를 IP 단위로 막지 않으면 한도가
  * 아무 의미가 없어집니다(렌더 API 실비가 직접 새는 지점입니다).
  */
+/**
+ * 소싱·이미지 생성 상한.
+ *
+ * 둘 다 크레딧으로도 막히지만, 크레딧이 넉넉한 계정 하나가 웹 검색과 이미지 생성을
+ * 몰아치면 외부 API 요금이 그대로 나갑니다. 사용자 단위 상한을 함께 둡니다.
+ */
+export const sourcingLimiter = rateLimit({
+  ...base,
+  windowMs: HOUR,
+  limit: LIMITS.sourcingPerHour,
+  keyGenerator: byUserOrIp,
+  message: message('제품 소싱 요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.'),
+})
+
+export const imageLimiter = rateLimit({
+  ...base,
+  windowMs: HOUR,
+  limit: LIMITS.imagePerHour,
+  keyGenerator: byUserOrIp,
+  message: message('이미지 생성 요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.'),
+})
+
 export const guestLimiter = rateLimit({
   ...base,
   windowMs: HOUR,

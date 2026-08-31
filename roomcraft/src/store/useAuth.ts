@@ -1,3 +1,4 @@
+import type { HealthInfo } from '../lib/api'
 import { create } from 'zustand'
 import { ApiError, api, type ServerUser } from '../lib/api'
 
@@ -10,6 +11,8 @@ import { ApiError, api, type ServerUser } from '../lib/api'
 interface AuthState {
   user: ServerUser | null
   serverAvailable: boolean
+  /** health 응답 전체 — 어떤 AI 기능이 살아 있는지 UI 가 알아야 합니다. */
+  health: HealthInfo | null
   paymentProvider: 'stripe' | 'dev' | null
   loading: boolean
   error: string | null
@@ -46,6 +49,7 @@ interface AuthState {
 export const useAuth = create<AuthState>()((set, get) => ({
   user: null,
   serverAvailable: false,
+  health: null,
   paymentProvider: null,
   loading: false,
   error: null,
@@ -58,12 +62,12 @@ export const useAuth = create<AuthState>()((set, get) => ({
   init: async () => {
     try {
       const health = await api.health()
-      set({ serverAvailable: health.ok, paymentProvider: health.paymentProvider })
+      set({ serverAvailable: health.ok, paymentProvider: health.paymentProvider, health })
       const { user } = await api.me()
       set({ user })
     } catch {
       // 서버가 없으면 로컬 데모 모드로 계속 동작합니다.
-      set({ serverAvailable: false, user: null })
+      set({ serverAvailable: false, user: null, health: null })
     }
   },
 

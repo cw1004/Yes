@@ -5,6 +5,8 @@
  * 서버가 없을 수도 있으므로(목 모드), 모든 호출은 ApiError 를 던지고
  * 호출부가 폴백을 결정합니다.
  */
+import type { Product } from '../types'
+
 export class ApiError extends Error {
   status: number
   code?: string
@@ -56,12 +58,39 @@ export interface HealthInfo {
   ok: boolean
   renderReady: boolean
   chatReady: boolean
+  /** 웹 검색 기반 실시간 제품 소싱 가능 여부 */
+  sourcingReady: boolean
+  /** 제품 이미지 생성 가능 여부 */
+  productImagesReady: boolean
   paymentProvider: 'stripe' | 'dev'
   authenticated: boolean
 }
 
+/** 서버가 찾아온 제품. 내장 카탈로그와 같은 모양이되 sourced 로 구분합니다. */
+export interface SourcedProduct extends Product {
+  sourced: true
+  region: string
+}
+
 export const api = {
   health: () => request<HealthInfo>('/health'),
+
+  /** AI 실시간 제품 소싱. 같은 조건은 서버가 캐시하므로 재과금되지 않습니다. */
+  source: (body: { style: string; space: string; region?: string; budgetUsd?: number; count?: number }) =>
+    post<{
+      products: SourcedProduct[]
+      provider: string
+      sourcedAt: number
+      cached: boolean
+      credits: number
+    }>('/sourcing', body),
+
+  /** 아직 이미지가 없는 제품의 상품 컷을 생성합니다. */
+  generateImages: (items: { sku: string; name: string; materials: string }[]) =>
+    post<{ generated: string[]; failed?: { sku: string; error: string }[]; credits: number }>(
+      '/product-image',
+      { items },
+    ),
 
   signup: (email: string, password: string, displayName?: string) =>
     post<{ user: ServerUser; verificationSent: boolean; devVerifyUrl?: string }>('/auth/signup', {

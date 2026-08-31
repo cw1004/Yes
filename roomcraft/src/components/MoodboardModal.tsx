@@ -9,6 +9,7 @@ import { Modal } from './ui/Modal'
 import { Badge, Button, inputClass } from './ui/primitives'
 import type { ProductCategory } from '../types'
 import { ProductThumb } from './ProductThumb'
+import { SourcingPanel } from './SourcingPanel'
 
 const CATEGORIES: (ProductCategory | 'All')[] = [
   'All',
@@ -86,6 +87,10 @@ export function MoodboardModal() {
     >
       <div className="grid max-h-[74vh] gap-0 overflow-hidden bg-ink-900 lg:grid-cols-[1.5fr_1fr]">
         <div className="flex min-h-0 flex-col border-r border-line-soft">
+          {/* 내장 카탈로그로 덮이지 않는 조합은 웹에서 지금 찾아옵니다. */}
+          <div className="border-b border-line-soft p-3">
+            <SourcingPanel />
+          </div>
           <div className="flex flex-wrap items-center gap-2 border-b border-line-soft p-3">
             <input
               className={`${inputClass} flex-1 min-w-[180px]`}

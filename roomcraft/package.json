@@ -19,7 +19,8 @@
     "check:contrast": "node scripts/contrast.mjs",
     "sim": "API_BASE=${API_BASE:-http://localhost:8787/api} node scripts/simulate.mjs",
     "shots": "BASE_URL=${BASE_URL:-http://localhost:5173} node scripts/screenshots.mjs",
-    "demo": "npm run build && node scripts/bundle-standalone.mjs"
+    "demo": "npm run build && node scripts/bundle-standalone.mjs",
+    "test:sourcing": "API_BASE=${API_BASE:-http://localhost:8787/api} node e2e-sourcing.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.120.0",

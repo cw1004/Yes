@@ -151,6 +151,33 @@ const MIGRATIONS = [
   ALTER TABLE users ADD COLUMN is_guest INTEGER NOT NULL DEFAULT 0;
   CREATE INDEX idx_users_guest ON users(is_guest, created_at);
   `,
+
+  // v5 — AI 제품 소싱 캐시와 생성 이미지 저장소.
+  //
+  // 두 호출 모두 느리고 돈이 듭니다(웹 검색 + 이미지 생성). 같은 조건이면 결과가
+  // 크게 달라지지 않으므로 캐시가 없으면 사용자가 탭을 옮길 때마다 과금됩니다.
+  `
+  CREATE TABLE sourced_products (
+    query_key  TEXT PRIMARY KEY,   -- 스타일·공간·예산·지역을 합친 키
+    payload    TEXT NOT NULL,      -- 정규화된 제품 배열 (JSON)
+    provider   TEXT NOT NULL,      -- 'claude-web-search' | 'stub'
+    created_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL
+  );
+  CREATE INDEX idx_sourced_expires ON sourced_products(expires_at);
+
+  -- 생성 이미지. 소매점 사진을 핫링크할 수 없어서 직접 만들어 보관합니다.
+  -- is_generated 를 남기는 이유: 실제 판매 상품의 사진이 아니라는 사실을
+  -- 화면에서 반드시 표시해야 합니다(그러지 않으면 오인 광고가 됩니다).
+  CREATE TABLE product_images (
+    sku          TEXT PRIMARY KEY,
+    image        BLOB NOT NULL,
+    mime         TEXT NOT NULL DEFAULT 'image/jpeg',
+    provider     TEXT NOT NULL,
+    is_generated INTEGER NOT NULL DEFAULT 1,
+    created_at   INTEGER NOT NULL
+  );
+  `,
 ]
 
 function migrate() {
