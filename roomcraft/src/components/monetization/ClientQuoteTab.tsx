@@ -41,7 +41,7 @@ export function ClientQuoteTab() {
         <Stat label="디자이너 순이익" value={usd(q.netProfit)} sub="가구 마진 + 디자인 피" tone="emerald" />
       </div>
 
-      <section className="rounded-xl border border-ink-700 bg-ink-850 p-4">
+      <section className="rounded-xl border border-line-soft bg-ink-850 p-4">
         <SectionTitle icon="📄" title="견적 조건" desc="고객 정보와 마진 정책을 설정하면 아래 견적서가 즉시 갱신됩니다." />
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           <Field label="고객명">
@@ -99,7 +99,7 @@ export function ClientQuoteTab() {
         </Field>
       </section>
 
-      <section className="rounded-xl border border-ink-700 bg-ink-850 p-4">
+      <section className="rounded-xl border border-line-soft bg-ink-850 p-4">
         <SectionTitle
           icon="🧾"
           title="납품 견적서 미리보기"
@@ -132,7 +132,7 @@ export function ClientQuoteTab() {
         />
 
         {rows.length ? (
-          <div className="mt-4 overflow-x-auto rounded-lg border border-ink-700">
+          <div className="mt-4 overflow-x-auto rounded-lg border border-line-soft">
             <table className="w-full min-w-[560px] text-left text-xs">
               <thead className="bg-ink-900 text-mist-400">
                 <tr>
@@ -145,7 +145,7 @@ export function ClientQuoteTab() {
               </thead>
               <tbody>
                 {q.lines.map((l) => (
-                  <tr key={l.product.sku} className="border-t border-ink-700">
+                  <tr key={l.product.sku} className="border-t border-line-soft">
                     <td className="max-w-[260px] truncate px-3 py-2 text-mist-200">{l.product.name}</td>
                     <td className="px-3 py-2 text-mist-400">{l.qty}</td>
                     <td className="px-3 py-2 text-mist-500">{usd(l.unitCost)}</td>
@@ -155,7 +155,7 @@ export function ClientQuoteTab() {
                 ))}
               </tbody>
               <tfoot className="bg-ink-900">
-                <tr className="border-t border-ink-700">
+                <tr className="border-t border-line-soft">
                   <td colSpan={4} className="px-3 py-2 text-right text-mist-400">
                     가구 소계
                   </td>
@@ -173,7 +173,7 @@ export function ClientQuoteTab() {
                   </td>
                   <td className="px-3 py-2 text-right text-mist-200">{usd(q.vat)}</td>
                 </tr>
-                <tr className="border-t border-ink-700">
+                <tr className="border-t border-line-soft">
                   <td colSpan={4} className="px-3 py-2.5 text-right font-bold text-mist-200">
                     합계
                   </td>
@@ -185,7 +185,7 @@ export function ClientQuoteTab() {
             </table>
           </div>
         ) : (
-          <p className="mt-4 rounded-lg border border-dashed border-ink-600 p-4 text-center text-xs text-mist-500">
+          <p className="mt-4 rounded-lg border border-dashed border-line p-4 text-center text-xs text-mist-500">
             무드보드에 가구를 담으면 견적서가 자동으로 작성됩니다.
           </p>
         )}

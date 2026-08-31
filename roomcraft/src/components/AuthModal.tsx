@@ -90,7 +90,7 @@ export function AuthModal({ open, onClose }: { open: boolean; onClose: () => voi
     >
       <div className="space-y-4 bg-ink-900 p-5">
         {mode === 'login' || mode === 'signup' ? (
-          <div className="flex rounded-lg border border-ink-700 p-1">
+          <div className="flex rounded-lg border border-line-soft p-1">
             {(['login', 'signup'] as const).map((m) => (
               <button
                 key={m}
@@ -217,7 +217,7 @@ export function DevPaymentModal() {
       width="max-w-sm"
     >
       <div className="space-y-4 bg-ink-900 p-5">
-        <div className="rounded-xl border border-ink-700 bg-ink-850 p-4 text-center">
+        <div className="rounded-xl border border-line-soft bg-ink-850 p-4 text-center">
           <p className="text-sm font-semibold text-mist-200">{pendingPayment?.name}</p>
           <p className="mt-1 text-2xl font-extrabold text-amber-brand">
             ${((pendingPayment?.amountCents ?? 0) / 100).toFixed(2)}

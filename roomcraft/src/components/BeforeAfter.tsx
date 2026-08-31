@@ -52,7 +52,7 @@ export function BeforeAfter({
     <div>
       <div
         ref={frameRef}
-        className="relative select-none overflow-hidden rounded-xl border border-ink-700 bg-ink-900"
+        className="relative select-none overflow-hidden rounded-xl border border-line-soft bg-ink-900"
         onPointerDown={(e) => {
           setOpenTag(null)
           e.currentTarget.setPointerCapture(e.pointerId)
@@ -74,7 +74,7 @@ export function BeforeAfter({
         <span className="pointer-events-none absolute left-3 top-3 rounded-md bg-black/65 px-2.5 py-1 text-xs font-semibold text-mist-200">
           Before (Original)
         </span>
-        <span className="pointer-events-none absolute right-3 top-3 rounded-md bg-amber-brand/90 px-2.5 py-1 text-xs font-bold text-ink-950">
+        <span className="pointer-events-none absolute right-3 top-3 rounded-md bg-amber-brand/90 px-2.5 py-1 text-xs font-bold text-on-brand">
           ✦ After ({styleName})
         </span>
 
@@ -126,7 +126,7 @@ export function BeforeAfter({
         </div>
       </div>
 
-      <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-ink-700 bg-ink-850 px-3 py-2">
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line-soft bg-ink-850 px-3 py-2">
         <p className="text-xs text-mist-400">
           <span className="text-amber-brand">ⓘ</span> Active Style:{' '}
           <span className="font-semibold text-mist-200">{styleName}</span>
@@ -207,7 +207,7 @@ function Tag({
         pointerEvents: visible ? 'auto' : 'none',
       }}
       className={`absolute z-10 flex -translate-x-1/2 -translate-y-1/2 touch-none items-center gap-1.5 rounded-full py-1 pl-1 pr-2.5 shadow-lg transition-[background,transform] ${
-        active ? 'bg-amber-brand text-ink-950' : 'bg-ink-950/85 text-mist-200 hover:bg-amber-brand hover:text-ink-950'
+        active ? 'bg-amber-brand text-on-brand' : 'bg-ink-950/85 text-mist-200 hover:bg-amber-brand hover:text-on-brand'
       } ${dragging ? 'scale-110 cursor-grabbing' : 'cursor-grab'}`}
     >
       <span

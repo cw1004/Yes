@@ -38,11 +38,11 @@ export function Modal({
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/75 p-4 backdrop-blur-sm sm:p-8">
       <div
-        className={`rc-fade-up my-auto w-full ${width} overflow-hidden rounded-2xl border border-ink-700 bg-ink-900 shadow-2xl`}
+        className={`rc-fade-up my-auto w-full ${width} overflow-hidden rounded-2xl border border-line-soft bg-ink-900 shadow-2xl`}
         role="dialog"
         aria-modal="true"
       >
-        <header className="flex items-start justify-between gap-4 border-b border-ink-700 bg-ink-850 px-5 py-4">
+        <header className="flex items-start justify-between gap-4 border-b border-line-soft bg-ink-850 px-5 py-4">
           <div className="flex items-start gap-3">
             {icon ? (
               <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-emerald-brand/15 text-lg">
@@ -81,7 +81,7 @@ export function Tabs<T extends string>({
   onChange: (id: T) => void
 }) {
   return (
-    <div className="flex gap-1 overflow-x-auto border-b border-ink-700 bg-ink-900 px-3">
+    <div className="flex gap-1 overflow-x-auto border-b border-line-soft bg-ink-900 px-3">
       {tabs.map((t) => {
         const on = t.id === active
         return (

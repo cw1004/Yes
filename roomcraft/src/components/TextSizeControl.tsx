@@ -56,7 +56,7 @@ export function TextSizeControl() {
       role="group"
       aria-label="글자 크기"
       title="글자 크기 조절"
-      className="flex items-center gap-0.5 rounded-xl border border-ink-700 bg-ink-850 p-1"
+      className="flex items-center gap-0.5 rounded-xl border border-line-soft bg-ink-850 p-1"
     >
       <span aria-hidden className="px-1.5 text-xs text-mist-400">
         가
@@ -69,7 +69,7 @@ export function TextSizeControl() {
           aria-label={`글자 ${s.label}`}
           className={`min-h-[32px] rounded-lg px-2.5 text-xs font-bold transition ${
             step === s.id
-              ? 'bg-amber-brand text-ink-950'
+              ? 'bg-amber-brand text-on-brand'
               : 'text-mist-300 hover:bg-ink-800 hover:text-mist-200'
           }`}
           style={{ fontSize: `${12 + STEPS.indexOf(s) * 2}px` }}

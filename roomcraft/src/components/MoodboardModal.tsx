@@ -84,8 +84,8 @@ export function MoodboardModal() {
       width="max-w-6xl"
     >
       <div className="grid max-h-[74vh] gap-0 overflow-hidden bg-ink-900 lg:grid-cols-[1.5fr_1fr]">
-        <div className="flex min-h-0 flex-col border-r border-ink-700">
-          <div className="flex flex-wrap items-center gap-2 border-b border-ink-700 p-3">
+        <div className="flex min-h-0 flex-col border-r border-line-soft">
+          <div className="flex flex-wrap items-center gap-2 border-b border-line-soft p-3">
             <input
               className={`${inputClass} flex-1 min-w-[180px]`}
               value={q}
@@ -95,7 +95,7 @@ export function MoodboardModal() {
             <select
               value={cat}
               onChange={(e) => setCat(e.target.value as (typeof CATEGORIES)[number])}
-              className="rounded-lg border border-ink-700 bg-ink-900 px-2 py-2 text-xs text-mist-200 outline-none"
+              className="rounded-lg border border-line-soft bg-ink-900 px-2 py-2 text-xs text-mist-200 outline-none"
             >
               {CATEGORIES.map((c) => (
                 <option key={c} value={c}>
@@ -110,7 +110,7 @@ export function MoodboardModal() {
               const inBoard = rows.some((r) => r.product.sku === p.sku)
               const recommended = style.curatedSkus.includes(p.sku)
               return (
-                <div key={p.sku} className="rounded-lg border border-ink-700 bg-ink-850 p-3">
+                <div key={p.sku} className="rounded-lg border border-line-soft bg-ink-850 p-3">
                   <div className="flex items-start gap-2.5">
                     <span className="h-12 w-12 shrink-0 rounded-md" style={{ background: p.swatch }} />
                     <div className="min-w-0 flex-1">
@@ -131,7 +131,7 @@ export function MoodboardModal() {
                           href={p.officialUrl}
                           target="_blank"
                           rel="noreferrer noopener"
-                          className="grid h-7 w-7 place-items-center rounded-md border border-ink-700 text-xs text-mist-400 hover:text-amber-brand"
+                          className="grid h-7 w-7 place-items-center rounded-md border border-line-soft text-xs text-mist-400 hover:text-amber-brand"
                         >
                           ↗
                         </a>
@@ -148,7 +148,7 @@ export function MoodboardModal() {
         </div>
 
         <div className="flex min-h-0 flex-col">
-          <div className="flex items-center justify-between border-b border-ink-700 px-3 py-2.5">
+          <div className="flex items-center justify-between border-b border-line-soft px-3 py-2.5">
             <p className="text-xs font-bold text-mist-200">내 무드보드 ({count})</p>
             <Button size="sm" variant="ghost" disabled={!rows.length} onClick={clearMoodboard}>
               전체 비우기
@@ -157,7 +157,7 @@ export function MoodboardModal() {
           <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3">
             {rows.length ? (
               rows.map(({ product, qty }) => (
-                <div key={product.sku} className="rounded-lg border border-ink-700 bg-ink-850 p-2.5">
+                <div key={product.sku} className="rounded-lg border border-line-soft bg-ink-850 p-2.5">
                   <div className="flex items-start gap-2.5">
                     <span className="h-9 w-9 shrink-0 rounded-md" style={{ background: product.swatch }} />
                     <div className="min-w-0 flex-1">
@@ -167,20 +167,20 @@ export function MoodboardModal() {
                     <div className="flex items-center gap-1">
                       <button
                         onClick={() => setQty(product.sku, qty - 1)}
-                        className="h-6 w-6 rounded border border-ink-600 text-mist-300 hover:border-amber-brand/50"
+                        className="h-6 w-6 rounded border border-line text-mist-300 hover:border-amber-brand/50"
                       >
                         −
                       </button>
                       <span className="w-6 text-center text-xs tabular-nums text-mist-200">{qty}</span>
                       <button
                         onClick={() => setQty(product.sku, qty + 1)}
-                        className="h-6 w-6 rounded border border-ink-600 text-mist-300 hover:border-amber-brand/50"
+                        className="h-6 w-6 rounded border border-line text-mist-300 hover:border-amber-brand/50"
                       >
                         ＋
                       </button>
                       <button
                         onClick={() => removeFromMoodboard(product.sku)}
-                        className="ml-1 h-6 w-6 rounded border border-ink-600 text-mist-400 hover:border-red-500/50 hover:text-red-400"
+                        className="ml-1 h-6 w-6 rounded border border-line text-mist-400 hover:border-red-500/50 hover:text-red-400"
                       >
                         🗑
                       </button>
@@ -189,12 +189,12 @@ export function MoodboardModal() {
                 </div>
               ))
             ) : (
-              <p className="rounded-lg border border-dashed border-ink-600 p-6 text-center text-xs text-mist-500">
+              <p className="rounded-lg border border-dashed border-line p-6 text-center text-xs text-mist-500">
                 왼쪽 카탈로그에서 가구를 담아보세요.
               </p>
             )}
           </div>
-          <div className="border-t border-ink-700 p-3">
+          <div className="border-t border-line-soft p-3">
             <div className="flex items-center justify-between text-sm">
               <span className="text-mist-400">합계</span>
               <span className="font-bold text-mist-200">{usd(total)}</span>

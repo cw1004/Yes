@@ -49,9 +49,9 @@ export function ShoppableCard({
         top: `${hotspot.y * 100}%`,
         transform: `translate(${flipX ? 'calc(-100% - 22px)' : '22px'}, ${flipY ? 'calc(-100% + 14px)' : '-14px'})`,
       }}
-      className="rc-fade-up absolute z-30 w-[290px] overflow-hidden rounded-xl border border-ink-600 bg-ink-900/97 shadow-2xl backdrop-blur"
+      className="rc-fade-up absolute z-30 w-[290px] overflow-hidden rounded-xl border border-line bg-ink-900/97 shadow-2xl backdrop-blur"
     >
-      <div className="flex items-start gap-2.5 border-b border-ink-700 p-3">
+      <div className="flex items-start gap-2.5 border-b border-line-soft p-3">
         <span className="mt-0.5 h-11 w-11 shrink-0 rounded-lg" style={{ background: product.swatch }} />
         <div className="min-w-0 flex-1">
           <p className="text-sm font-bold leading-snug text-mist-200">{product.name}</p>
@@ -80,12 +80,12 @@ export function ShoppableCard({
                 href={url}
                 target="_blank"
                 rel="noreferrer noopener sponsored"
-                className="flex flex-1 items-center justify-between gap-2 rounded-md border border-ink-700 bg-ink-850 px-2 py-1.5 text-xs text-mist-300 transition hover:border-amber-brand/50 hover:text-amber-brand"
+                className="flex flex-1 items-center justify-between gap-2 rounded-md border border-line-soft bg-ink-850 px-2 py-1.5 text-xs text-mist-300 transition hover:border-amber-brand/50 hover:text-amber-brand"
               >
                 <span className="truncate">
                   {mall.icon} {mall.label}
                 </span>
-                <span className={linked ? 'text-emerald-brand' : 'text-mist-600'}>
+                <span className={linked ? 'text-emerald-brand' : 'text-mist-500'}>
                   {linked ? '추적 ✓' : '추적 ✗'}
                 </span>
               </a>
@@ -95,7 +95,7 @@ export function ShoppableCard({
                   showToast(ok ? `${mall.label} 링크를 복사했습니다.` : '복사에 실패했습니다.')
                 }}
                 title="링크 복사"
-                className="grid h-7 w-7 shrink-0 place-items-center rounded-md border border-ink-700 text-xs text-mist-400 hover:text-amber-brand"
+                className="grid h-7 w-7 shrink-0 place-items-center rounded-md border border-line-soft text-xs text-mist-400 hover:text-amber-brand"
               >
                 ⧉
               </button>
@@ -104,16 +104,16 @@ export function ShoppableCard({
         </div>
       </div>
 
-      <p className="border-t border-ink-700 px-3 py-1.5 text-xs leading-relaxed text-mist-500">
+      <p className="border-t border-line-soft px-3 py-1.5 text-xs leading-relaxed text-mist-500">
         이미지는 AI 시안입니다. 이 제품은 스타일에 맞춰 고른 추천 상품으로, 이미지 속 가구와 동일한 제품이 아닐 수 있습니다.
       </p>
 
-      <div className="flex gap-1.5 border-t border-ink-700 p-2">
+      <div className="flex gap-1.5 border-t border-line-soft p-2">
         <button
           onClick={() => addToMoodboard(product.sku)}
           className={`flex-1 rounded-md px-2.5 py-2 text-xs font-semibold transition ${
             inBoard
-              ? 'border border-ink-600 text-mist-400 hover:text-mist-200'
+              ? 'border border-line text-mist-400 hover:text-mist-200'
               : 'border border-emerald-brand/40 bg-emerald-brand/10 text-emerald-brand hover:bg-emerald-brand/20'
           }`}
         >
@@ -124,7 +124,7 @@ export function ShoppableCard({
           target="_blank"
           rel="noreferrer noopener"
           title="브랜드 공식몰"
-          className="grid h-7 w-7 place-items-center rounded-md border border-ink-600 text-xs text-mist-400 hover:text-amber-brand"
+          className="grid h-7 w-7 place-items-center rounded-md border border-line text-xs text-mist-400 hover:text-amber-brand"
         >
           ↗
         </a>
@@ -134,7 +134,7 @@ export function ShoppableCard({
             onClose()
           }}
           title="이미지에서 태그 제거"
-          className="grid h-7 w-7 place-items-center rounded-md border border-ink-600 text-xs text-mist-400 hover:border-red-500/50 hover:text-red-400"
+          className="grid h-7 w-7 place-items-center rounded-md border border-line text-xs text-mist-400 hover:border-red-500/50 hover:text-red-400"
         >
           🗑
         </button>

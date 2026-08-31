@@ -6,6 +6,7 @@ import { planById } from '../data/plans'
 import { usd } from '../lib/format'
 import { Badge, Button } from './ui/primitives'
 import { TextSizeControl } from './TextSizeControl'
+import { ThemeControl } from './ThemeControl'
 import type { SpaceKind } from '../types'
 
 function HeaderCell({
@@ -24,10 +25,10 @@ function HeaderCell({
     <Tag
       onClick={onClick}
       title={title}
-      className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-xs transition ${
+      className={`flex items-center gap-2 whitespace-nowrap rounded-xl border px-3 py-2 text-xs transition ${
         active
-          ? 'border-amber-brand/70 bg-amber-brand/10 text-amber-brand'
-          : 'border-ink-700 bg-ink-850 text-mist-300'
+          ? 'border-amber-brand bg-amber-brand/10 text-amber-brand'
+          : 'border-line-soft bg-ink-850 text-mist-300'
       } ${onClick ? 'hover:border-amber-brand/50 hover:text-amber-brand' : ''}`}
     >
       {children}
@@ -57,9 +58,9 @@ export function Header() {
   const plan = planById(user?.planId ?? planId)
 
   return (
-    <header className="sticky top-0 z-40 flex flex-wrap items-center gap-2 border-b border-ink-700 bg-ink-900/95 px-4 py-3 backdrop-blur">
+    <header className="sticky top-0 z-40 flex flex-wrap items-center gap-2 border-b border-line-soft bg-ink-900/95 px-4 py-3 backdrop-blur">
       <div className="flex min-w-[210px] items-center gap-3 pr-2">
-        <span className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-amber-brand to-amber-deep text-lg text-ink-950">
+        <span className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-amber-brand to-amber-deep text-lg text-on-brand">
           ✦
         </span>
         <div className="leading-tight">
@@ -117,6 +118,7 @@ export function Header() {
       </div>
 
       <div className="flex items-center gap-2">
+        <ThemeControl />
         <TextSizeControl />
         <Button variant="success" size="sm" onClick={() => openModal('monetization')}>
           💲 수익 허브 &amp; 출금
@@ -132,7 +134,7 @@ export function Header() {
         <HeaderCell onClick={() => openModal('moodboard')}>⤓ 내보내기</HeaderCell>
         {user ? (
           <HeaderCell onClick={() => openModal('account')} title={`${user.email} · 클릭하여 계정 관리`}>
-            <span className="grid h-6 w-6 place-items-center rounded-full bg-gradient-to-br from-amber-brand to-amber-deep text-xs text-ink-950">
+            <span className="grid h-6 w-6 place-items-center rounded-full bg-gradient-to-br from-amber-brand to-amber-deep text-xs text-on-brand">
               {user.displayName.slice(0, 1).toUpperCase()}
             </span>
             <span className="max-w-[120px] truncate font-semibold text-mist-200">{user.displayName}</span>

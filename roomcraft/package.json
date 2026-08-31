@@ -11,11 +11,14 @@
     "server": "node server/index.js",
     "typecheck": "tsc -b --noEmit false --emitDeclarationOnly false",
     "test:api": "API_BASE=${API_BASE:-http://localhost:8787/api} node server/api.test.mjs",
-    "test:e2e": "node smoke.mjs && node e2e-auth.mjs",
+    "test:e2e": "node smoke.mjs && node shoptest.mjs && node e2e-auth.mjs && node e2e-tracking.mjs && node e2e-verify.mjs && node e2e-a11y.mjs",
     "dev:all": "node -e \"console.log('터미널 두 개로: npm run server / npm run dev')\"",
     "start": "node server/index.js",
     "build:deploy": "npm run build && NODE_ENV=production node server/index.js",
-    "mail:check": "node scripts/mail-doctor.mjs"
+    "mail:check": "node scripts/mail-doctor.mjs",
+    "check:contrast": "node scripts/contrast.mjs",
+    "sim": "API_BASE=${API_BASE:-http://localhost:8787/api} node scripts/simulate.mjs",
+    "shots": "BASE_URL=${BASE_URL:-http://localhost:5173} node scripts/screenshots.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.120.0",

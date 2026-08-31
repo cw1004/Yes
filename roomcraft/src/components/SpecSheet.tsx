@@ -13,7 +13,7 @@ export function SpecSheet() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="border-b border-ink-700 p-4">
+      <div className="border-b border-line-soft p-4">
         <div className="flex items-start justify-between gap-3">
           <div>
             <h3 className="flex items-center gap-2 text-sm font-bold text-mist-200">
@@ -53,7 +53,7 @@ export function SpecSheet() {
             {rows.map(({ product, qty }) => (
               <div
                 key={product.sku}
-                className="flex items-center gap-2.5 rounded-lg border border-ink-700 bg-ink-900 p-2.5"
+                className="flex items-center gap-2.5 rounded-lg border border-line-soft bg-ink-900 p-2.5"
               >
                 <span className="h-10 w-10 shrink-0 rounded-md" style={{ background: product.swatch }} />
                 <div className="min-w-0 flex-1">
@@ -72,14 +72,14 @@ export function SpecSheet() {
                   target="_blank"
                   rel="noreferrer noopener"
                   title="브랜드 공식몰"
-                  className="grid h-7 w-7 place-items-center rounded-md border border-ink-600 text-xs text-mist-400 hover:text-amber-brand"
+                  className="grid h-7 w-7 place-items-center rounded-md border border-line text-xs text-mist-400 hover:text-amber-brand"
                 >
                   ↗
                 </a>
                 <button
                   onClick={() => removeFromMoodboard(product.sku)}
                   title="무드보드에서 제거"
-                  className="grid h-7 w-7 place-items-center rounded-md border border-ink-600 text-xs text-mist-400 hover:border-red-500/50 hover:text-red-400"
+                  className="grid h-7 w-7 place-items-center rounded-md border border-line text-xs text-mist-400 hover:border-red-500/50 hover:text-red-400"
                 >
                   🗑
                 </button>
@@ -87,7 +87,7 @@ export function SpecSheet() {
             ))}
           </>
         ) : (
-          <p className="rounded-lg border border-dashed border-ink-600 p-4 text-center text-xs text-mist-500">
+          <p className="rounded-lg border border-dashed border-line p-4 text-center text-xs text-mist-500">
             무드보드가 비어 있습니다. 아래 큐레이션에서 담아보세요.
           </p>
         )}
@@ -96,7 +96,7 @@ export function SpecSheet() {
           {style.name} 큐레이션 ({curated.length})
         </p>
         {curated.map((p) => (
-          <div key={p.sku} className="rounded-lg border border-ink-700 bg-ink-900 p-2.5">
+          <div key={p.sku} className="rounded-lg border border-line-soft bg-ink-900 p-2.5">
             <div className="flex items-start gap-2.5">
               <span className="mt-0.5 h-10 w-10 shrink-0 rounded-md" style={{ background: p.swatch }} />
               <div className="min-w-0 flex-1">
@@ -113,7 +113,7 @@ export function SpecSheet() {
                     href={p.officialUrl}
                     target="_blank"
                     rel="noreferrer noopener"
-                    className="rounded-md border border-ink-600 px-2.5 py-2 text-xs text-mist-300 hover:border-amber-brand/50 hover:text-amber-brand"
+                    className="rounded-md border border-line px-2.5 py-2 text-xs text-mist-300 hover:border-amber-brand/50 hover:text-amber-brand"
                   >
                     {p.brand} ↗
                   </a>
@@ -130,7 +130,7 @@ export function SpecSheet() {
         ))}
       </div>
 
-      <div className="border-t border-ink-700 p-3">
+      <div className="border-t border-line-soft p-3">
         <Button variant="primary" className="w-full" onClick={() => openModal('moodboard')}>
           🗂 Open Full Moodboard &amp; Catalog Modal
         </Button>

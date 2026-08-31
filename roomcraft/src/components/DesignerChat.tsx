@@ -70,8 +70,8 @@ export function DesignerChat() {
               <div
                 className={`rounded-xl px-3.5 py-2.5 text-sm leading-relaxed ${
                   m.role === 'assistant'
-                    ? 'border border-ink-700 bg-ink-850 text-mist-300'
-                    : 'bg-amber-brand/90 text-ink-950'
+                    ? 'border border-line-soft bg-ink-850 text-mist-300'
+                    : 'bg-amber-brand/90 text-on-brand'
                 }`}
               >
                 {renderText(m.content)}
@@ -91,7 +91,7 @@ export function DesignerChat() {
                     return (
                       <div
                         key={sku}
-                        className="rounded-lg border border-ink-700 bg-ink-900 p-2.5 text-left"
+                        className="rounded-lg border border-line-soft bg-ink-900 p-2.5 text-left"
                       >
                         <div className="flex items-start gap-2.5">
                           <span
@@ -113,7 +113,7 @@ export function DesignerChat() {
                                 href={p.officialUrl}
                                 target="_blank"
                                 rel="noreferrer noopener"
-                                className="rounded-md border border-ink-600 px-2.5 py-2 text-xs text-mist-300 hover:border-amber-brand/50 hover:text-amber-brand"
+                                className="rounded-md border border-line px-2.5 py-2 text-xs text-mist-300 hover:border-amber-brand/50 hover:text-amber-brand"
                               >
                                 {p.brand} ↗
                               </a>
@@ -140,7 +140,7 @@ export function DesignerChat() {
         {isChatting ? (
           <div className="flex gap-2.5">
             <span className="grid h-8 w-8 place-items-center rounded-lg bg-amber-brand/15 text-amber-brand">🪄</span>
-            <div className="flex items-center gap-1 rounded-xl border border-ink-700 bg-ink-850 px-4 py-3">
+            <div className="flex items-center gap-1 rounded-xl border border-line-soft bg-ink-850 px-4 py-3">
               {[0, 1, 2].map((i) => (
                 <span
                   key={i}
@@ -154,7 +154,7 @@ export function DesignerChat() {
         <div ref={endRef} />
       </div>
 
-      <div className="border-t border-ink-700 p-3">
+      <div className="border-t border-line-soft p-3">
         <div className="flex items-center gap-1.5 overflow-x-auto pb-2">
           <span className="shrink-0 text-xs text-mist-500">빠른 질문/요청:</span>
           {QUICK.map((q) => (
@@ -162,7 +162,7 @@ export function DesignerChat() {
               key={q}
               onClick={() => void sendChat(q)}
               disabled={isChatting}
-              className="shrink-0 rounded-lg border border-ink-700 bg-ink-850 px-2.5 py-1.5 text-xs text-mist-300 transition hover:border-amber-brand/50 hover:text-amber-brand disabled:opacity-50"
+              className="shrink-0 rounded-lg border border-line-soft bg-ink-850 px-2.5 py-1.5 text-xs text-mist-300 transition hover:border-amber-brand/50 hover:text-amber-brand disabled:opacity-50"
             >
               {q}
             </button>
@@ -174,7 +174,7 @@ export function DesignerChat() {
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && submit()}
             placeholder={`인테리어 디자이너 아치에게 질문하세요 (예: "${style.signatureItems[0]} 추천해줘")`}
-            className="w-full rounded-lg border border-ink-700 bg-ink-900 px-3 py-2.5 text-sm text-mist-200 outline-none placeholder:text-ink-500 focus:border-amber-brand/60"
+            className="w-full rounded-lg border border-line-soft bg-ink-900 px-3 py-2.5 text-sm text-mist-200 outline-none placeholder:text-ink-500 focus:border-amber-brand/60"
           />
           <Button variant="primary" onClick={submit} disabled={isChatting || !draft.trim()}>
             ➤ 전송

@@ -39,7 +39,7 @@ export function TemplateMarketTab() {
         />
       </div>
 
-      <section className="rounded-xl border border-ink-700 bg-ink-850 p-4">
+      <section className="rounded-xl border border-line-soft bg-ink-850 p-4">
         <SectionTitle
           icon="🏬"
           title="현재 디자인을 템플릿으로 판매 등록"
@@ -80,14 +80,14 @@ export function TemplateMarketTab() {
         ) : null}
       </section>
 
-      <section className="rounded-xl border border-ink-700 bg-ink-850 p-4">
+      <section className="rounded-xl border border-line-soft bg-ink-850 p-4">
         <SectionTitle icon="📦" title="내 템플릿" desc="판매 시뮬레이션 버튼으로 정산 흐름을 확인할 수 있습니다." />
         <div className="mt-4 space-y-2">
           {templates.length ? (
             templates.map((t) => (
               <div
                 key={t.id}
-                className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-ink-700 bg-ink-900 px-3 py-2.5"
+                className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-line-soft bg-ink-900 px-3 py-2.5"
               >
                 <div className="min-w-0">
                   <p className="truncate text-xs font-semibold text-mist-200">{t.title}</p>
@@ -108,7 +108,7 @@ export function TemplateMarketTab() {
               </div>
             ))
           ) : (
-            <p className="rounded-lg border border-dashed border-ink-600 p-4 text-center text-xs text-mist-500">
+            <p className="rounded-lg border border-dashed border-line p-4 text-center text-xs text-mist-500">
               아직 등록한 템플릿이 없습니다.
             </p>
           )}

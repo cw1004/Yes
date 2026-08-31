@@ -108,7 +108,7 @@ export function AffiliateTab() {
         />
       </div>
 
-      <section className="rounded-xl border border-ink-700 bg-ink-850 p-4">
+      <section className="rounded-xl border border-line-soft bg-ink-850 p-4">
         <SectionTitle
           icon="🛍"
           title={`제휴 채널 선택 (${enabledMalls.length}/${MALLS.length})`}
@@ -139,7 +139,7 @@ export function AffiliateTab() {
                     key={mall.id}
                     onClick={() => toggleMall(mall.id)}
                     className={`rounded-lg border p-2.5 text-left transition ${
-                      on ? 'border-emerald-brand/50 bg-emerald-brand/8' : 'border-ink-700 bg-ink-900 hover:border-ink-500'
+                      on ? 'border-emerald-brand bg-emerald-brand/8' : 'border-line-soft bg-ink-900 hover:border-line-strong'
                     }`}
                   >
                     <div className="flex items-center justify-between gap-2">
@@ -148,7 +148,7 @@ export function AffiliateTab() {
                       </span>
                       <span
                         className={`grid h-4 w-4 shrink-0 place-items-center rounded text-xs ${
-                          on ? 'bg-emerald-brand text-ink-950' : 'border border-ink-600 text-transparent'
+                          on ? 'bg-emerald-brand text-on-brand' : 'border border-line text-transparent'
                         }`}
                       >
                         ✓
@@ -171,7 +171,7 @@ export function AffiliateTab() {
         ))}
       </section>
 
-      <section className="rounded-xl border border-ink-700 bg-ink-850 p-4">
+      <section className="rounded-xl border border-line-soft bg-ink-850 p-4">
         <SectionTitle
           icon="🛡"
           title="제휴 프로그램 ID 설정 (AFFILIATE PROGRAM IDS)"
@@ -200,7 +200,7 @@ export function AffiliateTab() {
             const covered = MALLS.filter((m) => m.programId === program.id)
             const activeCovered = covered.filter((m) => enabledMalls.includes(m.id))
                 return (
-                  <div key={program.id} className="rounded-lg border border-ink-700 bg-ink-900 p-3">
+                  <div key={program.id} className="rounded-lg border border-line-soft bg-ink-900 p-3">
                 <div className="flex items-start justify-between gap-2">
                   <span className="text-sm font-semibold text-mist-200">{program.label}</span>
                   <Badge tone={activeCovered.length ? 'amber' : 'neutral'}>
@@ -242,7 +242,7 @@ export function AffiliateTab() {
         </p>
       </section>
 
-      <section className="rounded-xl border border-ink-700 bg-ink-850 p-4">
+      <section className="rounded-xl border border-line-soft bg-ink-850 p-4">
         <SectionTitle
           icon="📈"
           title="전환율 가정"
@@ -270,7 +270,7 @@ export function AffiliateTab() {
         </div>
       </section>
 
-      <section className="rounded-xl border border-ink-700 bg-ink-850 p-4">
+      <section className="rounded-xl border border-line-soft bg-ink-850 p-4">
         <SectionTitle
           icon="🔗"
           title="추천 제품 대량 제휴 링크 일괄 생성 (Bulk Exporter)"
@@ -279,7 +279,7 @@ export function AffiliateTab() {
             <select
               value={primaryMall}
               onChange={(e) => setPrimaryMall(e.target.value as MallId)}
-              className="rounded-lg border border-ink-700 bg-ink-900 px-2 py-1.5 text-xs text-mist-200 outline-none"
+              className="rounded-lg border border-line-soft bg-ink-900 px-2 py-1.5 text-xs text-mist-200 outline-none"
             >
               {REGIONS.map((r) => (
                 <optgroup key={r.id} label={`${r.flag} ${r.label}`}>
@@ -357,7 +357,7 @@ export function AffiliateTab() {
         {!rows.length ? (
           <p className="mt-3 text-xs text-mist-500">무드보드에 가구를 먼저 담아주세요.</p>
         ) : (
-          <div className="mt-4 max-h-56 overflow-y-auto rounded-lg border border-ink-700">
+          <div className="mt-4 max-h-56 overflow-y-auto rounded-lg border border-line-soft">
             <table className="w-full text-left text-xs">
               <thead className="sticky top-0 bg-ink-900 text-mist-400">
                 <tr>
@@ -370,7 +370,7 @@ export function AffiliateTab() {
                 {rows.map(({ product, qty }) => {
                   const link = buildDeeplink(primaryMall, product.searchTerm, affiliateIds)
                   return (
-                    <tr key={product.sku} className="border-t border-ink-700">
+                    <tr key={product.sku} className="border-t border-line-soft">
                       <td className="max-w-[220px] truncate px-3 py-2 text-mist-200">
                         {product.name}
                         {qty > 1 ? ` ×${qty}` : ''}
@@ -394,7 +394,7 @@ export function AffiliateTab() {
         )}
       </section>
 
-      <section className="rounded-xl border border-ink-700 bg-ink-850 p-4">
+      <section className="rounded-xl border border-line-soft bg-ink-850 p-4">
         <SectionTitle
           icon="⚡"
           title="실시간 딥링크 즉시 생성기 (INSTANT MULTI-MALL SEARCH LINKER)"
@@ -418,7 +418,7 @@ export function AffiliateTab() {
               return (
                 <div
                   key={m.id}
-                  className="flex items-center justify-between gap-2 rounded-lg border border-ink-700 bg-ink-900 px-3 py-2"
+                  className="flex items-center justify-between gap-2 rounded-lg border border-line-soft bg-ink-900 px-3 py-2"
                 >
                   <div className="min-w-0">
                     <p className="text-xs font-semibold text-mist-200">
@@ -439,7 +439,7 @@ export function AffiliateTab() {
                       href={link}
                       target="_blank"
                       rel="noreferrer noopener"
-                      className="grid h-7 w-7 place-items-center rounded-md border border-ink-700 text-xs text-mist-400 hover:text-amber-brand"
+                      className="grid h-7 w-7 place-items-center rounded-md border border-line-soft text-xs text-mist-400 hover:text-amber-brand"
                     >
                       ↗
                     </a>

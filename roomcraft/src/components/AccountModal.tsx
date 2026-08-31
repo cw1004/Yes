@@ -91,7 +91,7 @@ export function AccountModal() {
           </Button>
         </div>
 
-        <section className="rounded-xl border border-ink-700 bg-ink-850 p-4">
+        <section className="rounded-xl border border-line-soft bg-ink-850 p-4">
           <h4 className="text-xs font-bold text-mist-200">크레딧 원장</h4>
           <p className="mt-1 text-xs text-mist-500">
             모든 적립과 차감이 한 줄씩 기록됩니다. 잔액은 이 합계이므로 사후 감사가 가능합니다.
@@ -101,7 +101,7 @@ export function AccountModal() {
               <table className="w-full text-left text-xs">
                 <tbody>
                   {ledger.map((e, i) => (
-                    <tr key={`${e.ref ?? i}-${e.createdAt}`} className="border-b border-ink-800 last:border-0">
+                    <tr key={`${e.ref ?? i}-${e.createdAt}`} className="border-b border-line-soft last:border-0">
                       <td className="py-1.5 text-mist-300">{label(e.reason)}</td>
                       <td className="py-1.5 text-right text-mist-500">{relativeTime(e.createdAt)}</td>
                       <td
@@ -122,14 +122,14 @@ export function AccountModal() {
           </div>
         </section>
 
-        <section className="rounded-xl border border-ink-700 bg-ink-850 p-4">
+        <section className="rounded-xl border border-line-soft bg-ink-850 p-4">
           <h4 className="text-xs font-bold text-mist-200">결제 내역</h4>
           <div className="mt-3 space-y-2">
             {payments.length ? (
               payments.map((p) => (
                 <div
                   key={p.id}
-                  className="flex items-center justify-between gap-2 rounded-lg border border-ink-700 bg-ink-900 px-3 py-2"
+                  className="flex items-center justify-between gap-2 rounded-lg border border-line-soft bg-ink-900 px-3 py-2"
                 >
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-mist-200">

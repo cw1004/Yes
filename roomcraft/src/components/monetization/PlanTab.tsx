@@ -55,7 +55,7 @@ export function PlanTab() {
         </div>
       ) : null}
 
-      <section className="rounded-xl border border-ink-700 bg-ink-850 p-4">
+      <section className="rounded-xl border border-line-soft bg-ink-850 p-4">
         <SectionTitle
           icon="♛"
           title="구독 플랜"
@@ -75,7 +75,7 @@ export function PlanTab() {
               <div
                 key={p.id}
                 className={`flex flex-col rounded-xl border p-4 ${
-                  on ? 'border-amber-brand bg-amber-brand/8' : 'border-ink-700 bg-ink-900'
+                  on ? 'border-amber-brand bg-amber-brand/8' : 'border-line-soft bg-ink-900'
                 }`}
               >
                 <div className="flex items-center justify-between">
@@ -112,11 +112,11 @@ export function PlanTab() {
         </div>
       </section>
 
-      <section className="rounded-xl border border-ink-700 bg-ink-850 p-4">
+      <section className="rounded-xl border border-line-soft bg-ink-850 p-4">
         <SectionTitle icon="⚡" title="크레딧 충전" desc="구독과 별개로 필요할 때만 추가 렌더 크레딧을 구매합니다." />
         <div className="mt-4 grid gap-3 sm:grid-cols-3">
           {CREDIT_PACKS.map((pack) => (
-            <div key={pack.id} className="rounded-xl border border-ink-700 bg-ink-900 p-4 text-center">
+            <div key={pack.id} className="rounded-xl border border-line-soft bg-ink-900 p-4 text-center">
               <p className="text-lg font-bold text-mist-200">
                 {pack.credits}
                 {pack.bonus ? <span className="text-emerald-brand"> +{pack.bonus}</span> : null}

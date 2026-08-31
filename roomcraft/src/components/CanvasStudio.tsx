@@ -51,13 +51,13 @@ export function CanvasStudio() {
                   className={`rounded-lg border px-3 py-2 text-xs font-semibold transition ${
                     s.id === styleId
                       ? 'border-amber-brand bg-amber-brand/10 text-amber-brand'
-                      : 'border-ink-700 text-mist-400 hover:text-mist-200'
+                      : 'border-line-soft text-mist-400 hover:text-mist-200'
                   }`}
                 >
                   ✦ {s.name}
                 </button>
               ))}
-              <span className="rounded-lg border border-ink-700 px-2.5 py-1 text-xs text-mist-400">
+              <span className="rounded-lg border border-line-soft px-2.5 py-1 text-xs text-mist-400">
                 {STYLES.length} Styles ⊞
               </span>
             </div>
@@ -74,7 +74,7 @@ export function CanvasStudio() {
       </Card>
 
       <Card>
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-ink-700 px-3">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line-soft px-3">
           <div className="flex gap-1">
             {TABS.map((t) => (
               <button
@@ -134,7 +134,7 @@ function MakeoverView() {
   if (!sourceImage) {
     return (
       <div className="space-y-4">
-        <div className="rounded-xl border border-dashed border-ink-600 bg-ink-900 p-8 text-center">
+        <div className="rounded-xl border border-dashed border-line bg-ink-900 p-8 text-center">
           <div className="text-4xl">🏠</div>
           <p className="mt-3 text-sm font-semibold text-mist-200">아직 업로드된 공간 사진이 없습니다</p>
           <p className="mt-1 text-xs text-mist-400">
@@ -183,9 +183,9 @@ function MakeoverView() {
       </div>
 
       {isRendering ? (
-        <div className="rc-shimmer grid aspect-[16/10] w-full place-items-center rounded-xl border border-ink-700">
+        <div className="rc-shimmer grid aspect-[16/10] w-full place-items-center rounded-xl border border-line-soft">
           <div className="text-center">
-            <span className="inline-block h-8 w-8 animate-spin rounded-full border-2 border-ink-600 border-t-amber-brand" />
+            <span className="inline-block h-8 w-8 animate-spin rounded-full border-2 border-line border-t-amber-brand" />
             <p className="mt-3 text-sm font-semibold text-mist-300">{style.name} 렌더링 중…</p>
             <p className="mt-1 text-xs text-mist-500">조명 · 재질 · 가구 배치를 계산하고 있습니다</p>
           </div>
@@ -214,7 +214,7 @@ function MakeoverView() {
           </div>
         </>
       ) : (
-        <div className="grid aspect-[16/10] w-full place-items-center rounded-xl border border-dashed border-ink-600 bg-ink-900">
+        <div className="grid aspect-[16/10] w-full place-items-center rounded-xl border border-dashed border-line bg-ink-900">
           <div className="text-center">
             <img
               src={sourceImage}

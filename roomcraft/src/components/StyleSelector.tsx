@@ -89,7 +89,7 @@ export function StyleSelector() {
               className={`overflow-hidden rounded-xl border text-left transition ${
                 on
                   ? 'border-amber-brand ring-1 ring-amber-brand/40'
-                  : 'border-ink-700 hover:border-ink-500'
+                  : 'border-line-soft hover:border-line-strong'
               }`}
             >
               <div className="relative h-32" style={{ background: s.previewGradient }}>
@@ -97,7 +97,7 @@ export function StyleSelector() {
                   {s.family}
                 </span>
                 {on ? (
-                  <span className="absolute right-2 top-2 grid h-6 w-6 place-items-center rounded-full bg-amber-brand text-xs text-ink-950">
+                  <span className="absolute right-2 top-2 grid h-6 w-6 place-items-center rounded-full bg-amber-brand text-xs text-on-brand">
                     ✓
                   </span>
                 ) : null}
@@ -127,7 +127,7 @@ export function StyleSelector() {
         })}
       </div>
 
-      <div className="mt-4 rounded-xl border border-ink-700 bg-ink-900 p-4">
+      <div className="mt-4 rounded-xl border border-line-soft bg-ink-900 p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <span className="grid h-7 w-7 place-items-center rounded-lg bg-amber-brand/15 text-amber-brand">
@@ -172,7 +172,7 @@ export function StyleSelector() {
                 key={p.value}
                 onClick={() => setIntensity(p.value)}
                 className={`rounded-md px-3 py-2 text-xs font-semibold transition ${
-                  intensity === p.value ? 'bg-amber-brand text-ink-950' : 'bg-ink-800 text-mist-300 hover:bg-ink-700'
+                  intensity === p.value ? 'bg-amber-brand text-on-brand' : 'bg-ink-800 text-mist-300 hover:bg-ink-700'
                 }`}
               >
                 {p.label}
@@ -191,7 +191,7 @@ export function StyleSelector() {
         <Button variant="primary" size="lg" disabled={!canGenerate} onClick={() => void generate()}>
           {isRendering ? (
             <>
-              <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-ink-950/40 border-t-ink-950" />
+              <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-on-brand/40 border-t-on-brand" />
               생성 중…
             </>
           ) : (

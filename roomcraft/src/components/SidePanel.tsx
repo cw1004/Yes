@@ -14,8 +14,8 @@ export function SidePanel() {
   ]
 
   return (
-    <aside className="flex h-[calc(100vh-140px)] min-h-[560px] flex-col overflow-hidden rounded-xl border border-ink-700 bg-ink-850">
-      <div className="flex items-center justify-between border-b border-ink-700 px-2">
+    <aside className="flex h-[calc(100vh-140px)] min-h-[560px] flex-col overflow-hidden rounded-xl border border-line-soft bg-ink-850">
+      <div className="flex items-center justify-between border-b border-line-soft px-2">
         <div className="flex">
           {tabs.map((t) => (
             <button

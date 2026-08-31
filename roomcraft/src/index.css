@@ -1,19 +1,37 @@
 @import 'tailwindcss';
 
 @theme {
-  --color-ink-950: #08080a;
-  --color-ink-900: #0d0d10;
-  --color-ink-850: #131317;
-  --color-ink-800: #1a1a1f;
-  --color-ink-700: #26262d;
+  /*
+   * 표면 램프 — 어두운 쪽이 950, 밝은 쪽이 500.
+   * 라이트 테마에서는 이 램프가 통째로 뒤집힙니다(아래 [data-theme='light']).
+   * Tailwind v4 유틸리티는 값을 인라인하지 않고 var(--color-*) 를 그대로 참조하므로,
+   * 변수만 바꾸면 컴포넌트를 한 줄도 고치지 않고 테마가 바뀝니다.
+   */
+  --color-ink-950: #050508;
+  --color-ink-900: #111116;
+  --color-ink-850: #17171d;
+  --color-ink-800: #1e1e25;
+  --color-ink-700: #2a2a33;
   --color-ink-600: #3a3a44;
   --color-ink-500: #55555f;
+
+  /*
+   * 선 색은 표면 램프에서 떼어냈습니다.
+   * ink-700 하나로 카드 배경(bg-ink-700)과 버튼 테두리(border-ink-700)를 겸하고 있었는데,
+   * 테두리가 보이도록 값을 올리면 그 위에 얹힌 글자 대비가 같이 무너집니다.
+   *   line-soft  패널 구분선  — 장식이라 3:1 을 요구하지 않습니다
+   *   line       컨트롤 테두리 — 버튼/칩의 경계이므로 WCAG 비텍스트 3:1
+   *   line-strong 호버 강조
+   */
+  --color-line-soft: #34343e;
+  --color-line: #6a6a75;
+  --color-line-strong: #8b8b96;
+
   /*
    * mist-500 은 원래 정의 없이 76곳에서 쓰이고 있었습니다(클래스가 생성되지 않아
-   * 부모 색을 물려받던 상태). 어두운 배경 위에서 WCAG AA(4.5:1)를 통과하는 값으로 고정합니다.
-   *   ink-800 4.55:1 · ink-850 4.86:1 · ink-900 5.09:1
+   * 부모 색을 물려받던 상태). 배경 위에서 WCAG AA(4.5:1)를 통과하는 값으로 고정합니다.
    */
-  --color-mist-500: #82828a;
+  --color-mist-500: #8a8a93;
   --color-mist-400: #8b8b96;
   --color-mist-300: #b6b6be;
   --color-mist-200: #d8d8dd;
@@ -23,8 +41,53 @@
   --color-emerald-brand: #22c58a;
   --color-emerald-deep: #128a5d;
 
+  /*
+   * 브랜드 면 위에 얹는 글자색. 다크에서는 밝은 앰버 위의 검정,
+   * 라이트에서는 짙은 앰버 위의 흰색이 됩니다 — 두 테마에서 방향이 반대라
+   * ink-950 을 재활용하지 않고 따로 둡니다.
+   */
+  --color-on-brand: #050508;
+
   --font-sans: 'Pretendard', 'Apple SD Gothic Neo', 'Noto Sans KR', system-ui, -apple-system, sans-serif;
 }
+
+/*
+ * 라이트 테마 — 표면과 글자 램프를 뒤집습니다.
+ * 950 이 가장 어두운 색에서 가장 밝은 배경이 되고, mist-200 이 가장 밝은 글자에서
+ * 가장 진한 글자가 됩니다. 램프의 '방향'만 뒤집으므로 각 유틸리티의 의미(배경/본문/흐린 글자)는
+ * 그대로 유지됩니다.
+ *
+ * 강조색은 뒤집는 것이 아니라 어둡게 내립니다. #f0a437 은 흰 배경 위에서 1.9:1 로
+ * 글자로 쓸 수 없기 때문입니다. 실제 대비는 scripts/contrast.mjs 로 검증합니다.
+ */
+:root[data-theme='light'] {
+  --color-ink-950: #edebe6;
+  --color-ink-900: #ffffff;
+  --color-ink-850: #f8f7f4;
+  --color-ink-800: #eceae5;
+  --color-ink-700: #ddd9d1;
+  --color-ink-600: #c9c4b9;
+  --color-ink-500: #a8a29a;
+
+  --color-line-soft: #dcd8d0;
+  --color-line: #948f86;
+  --color-line-strong: #6e6960;
+
+  --color-mist-500: #5f5f6a;
+  --color-mist-400: #4d4d58;
+  --color-mist-300: #33333c;
+  --color-mist-200: #14141a;
+
+  --color-amber-brand: #925d11;
+  --color-amber-deep: #6d460d;
+  --color-emerald-brand: #1a7c59;
+  --color-emerald-deep: #135a41;
+
+  --color-on-brand: #ffffff;
+
+  color-scheme: light;
+}
+
 
 /*
  * 글자 크기 기준점.
@@ -119,7 +182,12 @@ body {
   }
 }
 .rc-shimmer {
-  background: linear-gradient(90deg, #1a1a1f 25%, #26262d 50%, #1a1a1f 75%);
+  background: linear-gradient(
+    90deg,
+    var(--color-ink-800) 25%,
+    var(--color-ink-700) 50%,
+    var(--color-ink-800) 75%
+  );
   background-size: 200% 100%;
   animation: rc-shimmer 1.4s linear infinite;
 }

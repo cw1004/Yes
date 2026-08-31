@@ -7,7 +7,7 @@
 import { chromium } from 'playwright'
 
 // 배포된 주소를 향해서도 그대로 돌릴 수 있게 합니다.
-const BASE_URL = process.env.BASE_URL || BASE_URL
+const BASE_URL = process.env.BASE_URL || 'http://localhost:5173'
 
 const errors = []
 const b = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {})
@@ -181,6 +181,30 @@ await step('버튼 클릭 영역이 WCAG 2.2 최소치(24px) 이상', async () =
     return [...new Set(bad)].slice(0, 5)
   })
   if (small.length) throw new Error(`작은 버튼 ${small.length}개: ${small.join(', ')}`)
+})
+
+await step('기본은 밝은 테마', async () => {
+  const t = await page.evaluate(() => document.documentElement.getAttribute('data-theme'))
+  if (t !== 'light') throw new Error(`data-theme=${t}`)
+})
+
+await step('밝게/어둡게 전환이 실제 색을 바꾼다', async () => {
+  // 속성만 보면 CSS 변수가 실제로 반영됐는지는 알 수 없습니다. 계산된 배경색을 봅니다.
+  const before = await page.evaluate(() => getComputedStyle(document.body).backgroundColor)
+  await page.getByRole('button', { name: '화면 어둡게' }).click()
+  await page.waitForTimeout(200)
+  const after = await page.evaluate(() => getComputedStyle(document.body).backgroundColor)
+  if (before === after) throw new Error(`배경이 그대로: ${after}`)
+  const lum = (c) => c.match(/\d+/g).slice(0, 3).reduce((s, v) => s + Number(v), 0)
+  if (lum(after) >= lum(before)) throw new Error(`어두워지지 않음: ${before} → ${after}`)
+})
+
+await step('새로고침해도 테마가 유지된다 (첫 페인트 전 적용)', async () => {
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  const t = await page.evaluate(() => document.documentElement.getAttribute('data-theme'))
+  if (t !== 'dark') throw new Error(`data-theme=${t}`)
+  await page.getByRole('button', { name: '화면 밝게' }).click()
+  await page.waitForTimeout(200)
 })
 
 if (process.argv[2]) await page.screenshot({ path: process.argv[2] })

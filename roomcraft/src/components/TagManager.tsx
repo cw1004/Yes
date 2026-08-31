@@ -84,7 +84,7 @@ export function TagManager() {
   }
 
   return (
-    <div className="rounded-xl border border-ink-700 bg-ink-850 p-3">
+    <div className="rounded-xl border border-line-soft bg-ink-850 p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="text-xs font-bold text-mist-200">🏷 이미지 태그</span>
@@ -95,7 +95,7 @@ export function TagManager() {
             return (
               <span
                 key={h.id}
-                className="group flex items-center gap-1 rounded-md border border-ink-700 bg-ink-900 py-1 pl-1.5 pr-1 text-xs text-mist-300"
+                className="group flex items-center gap-1 rounded-md border border-line-soft bg-ink-900 py-1 pl-1.5 pr-1 text-xs text-mist-300"
               >
                 <span className="h-2.5 w-2.5 rounded-full" style={{ background: p.swatch }} />
                 <span className="max-w-[110px] truncate">{p.name}</span>
@@ -149,7 +149,7 @@ export function TagManager() {
       </div>
 
       {picking ? (
-        <div className="mt-3 border-t border-ink-700 pt-3">
+        <div className="mt-3 border-t border-line-soft pt-3">
           <input
             className={inputClass}
             value={q}
@@ -165,7 +165,7 @@ export function TagManager() {
                   setPicking(false)
                   setQ('')
                 }}
-                className="flex items-center gap-2 rounded-lg border border-ink-700 bg-ink-900 px-2.5 py-2 text-left transition hover:border-amber-brand/50"
+                className="flex items-center gap-2 rounded-lg border border-line-soft bg-ink-900 px-2.5 py-2 text-left transition hover:border-amber-brand/50"
               >
                 <span className="h-7 w-7 shrink-0 rounded-md" style={{ background: p.swatch }} />
                 <span className="min-w-0 flex-1">

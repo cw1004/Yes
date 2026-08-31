@@ -34,7 +34,7 @@ export function EarningsPanel() {
         />
       </div>
 
-      <div className="rounded-xl border border-ink-700 bg-ink-850 p-4">
+      <div className="rounded-xl border border-line-soft bg-ink-850 p-4">
         <div className="flex items-center justify-between">
           <h4 className="text-xs font-bold text-mist-200">채널별 기여도</h4>
           <Badge tone={linkedCount ? 'emerald' : 'neutral'}>
@@ -73,13 +73,13 @@ export function EarningsPanel() {
             )
           })}
           {!top.length ? (
-            <p className="rounded-lg border border-dashed border-ink-600 p-4 text-center text-xs text-mist-500">
+            <p className="rounded-lg border border-dashed border-line p-4 text-center text-xs text-mist-500">
               활성화된 제휴 채널이 없습니다. 수익 허브에서 채널을 켜주세요.
             </p>
           ) : null}
         </div>
 
-        <div className="mt-3 grid grid-cols-3 gap-2 border-t border-ink-700 pt-3 text-center">
+        <div className="mt-3 grid grid-cols-3 gap-2 border-t border-line-soft pt-3 text-center">
           <div>
             <p className="text-xs text-mist-500">보수적</p>
             <p className="text-xs font-bold text-mist-300">{usd(est.conservative, { cents: true })}</p>
@@ -102,7 +102,7 @@ export function EarningsPanel() {
 
       <ClickStats />
 
-      <div className="rounded-xl border border-ink-700 bg-ink-850 p-4">
+      <div className="rounded-xl border border-line-soft bg-ink-850 p-4">
         <h4 className="text-xs font-bold text-mist-200">수익원 요약 (이번 달)</h4>
         <dl className="mt-3 space-y-2 text-sm">
           <Row label="제휴 커머스 (기대값)" value={usd(est.expected, { cents: true })} tone="emerald" />
@@ -113,7 +113,7 @@ export function EarningsPanel() {
           />
           <Row label="클라이언트 납품 순이익" value={usd(q.netProfit)} tone="emerald" />
           <Row label={`구독료 (${plan.name})`} value={`-${usd(monthlyCost)}`} tone="muted" />
-          <div className="border-t border-ink-700 pt-2">
+          <div className="border-t border-line-soft pt-2">
             <Row label="합계 (견적 제외)" value={usd(net, { cents: true })} tone="strong" />
           </div>
         </dl>

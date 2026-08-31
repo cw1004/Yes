@@ -8,7 +8,7 @@
 import { chromium } from 'playwright'
 
 // 배포된 주소를 향해서도 그대로 돌릴 수 있게 합니다.
-const BASE_URL = process.env.BASE_URL || BASE_URL
+const BASE_URL = process.env.BASE_URL || 'http://localhost:5173'
 
 const errors = []
 const browser = await chromium.launch(

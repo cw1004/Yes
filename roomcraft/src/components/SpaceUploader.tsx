@@ -70,7 +70,7 @@ export function SpaceUploader() {
           }}
           onClick={() => inputRef.current?.click()}
           className={`grid min-h-[168px] cursor-pointer place-items-center rounded-xl border-2 border-dashed p-6 text-center transition ${
-            dragging ? 'border-amber-brand bg-amber-brand/8' : 'border-ink-600 bg-ink-900 hover:border-ink-500'
+            dragging ? 'border-amber-brand bg-amber-brand/8' : 'border-line bg-ink-900 hover:border-line-strong'
           }`}
         >
           {sourceImage ? (

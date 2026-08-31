@@ -53,14 +53,14 @@ export function StagingBoard() {
           onPointerMove={(e) => dragId && moveTo(e.clientX, e.clientY, dragId)}
           onPointerUp={() => setDragId(null)}
           onPointerLeave={() => setDragId(null)}
-          className="relative mt-4 aspect-[16/10] w-full overflow-hidden rounded-xl border border-ink-700"
+          className="relative mt-4 aspect-[16/10] w-full overflow-hidden rounded-xl border border-line-soft"
           style={{
             background:
               'repeating-linear-gradient(0deg,#15151a,#15151a 1px,transparent 1px,transparent 32px),' +
               'repeating-linear-gradient(90deg,#15151a,#15151a 1px,transparent 1px,transparent 32px),#0f0f13',
           }}
         >
-          <div className="pointer-events-none absolute inset-6 rounded-lg border-2 border-dashed border-ink-600" />
+          <div className="pointer-events-none absolute inset-6 rounded-lg border-2 border-dashed border-line" />
           <span className="pointer-events-none absolute left-8 top-8 text-xs text-mist-500">
             {space.label} · 34m²
           </span>
@@ -110,7 +110,7 @@ export function StagingBoard() {
               rows.map(({ product, qty }) => (
                 <div
                   key={product.sku}
-                  className="flex items-center justify-between gap-2 rounded-lg border border-ink-700 bg-ink-900 px-3 py-2"
+                  className="flex items-center justify-between gap-2 rounded-lg border border-line-soft bg-ink-900 px-3 py-2"
                 >
                   <div className="min-w-0">
                     <p className="truncate text-xs font-semibold text-mist-200">{product.name}</p>
@@ -149,7 +149,7 @@ export function StagingBoard() {
             {suggestions.map((p) => (
               <div
                 key={p.sku}
-                className="flex items-center justify-between gap-2 rounded-lg border border-ink-700 bg-ink-900 px-3 py-2"
+                className="flex items-center justify-between gap-2 rounded-lg border border-line-soft bg-ink-900 px-3 py-2"
               >
                 <div className="min-w-0">
                   <p className="truncate text-xs font-semibold text-mist-200">{p.name}</p>

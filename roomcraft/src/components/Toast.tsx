@@ -21,7 +21,7 @@ export function Toast() {
 
   return (
     <div className="pointer-events-none fixed bottom-6 left-1/2 z-[60] -translate-x-1/2">
-      <div className="rc-fade-up rounded-xl border border-ink-600 bg-ink-800/95 px-4 py-2.5 text-sm text-mist-200 shadow-2xl backdrop-blur">
+      <div className="rc-fade-up rounded-xl border border-line bg-ink-800/95 px-4 py-2.5 text-sm text-mist-200 shadow-2xl backdrop-blur">
         {message}
       </div>
     </div>

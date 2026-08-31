@@ -6,3 +6,7 @@ dist
 
 # 서버 데이터
 data/
+
+# 로컬 확인용 산출물
+shots/
+shot-*.png

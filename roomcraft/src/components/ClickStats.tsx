@@ -78,7 +78,7 @@ export function ClickStats() {
   const maxClicks = top[0]?.clicks ?? 0
 
   return (
-    <div className="rounded-xl border border-ink-700 bg-ink-850 p-4">
+    <div className="rounded-xl border border-line-soft bg-ink-850 p-4">
       <div className="flex items-center justify-between">
         <h4 className="text-xs font-bold text-mist-200">실측 클릭 (내보낸 링크)</h4>
         <div className="flex items-center gap-2">
@@ -122,13 +122,13 @@ export function ClickStats() {
               )
             })}
           </div>
-          <p className="mt-3 border-t border-ink-700 pt-2 text-xs leading-relaxed text-mist-500">
+          <p className="mt-3 border-t border-line-soft pt-2 text-xs leading-relaxed text-mist-500">
             클릭은 실측치지만 <strong className="text-mist-400">구매 전환은 각 제휴 콘솔에서만 확인</strong>됩니다.
             클릭 대비 실제 정산액을 비교해 위 전환율 가정을 보정하세요.
           </p>
         </>
       ) : (
-        <p className="mt-3 rounded-lg border border-dashed border-ink-600 p-4 text-center text-xs leading-relaxed text-mist-500">
+        <p className="mt-3 rounded-lg border border-dashed border-line p-4 text-center text-xs leading-relaxed text-mist-500">
           아직 클릭이 없습니다.
           <br />
           수익 허브에서 블로그·카톡·쇼퍼블 HTML을 내보내면 그 링크의 클릭이 여기 집계됩니다.
