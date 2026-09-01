@@ -9,3 +9,6 @@ assets/stock/*
 !assets/stock/.gitkeep
 !assets/**/README.md
 .DS_Store
+
+# 특허 시뮬레이션 중간 산출물 (재생성 가능, 4 MB)
+sim/results/figure_data.npz
