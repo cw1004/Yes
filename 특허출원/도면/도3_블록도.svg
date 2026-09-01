@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="700" viewBox="0 0 900 700">
+<style>
+ .b{fill:none;stroke:#000;stroke-width:2}
+ .g{fill:none;stroke:#000;stroke-width:1.5;stroke-dasharray:8 6}
+ .a{fill:none;stroke:#000;stroke-width:1.4}
+ .t{font:15px sans-serif;fill:#000;text-anchor:middle}
+ .s{font:13px sans-serif;fill:#000;text-anchor:middle}
+ .cap{font:bold 20px sans-serif;fill:#000;text-anchor:middle}
+</style>
+<rect width="900" height="700" fill="#fff"/>
+<defs><marker id="ar" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 z" fill="#000"/></marker></defs>
+<text class="cap" x="450" y="36">【도 3】</text>
+
+<!-- body group -->
+<rect class="g" x="40" y="60" width="620" height="490"/>
+<text class="s" x="118" y="82">100 (110 본체)</text>
+
+<!-- sensor block -->
+<rect class="b" x="70" y="110" width="180" height="240"/>
+<text class="t" x="160" y="134">센서부 (140)</text>
+<rect class="b" x="88" y="148" width="144" height="30"/><text class="s" x="160" y="168">마이크로폰 141</text>
+<rect class="b" x="88" y="184" width="144" height="30"/><text class="s" x="160" y="204">관성센서 142</text>
+<rect class="b" x="88" y="220" width="144" height="30"/><text class="s" x="160" y="240">터치센서 143</text>
+<rect class="b" x="88" y="256" width="144" height="30"/><text class="s" x="160" y="276">조도센서 144</text>
+<rect class="b" x="88" y="292" width="144" height="24"/><text class="s" x="160" y="309">홀 센서 145</text>
+<rect class="b" x="88" y="320" width="144" height="24"/><text class="s" x="160" y="337">온도센서 146</text>
+
+<!-- controller -->
+<rect class="b" x="300" y="150" width="160" height="150"/>
+<text class="t" x="380" y="178">제어부 (130)</text>
+<rect class="b" x="316" y="196" width="128" height="34"/><text class="s" x="380" y="217">추론 연산부 131</text>
+<rect class="b" x="316" y="240" width="128" height="34"/><text class="s" x="380" y="261">메모리 132</text>
+
+<!-- output -->
+<rect class="b" x="510" y="110" width="130" height="90"/>
+<text class="s" x="575" y="140">발광 드라이버</text><text class="s" x="575" y="158">(124)</text>
+<rect class="b" x="510" y="216" width="130" height="90"/>
+<text class="s" x="575" y="246">발광 모듈 (120)</text><text class="s" x="575" y="266">121 / 122 / 123</text>
+<rect class="b" x="510" y="322" width="130" height="80"/>
+<text class="s" x="575" y="352">햅틱부 (160)</text><text class="s" x="575" y="372">161 / 진동모터</text>
+
+<!-- comm -->
+<rect class="b" x="300" y="330" width="160" height="110"/>
+<text class="t" x="380" y="356">무선통신부 (150)</text>
+<rect class="b" x="316" y="368" width="128" height="28"/><text class="s" x="380" y="387">BLE 모듈 151</text>
+<rect class="b" x="316" y="402" width="128" height="28"/><text class="s" x="380" y="421">NFC 모듈 152</text>
+
+<!-- handle group -->
+<rect class="g" x="70" y="400" width="180" height="140"/>
+<text class="s" x="132" y="422">손잡이부 (200)</text>
+<rect class="b" x="88" y="434" width="144" height="26"/><text class="s" x="160" y="452">배터리 171</text>
+<rect class="b" x="88" y="464" width="144" height="26"/><text class="s" x="160" y="482">충전 회로 172</text>
+<rect class="b" x="88" y="494" width="144" height="26"/><text class="s" x="160" y="512">전력관리 173 / 174</text>
+
+<!-- external -->
+<rect class="b" x="700" y="150" width="150" height="70"/>
+<text class="s" x="775" y="180">사용자 단말</text><text class="s" x="775" y="200">(300 / 310)</text>
+<rect class="b" x="700" y="300" width="150" height="70"/>
+<text class="s" x="775" y="330">송출부 (500)</text><text class="s" x="775" y="350">← 서버 (400)</text>
+
+<!-- arrows -->
+<line class="a" x1="250" y1="230" x2="298" y2="230" marker-end="url(#ar)"/>
+<line class="a" x1="460" y1="180" x2="508" y2="155" marker-end="url(#ar)"/>
+<line class="a" x1="460" y1="290" x2="508" y2="350" marker-end="url(#ar)"/>
+<line class="a" x1="575" y1="200" x2="575" y2="214" marker-end="url(#ar)"/>
+<line class="a" x1="380" y1="300" x2="380" y2="328" marker-end="url(#ar)"/>
+<line class="a" x1="460" y1="382" x2="698" y2="190" marker-end="url(#ar)"/>
+<line class="a" x1="698" y1="335" x2="462" y2="400" marker-end="url(#ar)"/>
+<line class="a" x1="232" y1="450" x2="298" y2="290" marker-end="url(#ar)"/>
+<text class="s" x="262" y="368">전력/신호 (220-115)</text>
+<text class="s" x="600" y="410">BLE 브로드캐스트</text>
+</svg>

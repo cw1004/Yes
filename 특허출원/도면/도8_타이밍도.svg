@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="620" viewBox="0 0 900 620">
+<style>
+ .ax{stroke:#000;stroke-width:1.6}
+ .b{fill:none;stroke:#000;stroke-width:1.8}
+ .a{fill:none;stroke:#000;stroke-width:1.3}
+ .d{stroke:#000;stroke-width:1;stroke-dasharray:5 4}
+ .tx{font:15px sans-serif;fill:#000}
+ .s{font:13px sans-serif;fill:#000}
+ .c{font:13px sans-serif;fill:#000;text-anchor:middle}
+ .cap{font:bold 20px sans-serif;fill:#000;text-anchor:middle}
+</style>
+<rect width="900" height="620" fill="#fff"/>
+<defs><marker id="a5" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 z" fill="#000"/></marker></defs>
+<text class="cap" x="450" y="36">【도 8】</text>
+
+<!-- transmitter timeline -->
+<text class="tx" x="30" y="96">송출부 500</text>
+<line class="ax" x1="160" y1="110" x2="850" y2="110" marker-end="url(#a5)"/>
+<g class="b">
+<rect x="200" y="82" width="46" height="28"/>
+<rect x="330" y="82" width="46" height="28"/>
+<rect x="460" y="82" width="46" height="28"/>
+<rect x="590" y="82" width="46" height="28"/>
+</g>
+<text class="c" x="223" y="74">P1</text><text class="c" x="353" y="74">P2</text>
+<text class="c" x="483" y="74">P3</text><text class="c" x="613" y="74">P4</text>
+<text class="s" x="660" y="132">P = {기준시각, 연출ID, 개시시각, 출력값/산출규칙}</text>
+
+<!-- device A -->
+<text class="tx" x="30" y="216">장치 A (100a)</text>
+<line class="ax" x1="160" y1="230" x2="850" y2="230" marker-end="url(#a5)"/>
+<g class="d">
+<line x1="223" y1="110" x2="232" y2="230"/>
+<line x1="353" y1="110" x2="360" y2="230"/>
+<line x1="483" y1="110" x2="489" y2="230"/>
+</g>
+<path class="b" d="M232,230 v-18 h8 v18"/>
+<path class="b" d="M360,230 v-18 h8 v18"/>
+<path class="b" d="M489,230 v-18 h8 v18"/>
+<text class="s" x="248" y="256">S210 수신 → S220 오프셋 산출 → S230 클럭 정렬</text>
+
+<!-- device B -->
+<text class="tx" x="30" y="336">장치 B (100b)</text>
+<line class="ax" x1="160" y1="350" x2="850" y2="350" marker-end="url(#a5)"/>
+<g class="d">
+<line x1="223" y1="110" x2="256" y2="350"/>
+<line x1="353" y1="110" x2="382" y2="350"/>
+<line x1="483" y1="110" x2="510" y2="350"/>
+</g>
+<path class="b" d="M256,350 v-18 h8 v18"/>
+<path class="b" d="M382,350 v-18 h8 v18"/>
+<path class="b" d="M510,350 v-18 h8 v18"/>
+<text class="s" x="256" y="376">수신 시점은 장치마다 상이 (Δt 발생)</text>
+
+<!-- start line -->
+<line class="ax" x1="700" y1="60" x2="700" y2="520" stroke-dasharray="8 5"/>
+<text class="s" x="710" y="58">개시 시각 T0</text>
+
+<!-- outputs -->
+<text class="tx" x="30" y="456">A 발광 출력</text>
+<line class="ax" x1="160" y1="470" x2="850" y2="470"/>
+<path class="b" d="M700,470 v-40 h120 v40"/>
+<text class="tx" x="30" y="536">B 발광 출력</text>
+<line class="ax" x1="160" y1="550" x2="850" y2="550"/>
+<path class="b" d="M700,550 v-40 h120 v40"/>
+
+<line class="a" x1="700" y1="600" x2="820" y2="600"/>
+<text class="s" x="440" y="600">→ 수신 시점이 달라도 정렬된 내부 클럭에 의해 출력 개시 시각은 T0로 일치 (편차 수 ms 이내)</text>
+</svg>

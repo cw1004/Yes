@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="700" height="820" viewBox="0 0 700 820">
+<style>
+ .b{fill:none;stroke:#000;stroke-width:1.8}
+ .a{fill:none;stroke:#000;stroke-width:1.4}
+ .t{font:15px sans-serif;fill:#000;text-anchor:middle}
+ .s{font:13px sans-serif;fill:#000;text-anchor:middle}
+ .cap{font:bold 20px sans-serif;fill:#000;text-anchor:middle}
+</style>
+<rect width="700" height="820" fill="#fff"/>
+<defs><marker id="a3" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 z" fill="#000"/></marker></defs>
+<text class="cap" x="350" y="36">【도 6】</text>
+
+<rect class="b" x="230" y="70" width="240" height="40" rx="20"/><text class="t" x="350" y="95">시작</text>
+<line class="a" x1="350" y1="110" x2="350" y2="140" marker-end="url(#a3)"/>
+
+<rect class="b" x="190" y="140" width="320" height="56"/>
+<text class="t" x="350" y="164">S110  음향신호 및 관성신호 취득</text>
+<text class="s" x="350" y="184">(141, 142)</text>
+<line class="a" x1="350" y1="196" x2="350" y2="226" marker-end="url(#a3)"/>
+
+<rect class="b" x="190" y="226" width="320" height="76"/>
+<text class="t" x="350" y="250">S120  특징 추출</text>
+<text class="s" x="350" y="270">주파수 대역별 에너지 / 변화율</text>
+<text class="s" x="350" y="290">+ 가속도 변화율 → 특징 벡터</text>
+<line class="a" x1="350" y1="302" x2="350" y2="332" marker-end="url(#a3)"/>
+
+<rect class="b" x="190" y="332" width="320" height="60"/>
+<text class="t" x="350" y="356">S130  온디바이스 추론 (131)</text>
+<text class="s" x="350" y="378">이벤트 종류별 확신도 산출</text>
+<line class="a" x1="350" y1="392" x2="350" y2="422" marker-end="url(#a3)"/>
+
+<path class="b" d="M350,422 L520,492 L350,562 L180,492 Z"/>
+<text class="t" x="350" y="486">S140  확신도 ≥ 문턱값</text>
+<text class="s" x="350" y="508">AND 불응시간 경과?</text>
+
+<line class="a" x1="520" y1="492" x2="610" y2="492"/>
+<path class="a" d="M610,492 L610,168 L512,168" marker-end="url(#a3)"/>
+<text class="s" x="566" y="482">아니오</text>
+
+<line class="a" x1="350" y1="562" x2="350" y2="592" marker-end="url(#a3)"/>
+<text class="s" x="372" y="582">예</text>
+
+<rect class="b" x="190" y="592" width="320" height="76"/>
+<text class="t" x="350" y="616">S150  패턴 출력</text>
+<text class="s" x="350" y="636">발광 패턴(124) + 진동 패턴(161)</text>
+<text class="s" x="350" y="656">개시 시각 정렬</text>
+<line class="a" x1="350" y1="668" x2="350" y2="698" marker-end="url(#a3)"/>
+
+<rect class="b" x="230" y="698" width="240" height="40" rx="20"/><text class="t" x="350" y="723">복귀 (S110)</text>
+<path class="a" d="M230,718 L110,718 L110,168 L188,168" marker-end="url(#a3)"/>
+
+<text class="s" x="350" y="782">※ S110 ~ S150 전 단계는 외부 서버 통신 없이 장치 내부에서 수행</text>
+</svg>

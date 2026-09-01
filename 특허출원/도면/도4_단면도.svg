@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="700" viewBox="0 0 760 700">
+<style>
+ .l{fill:none;stroke:#000;stroke-width:2}
+ .t{fill:none;stroke:#000;stroke-width:1.3}
+ .h{stroke:#000;stroke-width:0.8}
+ .r{fill:none;stroke:#000;stroke-width:1.6}
+ .n{font:15px sans-serif;fill:#000}
+ .cap{font:bold 20px sans-serif;fill:#000;text-anchor:middle}
+ .ld{stroke:#000;stroke-width:1}
+ .ray{stroke:#000;stroke-width:1;stroke-dasharray:5 4}
+</style>
+<rect width="760" height="700" fill="#fff"/>
+<defs><marker id="a2" markerWidth="8" markerHeight="8" refX="7" refY="2.6" orient="auto"><path d="M0,0 L7,2.6 L0,5.2 z" fill="#000"/></marker></defs>
+<text class="cap" x="380" y="36">【도 4】</text>
+
+<!-- outer sphere shell (double line = wall) -->
+<circle class="l" cx="380" cy="360" r="250"/>
+<circle class="t" cx="380" cy="360" r="234"/>
+
+<!-- baffles on shell (non-transmissive partitions 112) : short thick marks -->
+<g class="r">
+<path d="M380,110 l0,-0"/>
+</g>
+<!-- partitions at angles -->
+<g stroke="#000" stroke-width="7" fill="none">
+<path d="M456,124 l6,-15"/><path d="M304,124 l-6,-15"/>
+<path d="M604,284 l16,-4"/><path d="M156,284 l-16,-4"/>
+<path d="M604,436 l16,4"/><path d="M156,436 l-16,4"/>
+<path d="M456,596 l6,15"/><path d="M304,596 l-6,15"/>
+</g>
+
+<!-- pcb (equator plane) -->
+<rect class="l" x="200" y="352" width="360" height="16"/>
+<!-- LEDs both faces -->
+<g class="t">
+<rect x="240" y="338" width="22" height="14"/><rect x="330" y="338" width="22" height="14"/>
+<rect x="420" y="338" width="22" height="14"/><rect x="500" y="338" width="22" height="14"/>
+<rect x="240" y="368" width="22" height="14"/><rect x="330" y="368" width="22" height="14"/>
+<rect x="420" y="368" width="22" height="14"/><rect x="500" y="368" width="22" height="14"/>
+</g>
+
+<!-- radial light-guide ribs 123 aligned with partitions -->
+<g class="r">
+<path d="M400,352 L458,126"/><path d="M360,352 L302,126"/>
+<path d="M560,356 L604,286"/><path d="M200,356 L156,286"/>
+<path d="M560,364 L604,434"/><path d="M200,364 L156,434"/>
+<path d="M400,368 L458,594"/><path d="M360,368 L302,594"/>
+</g>
+
+<!-- light rays inside a cell -->
+<g class="ray">
+<path d="M430,340 L468,232" marker-end="url(#a2)"/>
+<path d="M430,340 L392,232" marker-end="url(#a2)"/>
+<path d="M415,205 L440,175" marker-end="url(#a2)"/>
+<path d="M415,205 L390,175" marker-end="url(#a2)"/>
+</g>
+
+<!-- diffusion layer arc 114 -->
+<path class="t" d="M300,132 A250,250 0 0 1 460,132" stroke-dasharray="3 3" stroke-width="4"/>
+
+<!-- hatching hint on shell -->
+<g class="h">
+<path d="M370,110 l10,10 M390,111 l10,10 M350,112 l10,10"/>
+</g>
+
+<line class="ld" x1="380" y1="110" x2="640" y2="80"/><text class="n" x="646" y="84">110</text>
+<line class="ld" x1="418" y1="140" x2="640" y2="128"/><text class="n" x="646" y="132">114</text>
+<line class="ld" x1="460" y1="118" x2="640" y2="176"/><text class="n" x="646" y="180">112</text>
+<line class="ld" x1="430" y1="230" x2="655" y2="240"/><text class="n" x="661" y="244">123</text>
+<line class="ld" x1="410" y1="290" x2="120" y2="200"/><text class="n" x="70" y="204">111</text>
+<line class="ld" x1="330" y1="345" x2="120" y2="330"/><text class="n" x="76" y="334">122</text>
+<line class="ld" x1="240" y1="360" x2="120" y2="392"/><text class="n" x="76" y="396">121</text>
+<line class="ld" x1="360" y1="500" x2="120" y2="540"/><text class="n" x="76" y="544">120</text>
+<text class="n" x="470" y="640" >* 도광 리브(123)는 격벽(112) 내측에 정렬</text>
+</svg>

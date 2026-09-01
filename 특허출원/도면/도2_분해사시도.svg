@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="900" viewBox="0 0 600 900">
+<style>
+ .l{fill:none;stroke:#000;stroke-width:2}
+ .t{fill:none;stroke:#000;stroke-width:1.2}
+ .d{fill:none;stroke:#000;stroke-width:1;stroke-dasharray:7 6}
+ .n{font:16px sans-serif;fill:#000}
+ .cap{font:bold 20px sans-serif;fill:#000}
+ .ld{stroke:#000;stroke-width:1}
+</style>
+<rect width="600" height="900" fill="#fff"/>
+<text class="cap" x="300" y="40" text-anchor="middle">【도 2】</text>
+
+<!-- upper hemisphere -->
+<path class="l" d="M160,180 a140,140 0 0 1 280,0"/>
+<ellipse class="t" cx="300" cy="180" rx="140" ry="46"/>
+<path class="t" d="M300,42 L352,72 M300,42 L248,72 M352,72 L378,132 M248,72 L222,132"/>
+<path class="t" d="M378,132 L340,176 M222,132 L260,176"/>
+
+<!-- light guide ribs -->
+<ellipse class="t" cx="300" cy="290" rx="140" ry="44"/>
+<path class="t" d="M300,246 L300,290 M160,290 L300,290 M440,290 L300,290"/>
+<path class="t" d="M205,262 L300,290 M395,262 L300,290 M205,318 L300,290 M395,318 L300,290"/>
+<ellipse class="t" cx="300" cy="290" rx="46" ry="15"/>
+
+<!-- pcb -->
+<ellipse class="l" cx="300" cy="392" rx="132" ry="42"/>
+<ellipse class="t" cx="300" cy="386" rx="132" ry="42"/>
+<path class="t" d="M168,386 v6 M432,386 v6"/>
+<circle class="t" cx="240" cy="378" r="7"/><circle class="t" cx="300" cy="370" r="7"/>
+<circle class="t" cx="360" cy="378" r="7"/><circle class="t" cx="270" cy="398" r="7"/>
+<circle class="t" cx="330" cy="398" r="7"/>
+<rect class="t" x="286" y="340" width="28" height="16" rx="3"/>
+
+<!-- lower hemisphere -->
+<path class="l" d="M160,500 a140,140 0 0 0 280,0"/>
+<ellipse class="t" cx="300" cy="500" rx="140" ry="46"/>
+<path class="t" d="M300,638 L352,608 M300,638 L248,608"/>
+<rect class="t" x="276" y="626" width="48" height="16" rx="4"/>
+<circle class="t" cx="266" cy="620" r="8"/>
+
+<!-- handle -->
+<path class="l" d="M262,700 h76 v20 h-76 z"/>
+<circle class="t" cx="300" cy="700" r="6"/>
+<path class="t" d="M276,706 v-8 M324,706 v-8"/>
+<path class="l" d="M256,720 h88 v148 q0,16 -16,16 h-56 q-16,0 -16,-16 z"/>
+<rect class="t" x="272" y="748" width="56" height="100" rx="8"/>
+<circle class="l" cx="300" cy="732" r="12"/>
+
+<line class="d" x1="300" y1="228" x2="300" y2="244"/>
+<line class="d" x1="300" y1="334" x2="300" y2="344"/>
+<line class="d" x1="300" y1="434" x2="300" y2="452"/>
+<line class="d" x1="300" y1="646" x2="300" y2="694"/>
+
+<line class="ld" x1="410" y1="110" x2="500" y2="86"/><text class="n" x="506" y="90">110</text>
+<line class="ld" x1="340" y1="120" x2="500" y2="140"/><text class="n" x="506" y="144">114</text>
+<line class="ld" x1="395" y1="278" x2="500" y2="252"/><text class="n" x="506" y="256">123</text>
+<line class="ld" x1="360" y1="378" x2="500" y2="360"/><text class="n" x="506" y="364">122</text>
+<line class="ld" x1="432" y1="390" x2="500" y2="412"/><text class="n" x="506" y="416">121</text>
+<line class="ld" x1="300" y1="348" x2="150" y2="330"/><text class="n" x="112" y="334">130</text>
+<line class="ld" x1="240" y1="378" x2="130" y2="392"/><text class="n" x="92" y="396">120</text>
+<line class="ld" x1="266" y1="620" x2="150" y2="612"/><text class="n" x="112" y="616">145</text>
+<line class="ld" x1="300" y1="634" x2="470" y2="626"/><text class="n" x="476" y="630">115</text>
+<line class="ld" x1="300" y1="710" x2="470" y2="700"/><text class="n" x="476" y="704">220</text>
+<line class="ld" x1="276" y1="702" x2="150" y2="690"/><text class="n" x="112" y="694">222</text>
+<line class="ld" x1="262" y1="712" x2="150" y2="740"/><text class="n" x="112" y="744">221</text>
+<line class="ld" x1="300" y1="798" x2="150" y2="820"/><text class="n" x="112" y="824">171</text>
+<line class="ld" x1="344" y1="780" x2="470" y2="800"/><text class="n" x="476" y="804">200</text>
+<line class="ld" x1="312" y1="732" x2="470" y2="744"/><text class="n" x="476" y="748">230</text>
+</svg>
