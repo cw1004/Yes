@@ -1,53 +1,33 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="700" height="820" viewBox="0 0 700 820">
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="1260" viewBox="0 0 980 1260">
 <style>
- .b{fill:none;stroke:#000;stroke-width:1.8}
- .a{fill:none;stroke:#000;stroke-width:1.4}
- .t{font:15px sans-serif;fill:#000;text-anchor:middle}
- .s{font:13px sans-serif;fill:#000;text-anchor:middle}
- .cap{font:bold 20px sans-serif;fill:#000;text-anchor:middle}
+ text{font-family:'Noto Sans CJK KR','NanumGothic','DejaVu Sans',sans-serif;fill:#000;stroke:none}
+ .o{fill:none;stroke:#000;stroke-width:2.4;stroke-linejoin:round;stroke-linecap:round}
+ .m{fill:none;stroke:#000;stroke-width:1.5;stroke-linejoin:round;stroke-linecap:round}
+ .f{fill:none;stroke:#000;stroke-width:0.9;stroke-linejoin:round}
+ .hd{fill:none;stroke:#000;stroke-width:1.0;stroke-dasharray:7 5}
+ .ct{fill:none;stroke:#000;stroke-width:1.0;stroke-dasharray:20 4 4 4}
+ .ld{fill:none;stroke:#000;stroke-width:0.9}
+ .ar{fill:none;stroke:#000;stroke-width:1.4;marker-end:url(#ar)}
+ .ar2{fill:none;stroke:#000;stroke-width:1.1;marker-end:url(#ar)}
+ .ray{fill:none;stroke:#000;stroke-width:1.0;stroke-dasharray:6 4;marker-end:url(#ar)}
+ .n{font-size:15px}
+ .ns{font-size:13.5px}
+ .nc{font-size:14px;text-anchor:middle}
+ .ncs{font-size:12px;text-anchor:middle}
+ .cap{font-size:21px;font-weight:700;text-anchor:middle}
+ .sub{font-size:14px}
+ .note{font-size:12.5px}
 </style>
-<rect width="700" height="820" fill="#fff"/>
-<defs><marker id="a3" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 z" fill="#000"/></marker></defs>
-<text class="cap" x="350" y="36">【도 6】</text>
-
-<rect class="b" x="230" y="70" width="240" height="40" rx="20"/><text class="t" x="350" y="95">시작</text>
-<line class="a" x1="350" y1="110" x2="350" y2="140" marker-end="url(#a3)"/>
-
-<rect class="b" x="190" y="140" width="320" height="56"/>
-<text class="t" x="350" y="164">S110  음향신호 및 관성신호 취득</text>
-<text class="s" x="350" y="184">(141, 142)</text>
-<line class="a" x1="350" y1="196" x2="350" y2="226" marker-end="url(#a3)"/>
-
-<rect class="b" x="190" y="226" width="320" height="76"/>
-<text class="t" x="350" y="250">S120  특징 추출</text>
-<text class="s" x="350" y="270">주파수 대역별 에너지 / 변화율</text>
-<text class="s" x="350" y="290">+ 가속도 변화율 → 특징 벡터</text>
-<line class="a" x1="350" y1="302" x2="350" y2="332" marker-end="url(#a3)"/>
-
-<rect class="b" x="190" y="332" width="320" height="60"/>
-<text class="t" x="350" y="356">S130  온디바이스 추론 (131)</text>
-<text class="s" x="350" y="378">이벤트 종류별 확신도 산출</text>
-<line class="a" x1="350" y1="392" x2="350" y2="422" marker-end="url(#a3)"/>
-
-<path class="b" d="M350,422 L520,492 L350,562 L180,492 Z"/>
-<text class="t" x="350" y="486">S140  확신도 ≥ 문턱값</text>
-<text class="s" x="350" y="508">AND 불응시간 경과?</text>
-
-<line class="a" x1="520" y1="492" x2="610" y2="492"/>
-<path class="a" d="M610,492 L610,168 L512,168" marker-end="url(#a3)"/>
-<text class="s" x="566" y="482">아니오</text>
-
-<line class="a" x1="350" y1="562" x2="350" y2="592" marker-end="url(#a3)"/>
-<text class="s" x="372" y="582">예</text>
-
-<rect class="b" x="190" y="592" width="320" height="76"/>
-<text class="t" x="350" y="616">S150  패턴 출력</text>
-<text class="s" x="350" y="636">발광 패턴(124) + 진동 패턴(161)</text>
-<text class="s" x="350" y="656">개시 시각 정렬</text>
-<line class="a" x1="350" y1="668" x2="350" y2="698" marker-end="url(#a3)"/>
-
-<rect class="b" x="230" y="698" width="240" height="40" rx="20"/><text class="t" x="350" y="723">복귀 (S110)</text>
-<path class="a" d="M230,718 L110,718 L110,168 L188,168" marker-end="url(#a3)"/>
-
-<text class="s" x="350" y="782">※ S110 ~ S150 전 단계는 외부 서버 통신 없이 장치 내부에서 수행</text>
-</svg>
+<defs>
+ <marker id="ar" markerWidth="10" markerHeight="10" refX="8.5" refY="3" orient="auto">
+  <path d="M0,0 L8.5,3 L0,6 z" fill="#000"/></marker>
+ <pattern id="hA" width="8" height="8" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
+  <line x1="0" y1="0" x2="0" y2="8" stroke="#000" stroke-width="0.8"/></pattern>
+ <pattern id="hB" width="8" height="8" patternTransform="rotate(-45)" patternUnits="userSpaceOnUse">
+  <line x1="0" y1="0" x2="0" y2="8" stroke="#000" stroke-width="0.8"/></pattern>
+ <pattern id="hC" width="5" height="5" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
+  <line x1="0" y1="0" x2="0" y2="5" stroke="#000" stroke-width="1.6"/></pattern>
+ <pattern id="hD" width="6" height="6" patternUnits="userSpaceOnUse">
+  <circle cx="3" cy="3" r="1.0" fill="#000"/></pattern>
+</defs>
+<rect width="980" height="1260" style="fill:#fff"/><text class="cap" x="490.0" y="40">【도 6】</text><text class="sub" x="30" y="72">온디바이스 이벤트 판별 및 출력 제어 순서도</text><rect class="m" x="290" y="96" width="220" height="40" rx="20"/><text class="nc" x="400" y="121">시작 / 초기화</text><path class="ar" d="M400,136 V166"/><path class="m" d="M400,168.0 L550.0,206 L400,244.0 L250.0,206 Z"/><text class="nc" x="400" y="201.5">S105  손잡이부 결합?</text><text class="ncs" x="400" y="220.5">(홀 센서 145)</text><path class="ar" d="M550,206 H760"/><text class="ns" x="672" y="198">아니오</text><rect class="m" x="760" y="172" width="190" height="68"/><text class="nc" x="855.0" y="192.0">S106 저전력</text><text class="ncs" x="855.0" y="211.0">표시 모드</text><text class="ncs" x="855.0" y="230.0">구동 전류 제한</text><path class="m" d="M855,240 V268 H400"/><circle cx="400" cy="268" r="3" fill="#000"/><path class="ar" d="M400,244 V296"/><text class="ns" x="410" y="264">예</text><rect class="m" x="225" y="296" width="350" height="62"/><text class="nc" x="400.0" y="322.5">S110  신호 취득</text><text class="ncs" x="400.0" y="341.5">마이크로폰 141 / 관성센서 142</text><path class="ar" d="M400,358 V388"/><path class="m" d="M400,390.0 L550.0,428 L400,466.0 L250.0,428 Z"/><text class="nc" x="400" y="423.5">S115  충격 검출?</text><text class="ncs" x="400" y="442.5">|a| > 충격 문턱값</text><path class="ar" d="M550,428 H760"/><text class="ns" x="672" y="420">예</text><rect class="m" x="760" y="394" width="190" height="68"/><text class="nc" x="855.0" y="414.0">S116 발광 출력</text><text class="ncs" x="855.0" y="433.0">제한 / 중지</text><text class="ncs" x="855.0" y="452.0">(소정 시간)</text><path class="m" d="M855,462 V492 H400"/><circle cx="400" cy="492" r="3" fill="#000"/><path class="ar" d="M400,466 V518"/><text class="ns" x="410" y="486">아니오</text><rect class="m" x="165" y="518" width="470" height="108"/><text class="nc" x="400.0" y="539.0">S120  특징 추출</text><text class="ncs" x="400.0" y="558.0">① 프레임 분할 → 주파수 변환 → 대역별 에너지</text><text class="ncs" x="400.0" y="577.0">② 에너지의 시간적 변화율 · 음압 상승 유지 시간</text><text class="ncs" x="400.0" y="596.0">③ 가속도 크기의 시간적 변화율 · 최대 가속도</text><text class="ncs" x="400.0" y="615.0">→ ①②③ 결합하여 특징 벡터 생성</text><path class="ar" d="M400,626 V656"/><rect class="m" x="225" y="656" width="350" height="62"/><text class="nc" x="400.0" y="682.5">S130  추론 (추론 연산부 131)</text><text class="ncs" x="400.0" y="701.5">이벤트 종류별 확신도 산출</text><path class="ar" d="M400,718 V748"/><path class="m" d="M400,748.0 L570.0,796 L400,844.0 L230.0,796 Z"/><text class="nc" x="400" y="782.0">S140  최대 확신도 ≥ 문턱값</text><text class="ncs" x="400" y="801.0">AND 직전 판정으로부터</text><text class="ncs" x="400" y="820.0">불응 시간 경과?</text><path class="m" d="M230,796 H70 V310"/><path class="ar" d="M70,310 H223"/><text class="ns" x="86" y="782">아니오</text><path class="ar" d="M400,844 V874"/><text class="ns" x="410" y="868">예</text><path class="m" d="M400,880.0 L570.0,922 L400,964.0 L230.0,922 Z"/><text class="nc" x="400" y="917.5">S145  브로드캐스트</text><text class="ncs" x="400" y="936.5">무선 신호 수신 중?</text><path class="ar" d="M570,922 H740"/><text class="ns" x="660" y="914">예</text><rect class="m" x="740" y="880" width="210" height="84"/><text class="nc" x="845.0" y="908.0">S146 연출 우선</text><text class="ncs" x="845.0" y="927.0">발광 : 연출 데이터</text><text class="ncs" x="845.0" y="946.0">진동 : 내부 판별 결과</text><path class="m" d="M845,964 V1002 H520"/><path class="ar" d="M520,1002 V1036"/><path class="ar" d="M400,964 V1036"/><text class="ns" x="410" y="996">아니오</text><rect class="m" x="165" y="1036" width="470" height="82"/><text class="nc" x="400.0" y="1063.0">S150  패턴 출력</text><text class="ncs" x="400.0" y="1082.0">발광 패턴 → 발광 드라이버 124</text><text class="ncs" x="400.0" y="1101.0">진동 패턴 → 햅틱 드라이버 161  (개시 시각 정렬)</text><path class="m" d="M165,1077 H152 V276 H340"/><path class="ar" d="M340,276 V294"/><text class="note" x="60" y="1170">S110 ~ S150 의 모든 단계는 외부 서버와의 통신 없이 발광 응원 장치(100) 내부에서 수행된다.</text><text class="note" x="60" y="1198">불응 시간의 도입에 의하여 동일 이벤트의 반복 판정에 따른 출력 진동이 억제된다.</text></svg>

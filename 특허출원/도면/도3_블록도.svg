@@ -1,72 +1,33 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="900" height="700" viewBox="0 0 900 700">
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="900" viewBox="0 0 1200 900">
 <style>
- .b{fill:none;stroke:#000;stroke-width:2}
- .g{fill:none;stroke:#000;stroke-width:1.5;stroke-dasharray:8 6}
- .a{fill:none;stroke:#000;stroke-width:1.4}
- .t{font:15px sans-serif;fill:#000;text-anchor:middle}
- .s{font:13px sans-serif;fill:#000;text-anchor:middle}
- .cap{font:bold 20px sans-serif;fill:#000;text-anchor:middle}
+ text{font-family:'Noto Sans CJK KR','NanumGothic','DejaVu Sans',sans-serif;fill:#000;stroke:none}
+ .o{fill:none;stroke:#000;stroke-width:2.4;stroke-linejoin:round;stroke-linecap:round}
+ .m{fill:none;stroke:#000;stroke-width:1.5;stroke-linejoin:round;stroke-linecap:round}
+ .f{fill:none;stroke:#000;stroke-width:0.9;stroke-linejoin:round}
+ .hd{fill:none;stroke:#000;stroke-width:1.0;stroke-dasharray:7 5}
+ .ct{fill:none;stroke:#000;stroke-width:1.0;stroke-dasharray:20 4 4 4}
+ .ld{fill:none;stroke:#000;stroke-width:0.9}
+ .ar{fill:none;stroke:#000;stroke-width:1.4;marker-end:url(#ar)}
+ .ar2{fill:none;stroke:#000;stroke-width:1.1;marker-end:url(#ar)}
+ .ray{fill:none;stroke:#000;stroke-width:1.0;stroke-dasharray:6 4;marker-end:url(#ar)}
+ .n{font-size:15px}
+ .ns{font-size:13.5px}
+ .nc{font-size:14px;text-anchor:middle}
+ .ncs{font-size:12px;text-anchor:middle}
+ .cap{font-size:21px;font-weight:700;text-anchor:middle}
+ .sub{font-size:14px}
+ .note{font-size:12.5px}
 </style>
-<rect width="900" height="700" fill="#fff"/>
-<defs><marker id="ar" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 z" fill="#000"/></marker></defs>
-<text class="cap" x="450" y="36">【도 3】</text>
-
-<!-- body group -->
-<rect class="g" x="40" y="60" width="620" height="490"/>
-<text class="s" x="118" y="82">100 (110 본체)</text>
-
-<!-- sensor block -->
-<rect class="b" x="70" y="110" width="180" height="240"/>
-<text class="t" x="160" y="134">센서부 (140)</text>
-<rect class="b" x="88" y="148" width="144" height="30"/><text class="s" x="160" y="168">마이크로폰 141</text>
-<rect class="b" x="88" y="184" width="144" height="30"/><text class="s" x="160" y="204">관성센서 142</text>
-<rect class="b" x="88" y="220" width="144" height="30"/><text class="s" x="160" y="240">터치센서 143</text>
-<rect class="b" x="88" y="256" width="144" height="30"/><text class="s" x="160" y="276">조도센서 144</text>
-<rect class="b" x="88" y="292" width="144" height="24"/><text class="s" x="160" y="309">홀 센서 145</text>
-<rect class="b" x="88" y="320" width="144" height="24"/><text class="s" x="160" y="337">온도센서 146</text>
-
-<!-- controller -->
-<rect class="b" x="300" y="150" width="160" height="150"/>
-<text class="t" x="380" y="178">제어부 (130)</text>
-<rect class="b" x="316" y="196" width="128" height="34"/><text class="s" x="380" y="217">추론 연산부 131</text>
-<rect class="b" x="316" y="240" width="128" height="34"/><text class="s" x="380" y="261">메모리 132</text>
-
-<!-- output -->
-<rect class="b" x="510" y="110" width="130" height="90"/>
-<text class="s" x="575" y="140">발광 드라이버</text><text class="s" x="575" y="158">(124)</text>
-<rect class="b" x="510" y="216" width="130" height="90"/>
-<text class="s" x="575" y="246">발광 모듈 (120)</text><text class="s" x="575" y="266">121 / 122 / 123</text>
-<rect class="b" x="510" y="322" width="130" height="80"/>
-<text class="s" x="575" y="352">햅틱부 (160)</text><text class="s" x="575" y="372">161 / 진동모터</text>
-
-<!-- comm -->
-<rect class="b" x="300" y="330" width="160" height="110"/>
-<text class="t" x="380" y="356">무선통신부 (150)</text>
-<rect class="b" x="316" y="368" width="128" height="28"/><text class="s" x="380" y="387">BLE 모듈 151</text>
-<rect class="b" x="316" y="402" width="128" height="28"/><text class="s" x="380" y="421">NFC 모듈 152</text>
-
-<!-- handle group -->
-<rect class="g" x="70" y="400" width="180" height="140"/>
-<text class="s" x="132" y="422">손잡이부 (200)</text>
-<rect class="b" x="88" y="434" width="144" height="26"/><text class="s" x="160" y="452">배터리 171</text>
-<rect class="b" x="88" y="464" width="144" height="26"/><text class="s" x="160" y="482">충전 회로 172</text>
-<rect class="b" x="88" y="494" width="144" height="26"/><text class="s" x="160" y="512">전력관리 173 / 174</text>
-
-<!-- external -->
-<rect class="b" x="700" y="150" width="150" height="70"/>
-<text class="s" x="775" y="180">사용자 단말</text><text class="s" x="775" y="200">(300 / 310)</text>
-<rect class="b" x="700" y="300" width="150" height="70"/>
-<text class="s" x="775" y="330">송출부 (500)</text><text class="s" x="775" y="350">← 서버 (400)</text>
-
-<!-- arrows -->
-<line class="a" x1="250" y1="230" x2="298" y2="230" marker-end="url(#ar)"/>
-<line class="a" x1="460" y1="180" x2="508" y2="155" marker-end="url(#ar)"/>
-<line class="a" x1="460" y1="290" x2="508" y2="350" marker-end="url(#ar)"/>
-<line class="a" x1="575" y1="200" x2="575" y2="214" marker-end="url(#ar)"/>
-<line class="a" x1="380" y1="300" x2="380" y2="328" marker-end="url(#ar)"/>
-<line class="a" x1="460" y1="382" x2="698" y2="190" marker-end="url(#ar)"/>
-<line class="a" x1="698" y1="335" x2="462" y2="400" marker-end="url(#ar)"/>
-<line class="a" x1="232" y1="450" x2="298" y2="290" marker-end="url(#ar)"/>
-<text class="s" x="262" y="368">전력/신호 (220-115)</text>
-<text class="s" x="600" y="410">BLE 브로드캐스트</text>
-</svg>
+<defs>
+ <marker id="ar" markerWidth="10" markerHeight="10" refX="8.5" refY="3" orient="auto">
+  <path d="M0,0 L8.5,3 L0,6 z" fill="#000"/></marker>
+ <pattern id="hA" width="8" height="8" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
+  <line x1="0" y1="0" x2="0" y2="8" stroke="#000" stroke-width="0.8"/></pattern>
+ <pattern id="hB" width="8" height="8" patternTransform="rotate(-45)" patternUnits="userSpaceOnUse">
+  <line x1="0" y1="0" x2="0" y2="8" stroke="#000" stroke-width="0.8"/></pattern>
+ <pattern id="hC" width="5" height="5" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
+  <line x1="0" y1="0" x2="0" y2="5" stroke="#000" stroke-width="1.6"/></pattern>
+ <pattern id="hD" width="6" height="6" patternUnits="userSpaceOnUse">
+  <circle cx="3" cy="3" r="1.0" fill="#000"/></pattern>
+</defs>
+<rect width="1200" height="900" style="fill:#fff"/><text class="cap" x="600.0" y="40">【도 3】</text><text class="sub" x="30" y="72">발광 응원 장치의 구성 블록도</text><rect class="hd" x="46" y="100" width="770" height="500"/><text class="ns" x="58" y="122">구형 하우징 (110) 내부</text><rect class="o" x="78" y="152" width="214" height="336" rx="0"/><text class="nc" x="185" y="178">센서부 (140)</text><rect class="m" x="96" y="192" width="178" height="38" rx="0"/><text class="ncs" x="185" y="216">마이크로폰　141</text><rect class="m" x="96" y="240" width="178" height="38" rx="0"/><text class="ncs" x="185" y="264">관성센서　142</text><rect class="m" x="96" y="288" width="178" height="38" rx="0"/><text class="ncs" x="185" y="312">터치센서　143</text><rect class="m" x="96" y="336" width="178" height="38" rx="0"/><text class="ncs" x="185" y="360">조도센서　144</text><rect class="m" x="96" y="384" width="178" height="38" rx="0"/><text class="ncs" x="185" y="408">홀 센서　145</text><rect class="m" x="96" y="432" width="178" height="38" rx="0"/><text class="ncs" x="185" y="456">온도센서　146</text><rect class="o" x="352" y="158" width="232" height="214" rx="0"/><text class="nc" x="468" y="184">제어부 (130)</text><rect class="m" x="372" y="198" width="192" height="52" rx="0"/><text class="ncs" x="468" y="220">추론 연산부 131</text><text class="ncs" x="468" y="240">(NPU / 추론 엔진)</text><rect class="m" x="372" y="262" width="192" height="52" rx="0"/><text class="ncs" x="468" y="284">메모리 132</text><text class="ncs" x="468" y="304">추론모델 · 패턴 데이터</text><rect class="m" x="372" y="326" width="192" height="32" rx="0"/><text class="ncs" x="468" y="347">내부 클럭 · 타이머</text><rect class="o" x="352" y="412" width="232" height="158" rx="0"/><text class="nc" x="468" y="438">무선통신부 (150)</text><rect class="m" x="372" y="452" width="172" height="46" rx="0"/><text class="ncs" x="458" y="480">BLE 모듈 151</text><rect class="m" x="372" y="506" width="172" height="46" rx="0"/><text class="ncs" x="458" y="534">NFC 모듈 152</text><path class="m" d="M556,470 l18,-11 v22 z"/><path class="m" d="M550,530 h18 M559,520 v20"/><rect class="o" x="646" y="158" width="152" height="74" rx="0"/><text class="nc" x="722.0" y="192.0">발광 드라이버</text><text class="ncs" x="722.0" y="210.0">124</text><rect class="o" x="646" y="258" width="152" height="132" rx="0"/><text class="nc" x="722" y="286">발광 모듈 (120)</text><text class="ncs" x="722" y="312">기판 121</text><text class="ncs" x="722" y="334">발광 소자 122</text><text class="ncs" x="722" y="356">도광 리브 123</text><rect class="o" x="646" y="424" width="152" height="132" rx="0"/><text class="nc" x="722" y="452">햅틱부 (160)</text><rect class="m" x="662" y="468" width="120" height="34" rx="0"/><text class="ncs" x="722" y="490">햅틱 드라이버 161</text><rect class="m" x="662" y="510" width="120" height="34" rx="0"/><text class="ncs" x="722" y="532">진동 모터</text><rect class="hd" x="46" y="672" width="770" height="180"/><text class="ns" x="58" y="694">손잡이부 (200)</text><rect class="o" x="96" y="706" width="150" height="100" rx="0"/><text class="nc" x="171.0" y="753.0">배터리</text><text class="ncs" x="171.0" y="771.0">171</text><rect class="m" x="276" y="706" width="150" height="46" rx="0"/><text class="nc" x="351.0" y="734.0">충전 회로 172</text><rect class="m" x="276" y="762" width="150" height="44" rx="0"/><text class="nc" x="351.0" y="789.0">보호 회로 174</text><rect class="o" x="456" y="706" width="176" height="100" rx="0"/><text class="nc" x="544" y="742">전력 관리 회로</text><text class="ncs" x="544" y="766">173 (PMIC)</text><text class="ncs" x="544" y="790">VLED / 3V3 생성</text><rect class="m" x="662" y="706" width="130" height="46" rx="0"/><text class="nc" x="727.0" y="734.0">커넥터 175</text><rect class="m" x="662" y="762" width="130" height="44" rx="0"/><text class="nc" x="727.0" y="789.0">전원 버튼 230</text><rect class="o" x="880" y="158" width="268" height="116" rx="0"/><text class="nc" x="1014" y="192">사용자 단말 (300)</text><text class="ncs" x="1014" y="220">응용 프로그램 310</text><text class="ncs" x="1014" y="246">패턴 · 좌표 식별자 · 갱신</text><rect class="o" x="880" y="400" width="268" height="84" rx="0"/><text class="nc" x="1014.0" y="439.0">송출부 (500)</text><text class="ncs" x="1014.0" y="457.0">브로드캐스트 송출</text><rect class="o" x="880" y="512" width="268" height="84" rx="0"/><text class="nc" x="1014.0" y="551.0">서버 (400)</text><text class="ncs" x="1014.0" y="569.0">410 스케줄러 / 420 매핑 DB</text><path class="ar" d="M1014,512 V488"/><path class="ar" d="M292,212 H350"/><text class="ns" x="298" y="204">I2S</text><path class="ar" d="M292,260 H350"/><text class="ns" x="298" y="252">I2C</text><path class="m" d="M292,404 H320 V300"/><path class="ar" d="M320,300 H350"/><text class="ns" x="296" y="396">GPIO</text><path class="ar" d="M584,196 H644"/><text class="ns" x="590" y="188">SPI</text><path class="ar" d="M722,232 V256"/><text class="ns" x="730" y="250">125</text><path class="m" d="M584,350 H604 V470"/><path class="ar" d="M604,470 H644"/><path class="ar" d="M468,372 V410"/><path class="ar" d="M478,410 V374"/><path class="m" d="M584,478 H800"/><path class="m" d="M800,478 a7,7 0 0 1 12,0"/><path class="m" d="M812,478 H856 V216"/><path class="ar" d="M856,216 H878"/><path class="ar" d="M866,226 V466 H586"/><text class="ncs" x="838" y="300">BLE</text><text class="ncs" x="838" y="318">양방향</text><path class="m" d="M878,442 H838 V506 H812"/><path class="m" d="M812,506 a7,7 0 0 0 -12,0"/><path class="ar" d="M800,506 H586"/><text class="ncs" x="838" y="352">브로드캐스트</text><text class="ncs" x="838" y="370">수신</text><path class="m" d="M544,706 V644 H185"/><path class="m" d="M544,644 H806 V196"/><path class="ar" d="M806,196 H800"/><path class="ar" d="M185,644 V490"/><path class="m" d="M468,644 V574"/><path class="ar" d="M468,574 V572"/><path class="ar" d="M722,644 V558"/><text class="ns" x="196" y="636">3V3</text><text class="ns" x="734" y="636">VLED</text><path class="ar" d="M246,752 H274"/><path class="ar" d="M426,752 H454"/><text class="ns" x="330" y="700">VBAT</text><text class="ns" x="56" y="618">전력 · 신호 : 결합부(220) – 대응 접점(115) 경유</text></svg>
