@@ -186,6 +186,64 @@ def cmd_backtest(a) -> int:
     return 0
 
 
+def cmd_live(a) -> int:
+    """실제 브로커에 주문을 내는 경로. 기본은 페이퍼 계좌입니다."""
+    from .live import AlpacaClient, AlpacaError, GuardConfig, LiveRunner
+
+    key = os.environ.get("ALPACA_API_KEY", "")
+    secret = os.environ.get("ALPACA_API_SECRET", "")
+    if not (key and secret):
+        print("ALPACA_API_KEY / ALPACA_API_SECRET 환경변수가 필요합니다.\n"
+              "  https://alpaca.markets 에서 페이퍼 계좌 키를 먼저 받으세요.", file=sys.stderr)
+        return 2
+
+    paper = not a.real
+    if a.real and os.environ.get("SCALPER_ALLOW_LIVE") != "1":
+        print("실계좌 주문은 SCALPER_ALLOW_LIVE=1 까지 있어야 열립니다.\n"
+              "  페이퍼로 최소 2주 검증한 뒤에 켜세요.", file=sys.stderr)
+        return 2
+
+    cfg = _cfg_from_args(a)
+    guards = GuardConfig(
+        allow_extended_hours=a.extended,
+        open_buffer_min=a.open_buffer,
+        close_buffer_min=a.close_buffer,
+        respect_pdt=not a.ignore_pdt,
+        daily_loss_limit_pct=cfg.daily_loss_limit_pct * 100,
+        min_equity=a.min_equity or 0.0,
+    )
+
+    try:
+        client = AlpacaClient(key, secret, paper=paper)
+    except AlpacaError as e:
+        print(f"클라이언트 초기화 실패: {e}", file=sys.stderr)
+        return 2
+
+    runner = LiveRunner(client, a.tickers or DEFAULT_TICKERS, cfg=cfg,
+                        guard_cfg=guards, state_path=a.state,
+                        use_context=not a.no_context)
+
+    print(BAR)
+    print(f"  모드       {'⚠ 실계좌 — 진짜 돈이 나갑니다' if a.real else '페이퍼 계좌 (모의)'}")
+    print(f"  종목       {' / '.join(s.ticker for s in runner.slots)}")
+    print(f"  리스크     1회 {cfg.risk_per_trade*100:.2f}% · 최대 {cfg.max_positions}포지션 "
+          f"· 일일한도 -{cfg.daily_loss_limit_pct*100:.1f}%")
+    print(f"  주기       {a.interval}초 · 상태파일 {a.state}")
+    if a.serve:
+        from .live.monitor import serve as serve_monitor
+        serve_monitor(runner, port=a.serve)
+        print(f"  모니터     http://127.0.0.1:{a.serve}  (읽기 전용)")
+    print(f"  정지       Ctrl+C 또는 `touch {guards.halt_file}` (즉시 전량 청산)")
+    print(BAR)
+
+    try:
+        runner.run(interval=a.interval, iterations=a.iterations)
+    except AlpacaError as e:
+        print(f"치명적 오류: {e}", file=sys.stderr)
+        return 1
+    return 0
+
+
 def cmd_run(a) -> int:
     cfg = _cfg_from_args(a)
     broker = None
@@ -281,6 +339,31 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--seed", type=int, default=7)
     common(sp)
     sp.set_defaults(func=cmd_backtest)
+
+    sp = sub.add_parser("live", help="실전 매매 (Alpaca)")
+    sp.add_argument("tickers", nargs="*", help="종목 3개 (기본 NVDA TSLA AAPL)")
+    sp.add_argument("--interval", type=float, default=5.0,
+                    help="틱 주기(초). API 분당 200콜 예산을 지키려면 3초 이상 권장")
+    sp.add_argument("--iterations", type=int, default=None, help="N번만 돌고 종료")
+    sp.add_argument("--state", default=".scalper_state.json",
+                    help="하루 상태 저장 파일 (재시작해도 손실 한도가 유지됩니다)")
+    sp.add_argument("--real", action="store_true",
+                    help="⚠ 실계좌. SCALPER_ALLOW_LIVE=1 도 필요합니다")
+    sp.add_argument("--extended", action="store_true", help="프리/애프터장 허용")
+    sp.add_argument("--open-buffer", dest="open_buffer", type=int, default=5,
+                    help="개장 후 N분간 신규 진입 금지")
+    sp.add_argument("--close-buffer", dest="close_buffer", type=int, default=15,
+                    help="마감 N분 전부터 신규 진입 금지")
+    sp.add_argument("--ignore-pdt", dest="ignore_pdt", action="store_true",
+                    help="PDT 제한 무시 (권장하지 않습니다)")
+    sp.add_argument("--min-equity", dest="min_equity", type=float, default=0.0,
+                    help="자산이 이 아래면 신규 진입 중단")
+    sp.add_argument("--no-context", dest="no_context", action="store_true",
+                    help="뉴스·매크로 없이 기술 신호만 사용")
+    sp.add_argument("--serve", type=int, default=0, metavar="PORT",
+                    help="읽기 전용 모니터 화면을 이 포트로 띄웁니다 (예: 8790)")
+    common(sp)
+    sp.set_defaults(func=cmd_live)
 
     sp = sub.add_parser("run", help="대시보드 + 3슬롯 엔진")
     sp.add_argument("tickers", nargs="*", help="슬롯 1/2/3 종목 (기본 NVDA TSLA AAPL)")

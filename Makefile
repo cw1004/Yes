@@ -9,7 +9,7 @@ CAPTION ?=            # 비우면 내레이션과 동일 (예: CAPTION=ko)
 LANG_OPT = --lang $(NARRATION) $(if $(CAPTION),--caption-lang $(CAPTION),)
 
 .PHONY: help setup check scripts all hindi fast test clean \
-        scalp scalp-live scan macro bt test-scalper
+        scalp scalp-live scan macro bt test-scalper live
 
 help:            ## 사용 가능한 명령 보기
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -37,7 +37,7 @@ test:            ## 테스트 실행
 	$(PY) -m unittest discover -s tests
 
 test-scalper:    ## 스캘퍼 테스트만 실행 (네트워크 불필요)
-	$(PY) -m unittest discover -s tests -p 'test_scalper.py'
+	$(PY) -m unittest discover -s tests -p 'test_scalper*.py'
 
 scalp:           ## 3분할 단타 대시보드 (시뮬레이션)
 	$(PY) -m scalper run $(TICKERS)
@@ -47,6 +47,9 @@ scalp-live:      ## 3분할 단타 대시보드 (실 시세 + AUTO)  예) make s
 
 scan:            ## 워치리스트 스캔 → 오늘의 추천 3선
 	$(PY) -m scalper scan $(TICKERS)
+
+live:            ## 실전 매매 (Alpaca 페이퍼)  예) make live TICKERS="NVDA AMD SPY"
+	$(PY) -m scalper live $(TICKERS) --serve 8790
 
 macro:           ## 세계 정세·거시 레짐 판독
 	$(PY) -m scalper macro

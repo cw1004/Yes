@@ -35,8 +35,21 @@ jobs:
       - name: 서드파티 없이 import 되는지
         run: python -c "import scalper, scalper.cli, scalper.engine, scalper.server; print(scalper.__version__)"
 
-      - name: 단위 테스트
-        run: python -m unittest discover -s tests -p 'test_scalper.py' -v
+      - name: 단위 테스트 (신호 + 실전 실행부)
+        run: python -m unittest discover -s tests -p 'test_scalper*.py' -v
+
+      - name: 실전 경로 안전장치 확인
+        run: |
+          # 키가 없으면 주문 경로가 열리면 안 됩니다.
+          if python -m scalper live --iterations 1; then
+            echo "실패: 키 없이도 live 가 실행됐습니다"; exit 1
+          fi
+          # 실계좌는 환경변수 없이 열리면 안 됩니다.
+          if ALPACA_API_KEY=x ALPACA_API_SECRET=y python -m scalper live --real; then
+            echo "실패: SCALPER_ALLOW_LIVE 없이 실계좌가 열렸습니다"; exit 1
+          fi
+          echo "실계좌 잠금 정상"
+
 
       - name: 오프라인 백테스트
         run: python -m scalper backtest NVDA TSLA --offline --bars 300

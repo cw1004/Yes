@@ -28,6 +28,7 @@ python3 -m scalper run --live --auto --broker alpaca   # Alpaca 페이퍼 계좌
 | `backtest.py` | 워크포워드 검증 (미래참조 없음) |
 | `broker.py` | Alpaca 주문 (페이퍼 기본, 실계좌는 2중 잠금) |
 | `server.py` + `web/` | 로컬 대시보드 |
+| **`live/`** | **실전 매매 — 실제 브로커 주문 (8장 참고)** |
 
 ---
 
@@ -170,38 +171,101 @@ python3 -m scalper backtest NVDA TSLA AAPL --offline
 
 ---
 
-## 8. 실제 돈으로 연결하기
+## 8. 실제 돈으로 연결하기 — `scalper/live/`
 
-### 8-1. 키 발급
+`run` 명령은 시뮬레이션입니다. **실제 주문은 `live` 명령과 `scalper/live/` 패키지가 냅니다.**
 
 ```bash
-export ALPACA_API_KEY="..."         # https://alpaca.markets  (미국주식 수수료 무료)
+python3 -m scalper live                            # Alpaca 페이퍼 계좌
+python3 -m scalper live NVDA AMD SPY --serve 8790  # 모니터 화면까지
+```
+
+### 8-1. 시뮬레이션과 무엇이 다른가
+
+시뮬레이션의 치명적 가정은 **"내가 산 줄 알면 산 것"** 이었습니다. 실전은 다릅니다.
+
+| 항목 | 시뮬레이션 (`run`) | 실전 (`live`) |
+|---|---|---|
+| 포지션의 진실 | 프로그램 메모리 | **브로커** (매 틱 대조) |
+| 진입가 | 5분봉 종가 | **실제 체결 평균가** |
+| 손절 판단 가격 | 5분봉 종가 | **실시간 체결가** |
+| 브래킷 손절이 거래소에서 체결되면 | 모름 (좀비 포지션) | 다음 틱에 청산으로 확정 |
+| 재시작하면 | 포지션·일일손익 소실 | 상태 파일 복원 + 보유분 인수 |
+| 장 마감 / PDT | 무시 | 진입 차단 |
+| API 오류·레이트리밋 | 없음 | 재시도 + 백오프 |
+
+구성:
+
+| 파일 | 역할 |
+|---|---|
+| `live/client.py` | Alpaca REST — 재시도·레이트리밋·실시간가·주문상태 |
+| `live/guards.py` | 시장시간 / PDT / 일일손실 / 킬 스위치 |
+| `live/state.py` | 재시작해도 유지되는 하루 상태 (원자적 저장) |
+| `live/executor.py` | 주문 실행 + **브로커 대조** (핵심) |
+| `live/runner.py` | 신호 × 안전장치 × 주문을 묶은 루프 |
+| `live/monitor.py` | 읽기 전용 모니터 화면 |
+
+### 8-2. 주문이 나가기 전에 통과해야 하는 관문
+
+하나라도 걸리면 **신규 진입은 막히고, 청산은 계속 허용**됩니다. 손절을 막는 조건은 없습니다.
+
+- 장 마감 / 프리·애프터장 (`--extended` 로 해제)
+- 개장 후 5분, 마감 전 15분 (`--open-buffer` / `--close-buffer`)
+- PDT: 자산 2.5만 달러 미만 + 당일매매 3회 이상 (`--ignore-pdt` 로 해제, 권장하지 않음)
+- 일일 손실 한도 도달
+- 계좌 거래정지 상태
+- 킬 스위치 파일 존재
+- 1주 미만 수량 (브래킷 주문은 소수점 매수를 지원하지 않습니다)
+
+### 8-3. 킬 스위치
+
+자리를 비운 사이 뭔가 잘못됐을 때, 파일 하나로 즉시 멈춥니다.
+
+```bash
+touch .scalper_halt      # 보유 포지션 전량 청산 후 정지
+rm .scalper_halt         # 해제
+```
+
+### 8-4. 단계별로 올라가기
+
+```bash
+export ALPACA_API_KEY="..."      # https://alpaca.markets (미국주식 수수료 무료)
 export ALPACA_API_SECRET="..."
-export FINNHUB_API_KEY="..."        # 선택 — 종목 뉴스 커버리지가 크게 올라감
-export MARKETAUX_API_KEY="..."      # 선택
+export FINNHUB_API_KEY="..."     # 선택 — 종목 뉴스 커버리지 향상
+
+python3 -m scalper check                        # 1. 키·네트워크 점검
+python3 -m scalper backtest NVDA --live         # 2. 실 데이터로 검증
+python3 -m scalper run --live                   # 3. 실 시세, 주문 없음 (신호만)
+python3 -m scalper live --serve 8790            # 4. 페이퍼 계좌 실제 주문
 ```
 
-### 8-2. 단계별로 올라가기
+**4번을 최소 2주** 돌려 승률·손익비·MDD를 확인한 뒤에 실계좌를 얘기하세요.
 
-```bash
-python3 -m scalper check                                  # 1. 키·네트워크 점검
-python3 -m scalper backtest NVDA --live                   # 2. 실 데이터로 검증
-python3 -m scalper run --live                             # 3. 실 시세, 신호만 (주문 없음)
-python3 -m scalper run --live --auto --broker alpaca      # 4. 페이퍼 계좌 자동매매
-```
-
-4번을 **최소 2주** 돌려 승률·손익비·MDD를 확인한 뒤에 실계좌를 얘기하세요.
-
-### 8-3. 실계좌 (2중 잠금)
+### 8-5. 실계좌 (2중 잠금)
 
 ```bash
 export SCALPER_ALLOW_LIVE=1
-python3 -m scalper run --live --auto --broker alpaca --live-account
+python3 -m scalper live --real
 ```
 
-`--live-account` 만으로는 열리지 않습니다. 환경변수까지 있어야 실계좌 엔드포인트로
-요청이 나갑니다. 주문은 항상 **브래킷 주문**(진입 + 손절 + 익절 동시)으로 나가므로
-프로그램이나 인터넷이 끊겨도 손절은 거래소에 남아 있습니다.
+`--real` 만으로는 열리지 않습니다. 환경변수까지 있어야 실계좌 엔드포인트로 요청이 나갑니다.
+CI 가 이 잠금이 살아 있는지 매번 검사합니다.
+
+주문은 항상 **브래킷 주문**(진입 + 손절 + 익절 동시)입니다. 프로그램이 죽거나 인터넷이
+끊겨도 손절은 거래소에 남아 있습니다. 그리고 그 손절이 체결되면 다음 틱에 우리 장부에
+자동으로 반영됩니다.
+
+### 8-6. 모니터 화면
+
+`--serve 8790` 을 붙이면 http://127.0.0.1:8790 에 상태 화면이 뜹니다.
+**읽기 전용입니다** — 실계좌가 도는 중에 브라우저 버튼 하나로 사고가 나지 않도록
+POST 요청 자체를 405 로 막았습니다. 정지는 콘솔 Ctrl+C 또는 킬 스위치 파일로만 합니다.
+
+### 8-7. API 호출 예산
+
+Alpaca 는 분당 200콜입니다. 기본 5초 주기에서 틱당 호출은 8회 이하로 유지됩니다
+(포지션 1 + 실시간가 3 + 여유). 계좌·시장시간은 30초, 봉은 60초, 뉴스·매크로는 5분
+캐시입니다. `--interval` 을 3초 미만으로 내리면 예산을 넘길 수 있습니다.
 
 ---
 
@@ -218,6 +282,16 @@ python3 -m scalper run --live --auto --broker alpaca --live-account
 --interval 1.5            틱 주기(초)
 --headless                웹 없이 콘솔만
 --offline                 외부 호출 없이 시뮬레이터만
+
+live 전용:
+--serve 8790              읽기 전용 모니터 화면
+--real                    ⚠ 실계좌 (SCALPER_ALLOW_LIVE=1 필요)
+--extended                프리/애프터장 허용
+--open-buffer 5           개장 후 N분간 신규 진입 금지
+--close-buffer 15         마감 N분 전부터 신규 진입 금지
+--ignore-pdt              PDT 제한 무시 (권장하지 않음)
+--state FILE              하루 상태 저장 위치
+--no-context              뉴스·매크로 없이 기술 신호만
 ```
 
 ---
