@@ -1,7 +1,11 @@
 # -*- coding: utf-8 -*-
 """클릭 추적 리다이렉트 서버.
 
-  https://내도메인/r/<code>   → 클릭 기록 후 제휴 링크로 302
+  GET  /                      → 링크인바이오 페이지 (프로필 링크에 거는 주소)
+  GET  /shop?p=instagram      → 같은 페이지, 유입 플랫폼별로 추적 코드를 분리
+  GET  /r/<code>              → 클릭 기록 후 제휴 링크로 302
+  GET  /img/<key>.jpg         → 상품 썸네일
+  GET  /v/<key>.mp4           → 영상 파일 (인스타그램 Graph API 가 공개 URL 을 요구한다)
   POST /postback              → 제휴 네트워크 전환 웹훅 (주문/수수료 기록)
   GET  /stats                 → 요약 JSON
   GET  /health                → 헬스체크
@@ -15,12 +19,20 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 from typing import Dict, Optional, Tuple
 from urllib.parse import parse_qs, urlparse
 
+from . import landing
 from .config import Config
 from .store import Store
+
+# 정적 파일 경로에 허용하는 이름 (경로 탈출 차단)
+SAFE_NAME = re.compile(r"^[0-9a-zA-Z_-]{1,64}$")
+MEDIA_TYPES = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png",
+               ".mp4": "video/mp4"}
 
 SALT = os.environ.get("SHOPREEL_IP_SALT", "shopreel")
 
@@ -55,6 +67,31 @@ class Handler(BaseHTTPRequestHandler):
         self._send(code, json.dumps(payload, ensure_ascii=False).encode("utf-8"),
                    "application/json; charset=utf-8")
 
+    def _serve_file(self, name: str, suffix: str) -> None:
+        """output/shopreel/video/ 안의 파일만 내보낸다."""
+        if not SAFE_NAME.match(name) or suffix not in MEDIA_TYPES:
+            return self._send(404, b"not found")
+        root = self.cfg.video_dir.resolve()
+        path = (self.cfg.video_dir / f"{name}{suffix}").resolve()
+        if suffix == ".jpg":
+            # 카드에는 자막이 박힌 영상 썸네일 대신 상품 원본 사진을 우선 쓴다
+            photo = (self.cfg.video_dir / f"{name}_photo.jpg").resolve()
+            if root in photo.parents and photo.is_file():
+                path = photo
+        if root not in path.parents or not path.is_file():
+            return self._send(404, b"not found")
+        data = path.read_bytes()
+        self._send(200, data, MEDIA_TYPES[suffix],
+                   {"Cache-Control": "public, max-age=3600",
+                    "Accept-Ranges": "none"})
+
+    def _serve_shop(self, query: Dict[str, list]) -> None:
+        platform = (query.get("p") or query.get("platform") or [""])[0][:24]
+        items = self.store.shop_items(limit=24, platform=platform)
+        page = landing.render(items, self.cfg, platform=platform)
+        self._send(200, page.encode("utf-8"), "text/html; charset=utf-8",
+                   {"Cache-Control": "public, max-age=120"})
+
     # ---------------------------------------------------------------- 라우팅
     def do_GET(self) -> None:            # noqa: N802
         parsed = urlparse(self.path)
@@ -86,12 +123,13 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(302, b"", headers={"Location": row["target"],
                                                  "Cache-Control": "no-store"})
 
-        if path == "/":
-            s = self.store.summary(30)
-            body = (f"SHOPREEL tracker\n\n최근 30일\n"
-                    f"  영상 {s['videos']}편 · 게시 {s['posts']}건\n"
-                    f"  클릭 {s['clicks']} · 주문 {s['orders']} · 수수료 {s['revenue']}\n")
-            return self._send(200, body.encode("utf-8"))
+        if path in ("/", "/shop"):
+            return self._serve_shop(parse_qs(parsed.query))
+
+        if path.startswith("/img/") or path.startswith("/v/"):
+            name = path.split("/")[-1]
+            stem, _, ext = name.rpartition(".")
+            return self._serve_file(stem, f".{ext}" if ext else "")
 
         self._send(404, b"not found")
 

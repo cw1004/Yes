@@ -9,6 +9,11 @@
   YOUTUBE_CATEGORY_ID  기본 22 (People & Blogs)
   YOUTUBE_PUBLISH_AT   예약 발행 시각 (RFC3339, privacy=private 일 때만 유효)
   YOUTUBE_THUMBNAIL    0 이면 썸네일 업로드 생략 (채널 인증 전이면 실패한다)
+  YOUTUBE_COMMENT      0 이면 상품 링크 댓글을 달지 않음 (기본 켬)
+
+설명란은 '더보기'에 가려지지만 댓글은 항상 보이므로, 업로드 직후 상품 링크를
+댓글로 남긴다. **댓글 고정(pin)은 YouTube API 가 지원하지 않아** 스튜디오에서
+한 번 눌러 줘야 한다(영상당 3초). 댓글 작성에는 youtube.force-ssl 스코프가 필요하다.
   YOUTUBE_TOKEN_URL / YOUTUBE_API_BASE   테스트용 엔드포인트 교체
 
 할당량 주의: 업로드 1건이 약 1,600 유닛을 쓴다. 기본 일일 할당량 10,000 유닛이면
@@ -200,6 +205,41 @@ class YouTubePublisher(Publisher):
             return 0
         return fallback
 
+    def comment_text(self, meta: Dict, cfg: Config) -> str:
+        """상품 링크 댓글. 광고 표기를 반드시 포함한다."""
+        from .. import compliance
+        link = meta.get("link") or ""
+        product = meta.get("product") or {}
+        title = str(product.get("title") or "")[:60]
+        if cfg.lang == "ko":
+            head = f"👉 상품 보기: {link}" if link else ""
+            body = f"{title}\n{head}" if title else head
+        else:
+            head = f"👉 Get it here: {link}" if link else ""
+            body = f"{title}\n{head}" if title else head
+        return f"{body}\n\n{compliance.disclosure(cfg.lang, cfg.disclosure)}".strip()
+
+    def post_comment(self, token: str, video_id: str, text: str) -> Tuple[bool, str]:
+        """영상에 댓글을 단다. (성공 여부, 안내 메시지)"""
+        if os.environ.get("YOUTUBE_COMMENT", "1") in ("0", "false", "no"):
+            return False, ""
+        if not text.strip():
+            return False, ""
+        payload = {"snippet": {"videoId": video_id,
+                               "topLevelComment": {"snippet": {"textOriginal": text}}}}
+        status, _, body = _request(f"{api_base()}/youtube/v3/commentThreads?part=snippet",
+                                   method="POST", timeout=60, headers={
+                                       "Authorization": f"Bearer {token}",
+                                       "Content-Type": "application/json; charset=UTF-8",
+                                   }, data=json.dumps(payload).encode("utf-8"))
+        if status in (200, 201):
+            return True, "링크 댓글 작성"
+        reason = error_reason(body)
+        if reason in ("insufficientPermissions", "forbidden", "authError"):
+            return False, ("링크 댓글 실패: youtube.force-ssl 스코프가 필요합니다 "
+                           "(python3 -m tools.youtube_auth 로 재발급)")
+        return False, f"링크 댓글 실패: {reason or status}"
+
     def set_thumbnail(self, token: str, video_id: str, thumb: Path) -> bool:
         """썸네일 지정 (채널 인증 전이면 실패한다 — 실패해도 업로드는 성공)."""
         if os.environ.get("YOUTUBE_THUMBNAIL", "1") in ("0", "false", "no"):
@@ -241,11 +281,19 @@ class YouTubePublisher(Publisher):
         if not video_id:
             return self.error(f"업로드 응답에 video id 가 없습니다: {str(data)[:200]}")
 
-        note = ""
+        notes = []
         try:
             if self.set_thumbnail(token, video_id, Path(meta.get("thumbnail", ""))):
-                note = "썸네일 적용"
+                notes.append("썸네일 적용")
         except Exception:
-            note = "썸네일 적용 실패(채널 인증 필요)"
+            notes.append("썸네일 적용 실패(채널 인증 필요)")
+        try:
+            ok_comment, note = self.post_comment(token, video_id,
+                                                 self.comment_text(meta, cfg))
+            if note:
+                notes.append(note)
+        except Exception as e:
+            notes.append(f"링크 댓글 실패: {type(e).__name__}")
 
-        return self.done(video_id, url=f"https://youtube.com/shorts/{video_id}", message=note)
+        return self.done(video_id, url=f"https://youtube.com/shorts/{video_id}",
+                         message=" · ".join(notes))

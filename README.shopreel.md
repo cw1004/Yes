@@ -29,7 +29,9 @@ API 키가 하나도 없어도 데모 데이터로 전체 흐름이 끝까지 �
           ▼
 [영상]  제품 카드 + 켄번즈 + 가격 배지 + 자막 + 내레이션 + 광고 표기  → mp4 (9:16)
           ▼
-[업로드] YouTube Shorts · TikTok · Instagram Reels · Facebook  (일일 한도 준수)
+[업로드] YouTube Shorts · Instagram Reels · Facebook · TikTok  (일일 한도 준수)
+          │  유튜브: 설명란 + 상품 링크 댓글
+          │  인스타·틱톡: 프로필 링크 → 링크인바이오 페이지(/shop)
           ▼
 [수익]  클릭 기록 → 전환 웹훅/CSV → 리포트 → 다음 제작 우선순위에 반영
 ```
@@ -175,6 +177,40 @@ python3 -m shopreel run --sources coupang --publish dryrun
 - 플랫폼별 **일일 업로드 한도**(`daily_limit`)를 넘으면 자동으로 건너뜁니다. 계정 보호용이니
   무리하게 올리지 마세요.
 
+### 6-2. 인스타그램 릴스 붙이기
+
+**필요한 것**
+
+1. 인스타그램 **프로페셔널 계정**(비즈니스/크리에이터) + 페이스북 페이지 연결
+2. Meta 앱 생성 → `instagram_content_publish`, `pages_show_list` 권한
+3. `IG_USER_ID`(인스타그램 비즈니스 계정 ID), `IG_ACCESS_TOKEN`(장기 토큰)
+4. **영상 공개 URL** — Graph API 는 로컬 파일을 받지 않습니다
+
+```bash
+export IG_USER_ID=... IG_ACCESS_TOKEN=...
+python3 -m shopreel run --sources coupang --publish instagram
+```
+
+**영상 공개 URL은 추적 서버가 대신합니다**
+
+별도 스토리지(S3/R2)를 붙이지 않아도, `shopreel serve` 로 띄운 추적 서버를 공개
+도메인에 두면 그 서버가 영상을 서빙합니다. `tracker_base` 를 실제 도메인으로 두면
+`https://내도메인/v/<key>.mp4` 가 자동으로 사용됩니다. (로컬 주소는 인스타그램
+서버가 접근할 수 없으므로 게시하지 않고 `queued` 로 남깁니다.)
+
+원하면 `PUBLIC_VIDEO_BASE=https://cdn.내도메인.com/reels` 로 따로 지정할 수 있습니다.
+
+**자동으로 처리되는 것**
+
+- 컨테이너 생성 → **인코딩 완료까지 대기**(점점 간격을 늘려 최대 5분) → 게시 → 퍼머링크 조회
+- 커버 이미지 지점 지정(`IG_THUMB_OFFSET`, 기본 2초), 피드 동시 노출(`IG_SHARE_TO_FEED`)
+- 3초 미만 영상은 릴스 요건 미달이라 게시하지 않습니다
+- 일일 게시 한도·속도 제한(code 4/17/32 등)은 실패가 아니라 `queued` → `shopreel publish` 로 재시도
+
+> **페이스북 릴스 동시 게시**는 Graph API 가 자동으로 해 주지 않습니다. 인스타그램 앱의
+> 계정 센터에서 "Facebook에 릴스 공유"를 켜 두면 인스타에 올린 릴스가 페이스북에도
+> 함께 올라갑니다. 페이스북 페이지에 직접 올리려면 `--publish facebook` 을 함께 쓰세요.
+
 ### 6-1. 유튜브 붙이기 (한 번만 하면 계속 자동)
 
 **1) 키 발급**
@@ -224,6 +260,23 @@ make shop-youtube        # 쿠팡 수집 → 영상 제작 → 유튜브 업로�
 | **토큰 만료** | OAuth 동의 화면이 **테스트 모드면 refresh token 이 7일 뒤 만료**됩니다 | 동의 화면을 **프로덕션으로 게시**하세요. 만료되면 `python3 -m tools.youtube_auth` 로 재발급 |
 | **썸네일** | `thumbnails.set` 은 **채널 인증(전화번호 확인)** 이 끝나야 됩니다 | 인증 전이면 `YOUTUBE_THUMBNAIL=0`. 썸네일이 실패해도 영상 업로드 자체는 성공합니다 |
 
+**5) 상품 링크 댓글 (클릭률의 핵심)**
+
+설명란은 "더보기"에 가려지지만 댓글은 항상 보입니다. 업로드 직후 상품 링크 댓글을
+자동으로 답니다(광고 표기 포함).
+
+```
+코시 접이식 LED 스탠드 무단조절 USB 충전식
+👉 상품 보기: https://link.내도메인.com/r/c97f33a24c
+
+이 영상은 제휴 링크를 포함하며, 구매 시 수수료를 받을 수 있습니다. #광고
+```
+
+> **댓글 고정(pin)은 YouTube API 가 지원하지 않습니다.** 자동으로 달린 댓글을
+> 스튜디오에서 한 번 눌러 고정해야 합니다(영상당 3초). 끄려면 `YOUTUBE_COMMENT=0`.
+> 댓글 작성에는 `youtube.force-ssl` 스코프가 필요해서, 이전에 발급한 토큰이라면
+> `python3 -m tools.youtube_auth` 로 다시 받아야 합니다(업로드는 그대로 됩니다).
+
 그 외 자동으로 처리되는 것
 
 - 세로 9:16 영상은 본문에 `#Shorts` 를 붙여 쇼츠로 분류되게 합니다.
@@ -234,7 +287,26 @@ make shop-youtube        # 쿠팡 수집 → 영상 제작 → 유튜브 업로�
 
 ---
 
-## 7. 링크·수익 추적
+## 7. 링크인바이오 페이지 (인스타·틱톡 수익화의 전제)
+
+인스타그램과 틱톡은 **캡션에 링크를 걸 수 없고 프로필 링크 한 개만** 허용합니다.
+영상마다 상품이 다른데 링크는 하나뿐이라, 이 페이지가 없으면 두 플랫폼의 조회수는
+클릭으로 이어지지 않습니다.
+
+추적 서버가 이 페이지를 함께 서빙합니다.
+
+```bash
+python3 -m shopreel serve --port 8787
+#   https://내도메인/shop              ← 인스타·틱톡 프로필 링크에 이 주소를 넣습니다
+#   https://내도메인/shop?p=instagram  ← 유입 플랫폼별로 클릭을 나눠 집계
+```
+
+- 최근 만든 영상의 상품이 카드로 나열되고, 각 카드는 그 상품의 추적 링크(`/r/<code>`)로 연결됩니다.
+- 카드 이미지는 **자막이 없는 상품 원본 사진**을 씁니다(영상 썸네일은 자막이 박혀 있어 카드에 부적합).
+- 할인율·정가·인기 순위·배송 정보가 함께 표시되고, 맨 위에 광고 표기가 항상 붙습니다.
+- 외부 CSS·JS·폰트를 쓰지 않아 모바일에서 빠르고, 모든 링크가 상대 경로라 도메인이 바뀌어도 그대로 동작합니다.
+
+## 8. 링크·수익 추적
 
 ```bash
 python3 -m shopreel serve --port 8787       # 추적 서버
@@ -242,7 +314,10 @@ python3 -m shopreel serve --port 8787       # 추적 서버
 
 | 엔드포인트 | 용도 |
 | --- | --- |
+| `GET /shop` | 링크인바이오 페이지 (프로필 링크) |
 | `GET /r/<code>` | 클릭 기록 후 제휴 링크로 302 |
+| `GET /img/<key>.jpg` | 상품 사진 (카드용) |
+| `GET /v/<key>.mp4` | 영상 파일 (인스타그램 Graph API 용) |
 | `POST /postback` | 제휴 네트워크 전환 웹훅 (`code`, `order_id`, `amount`, `commission`) |
 | `GET /stats` | 요약 JSON |
 | `GET /health` | 헬스체크 |
@@ -258,7 +333,7 @@ python3 -m shopreel serve --port 8787       # 추적 서버
 
 ---
 
-## 8. 24시간 자동화
+## 9. 24시간 자동화
 
 한 프로세스로 돌리기
 
@@ -277,7 +352,7 @@ python3 -m shopreel auto --every 180        # 3시간마다, Ctrl+C 로 종료
 
 ---
 
-## 9. 반드시 지켜야 할 것
+## 10. 반드시 지켜야 할 것
 
 - **광고 표기 의무.** 제휴 링크가 있는 콘텐츠는 대가성을 명확히 밝혀야 합니다(공정위
   추천·보증 심사지침, FTC Endorsement Guides). 이 파이프라인은 화면·본문·해시태그
@@ -294,7 +369,7 @@ python3 -m shopreel auto --every 180        # 3시간마다, Ctrl+C 로 종료
 
 ---
 
-## 10. 품질을 올리는 순서
+## 11. 품질을 올리는 순서
 
 1. `--script llm` (ANTHROPIC_API_KEY) — 상품별 카피가 확 달라집니다.
 2. TTS 업그레이드 — `pip install edge-tts` (무료) 또는 `ELEVENLABS_API_KEY`.
@@ -303,7 +378,7 @@ python3 -m shopreel auto --every 180        # 3시간마다, Ctrl+C 로 종료
 5. 2주쯤 데이터가 쌓이면 `shopreel report` 로 이기는 카테고리를 확인하고
    `allow_categories` 로 좁히기.
 
-## 11. 구조
+## 12. 구조
 
 ```
 shopreel/
@@ -317,7 +392,8 @@ shopreel/
   providers/llm.py Claude 대본(선택)
   render/          제품 카드 이미지 + 영상 조립(india2030 엔진 재사용)
   publish/         youtube · tiktok · instagram · facebook · dryrun
-  tracker.py       클릭 리다이렉트 + 전환 웹훅 서버
+  landing.py       링크인바이오 페이지(HTML)
+  tracker.py       클릭 리다이렉트 + 랜딩/정적 서빙 + 전환 웹훅 서버
   revenue.py       수익 집계·CSV 임포트·리포트
   store.py         SQLite 기록
   pipeline.py      전체 흐름
@@ -326,7 +402,8 @@ shopreel/
 tools/
   mock_coupang.py  쿠팡 오픈 API 목 서버 (서명 검증 포함)
   mock_youtube.py  유튜브 Data API 목 서버 (재개형 업로드·할당량 오류 재현)
-  coupang_demo.py  쿠팡→영상→유튜브 전 구간 시연 (키 없이)
+  mock_instagram.py 인스타그램 Graph API 목 서버 (영상 URL 접근성까지 검증)
+  coupang_demo.py  수집→영상→업로드→랜딩 전 구간 시연 (키 없이)
   youtube_auth.py  유튜브 refresh token 발급 도우미
 ```
 

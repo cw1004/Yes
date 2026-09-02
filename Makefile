@@ -9,7 +9,7 @@ LANG_OPT = --lang $(NARRATION) $(if $(CAPTION),--caption-lang $(CAPTION),)
 
 .PHONY: help setup check scripts all hindi fast test clean \
         shop-check shop-trends shop-make shop-run shop-auto shop-serve shop-report \
-        shop-coupang shop-youtube
+        shop-coupang shop-youtube shop-demo
 
 help:            ## 사용 가능한 명령 보기
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -72,3 +72,6 @@ shop-coupang:    ## 쿠팡 파트너스 연동 시연 (키 없이, 서명까지 
 
 shop-youtube:    ## 쿠팡 수집 → 영상 → 유튜브 업로드 전 구간 시연 (키 없이)
 	$(PY) -m tools.coupang_demo --top $(TOP) --duration $(SECS) --fast --youtube
+
+shop-demo:       ## 전 구간 시연 + 링크인바이오 페이지 띄우기 (키 없이)
+	$(PY) -m tools.coupang_demo --top $(TOP) --duration $(SECS) --fast --youtube --instagram --serve

@@ -38,7 +38,7 @@ class YouTubeUploadTestCase(unittest.TestCase):
         self._saved = {k: os.environ.get(k) for k in
                        ("YOUTUBE_CLIENT_ID", "YOUTUBE_CLIENT_SECRET", "YOUTUBE_REFRESH_TOKEN",
                         "YOUTUBE_TOKEN_URL", "YOUTUBE_API_BASE", "YOUTUBE_PRIVACY",
-                        "YOUTUBE_PUBLISH_AT", "YOUTUBE_THUMBNAIL")}
+                        "YOUTUBE_PUBLISH_AT", "YOUTUBE_THUMBNAIL", "YOUTUBE_COMMENT")}
         os.environ.update(env_for(self.base))
         self._chunk = yt.CHUNK
         yt.CHUNK = 64 * 1024              # 여러 청크로 나뉘게 (재개 로직 검증)
@@ -118,6 +118,28 @@ class UploadTest(YouTubeUploadTestCase):
                                       self.cfg)
         self.assertEqual(self.handler.uploads[0]["thumbnail_bytes"], 0)
 
+    def test_link_comment_is_posted(self):
+        meta = dict(self.meta, link="https://link.example.com/r/abc123",
+                    product={"title": "코시 접이식 LED 스탠드"})
+        result = yt.YouTubePublisher().publish(self.video, meta, self.cfg)
+        self.assertTrue(result.ok)
+        self.assertEqual(len(self.handler.comments), 1)
+        comment = self.handler.comments[0]
+        self.assertEqual(comment["video_id"], result.post_id)
+        self.assertIn("https://link.example.com/r/abc123", comment["text"])
+        self.assertIn("코시 접이식 LED 스탠드", comment["text"])
+        self.assertIn("제휴 링크", comment["text"])      # 댓글에도 광고 표기
+        self.assertIn("댓글", result.message)
+
+    def test_comment_can_be_disabled(self):
+        os.environ["YOUTUBE_COMMENT"] = "0"
+        try:
+            yt.YouTubePublisher().publish(
+                self.video, dict(self.meta, link="https://x.test/r/a"), self.cfg)
+        finally:
+            os.environ.pop("YOUTUBE_COMMENT", None)
+        self.assertEqual(self.handler.comments, [])
+
     def test_missing_file_is_error(self):
         result = yt.YouTubePublisher().publish(Path(self.tmp.name) / "없다.mp4",
                                                self.meta, self.cfg)
@@ -133,6 +155,18 @@ class FlakyUploadTest(YouTubeUploadTestCase):
         up = self.handler.uploads[0]
         self.assertEqual(up["sha1"], hashlib.sha1(self.data).hexdigest())
         self.assertEqual(up["size"], len(self.data))
+
+
+class NoCommentScopeTest(YouTubeUploadTestCase):
+    mode = "noscope"      # 예전 토큰이라 youtube.force-ssl 스코프가 없는 상황
+
+    def test_upload_succeeds_even_if_comment_fails(self):
+        result = yt.YouTubePublisher().publish(
+            self.video, dict(self.meta, link="https://x.test/r/a"), self.cfg)
+        self.assertTrue(result.ok)                    # 업로드 자체는 성공
+        self.assertEqual(result.status, "published")
+        self.assertIn("force-ssl", result.message)    # 재발급 안내
+        self.assertEqual(self.handler.comments, [])
 
 
 class QuotaTest(YouTubeUploadTestCase):

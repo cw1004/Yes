@@ -31,6 +31,8 @@ def prepare_visuals(product: Product, script: Script, cfg: Config,
     _, accent = imgprov.palette_for(product)
 
     photo = imgprov.download_image(product.image_url, workdir / "photo.img")
+    if photo:      # 링크인바이오 카드용 원본 사진 (영상 자막이 박히지 않은 이미지)
+        imgprov.save_card_photo(photo, cfg.video_dir / f"{product.key}_photo.jpg")
     disclosure_short = compliance.short_disclosure(cfg.lang)
     badge = _badge_text(product, cfg)
     cta_text = "LINK IN BIO" if cfg.lang != "ko" else "링크는 프로필에"

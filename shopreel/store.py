@@ -314,6 +314,42 @@ class Store:
                 out[r["category"]] = round(float(r["revenue"]) / clicks, 4)
         return out
 
+    def shop_items(self, limit: int = 20, platform: Optional[str] = None) -> List[Dict]:
+        """링크인바이오 페이지에 뿌릴 최신 상품 목록.
+
+        상품마다 플랫폼별 추적 코드를 함께 돌려주므로, 어느 SNS 프로필에서 들어온
+        클릭인지까지 구분된다.
+        """
+        with closing(self._conn()) as con:
+            rows = con.execute(
+                """SELECT v.product_key AS product_key,
+                          MAX(v.created_at) AS created_at,
+                          p.title AS title, p.payload AS payload
+                   FROM videos v JOIN products p ON p.key = v.product_key
+                   GROUP BY v.product_key
+                   ORDER BY created_at DESC LIMIT ?""", (limit,)).fetchall()
+            out: List[Dict] = []
+            for r in rows:
+                try:
+                    product = json.loads(r["payload"] or "{}")
+                except Exception:
+                    product = {}
+                link = con.execute(
+                    "SELECT code FROM links WHERE product_key=? AND platform=? "
+                    "ORDER BY created_at DESC LIMIT 1",
+                    (r["product_key"], platform or "")).fetchone()
+                if link is None:
+                    link = con.execute(
+                        "SELECT code FROM links WHERE product_key=? "
+                        "ORDER BY created_at DESC LIMIT 1", (r["product_key"],)).fetchone()
+                if link is None:
+                    continue
+                product["key"] = r["product_key"]
+                product.setdefault("title", r["title"])
+                out.append({"product": product, "code": link["code"],
+                            "created_at": float(r["created_at"])})
+        return out
+
     def recent_videos(self, limit: int = 20) -> List[Dict]:
         with closing(self._conn()) as con:
             rows = con.execute("SELECT * FROM videos ORDER BY created_at DESC LIMIT ?",

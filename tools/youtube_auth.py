@@ -30,7 +30,8 @@ from typing import Optional
 
 AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 TOKEN_URL = "https://oauth2.googleapis.com/token"
-SCOPE = "https://www.googleapis.com/auth/youtube.upload"
+SCOPE = ("https://www.googleapis.com/auth/youtube.upload "
+         "https://www.googleapis.com/auth/youtube.force-ssl")   # 업로드 + 댓글
 
 PAGE = """<html><head><meta charset="utf-8"><title>SHOPREEL</title></head>
 <body style="font-family:system-ui;padding:60px;text-align:center">

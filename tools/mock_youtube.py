@@ -9,6 +9,7 @@
   mode="flaky" : 첫 청크에서 한 번 500 을 던져 재시도·이어보내기를 시험
   mode="quota" : 세션 생성 시 403 quotaExceeded (할당량 소진)
   mode="badtoken" : refresh token 거부
+  mode="noscope"  : 댓글 작성 시 403 insufficientPermissions (스코프 부족)
 """
 
 from __future__ import annotations
@@ -31,6 +32,7 @@ class MockYouTubeHandler(BaseHTTPRequestHandler):
     mode = "ok"
     sessions: Dict[str, Dict] = {}
     uploads: List[Dict] = []
+    comments: List[Dict] = []
     calls: List[Dict] = []
     protocol_version = "HTTP/1.1"
 
@@ -99,6 +101,21 @@ class MockYouTubeHandler(BaseHTTPRequestHandler):
                                         "failed_once": False}
             return self._send(200, b"", "application/json",
                               {"Location": f"{self._base()}/resumable/{sid}"})
+
+        if path == "/youtube/v3/commentThreads":
+            if not self._authorized():
+                return
+            if self.mode == "noscope":
+                return self._error(403, "insufficientPermissions",
+                                   "Request had insufficient authentication scopes.")
+            payload = json.loads(self._body().decode("utf-8") or "{}")
+            snippet = payload.get("snippet", {})
+            text = (snippet.get("topLevelComment", {}).get("snippet", {})
+                    .get("textOriginal", ""))
+            type(self).comments.append({"video_id": snippet.get("videoId", ""),
+                                        "text": text})
+            return self._json(200, {"id": "comment_" + uuid.uuid4().hex[:8],
+                                    "snippet": snippet})
 
         if path == "/upload/youtube/v3/thumbnails/set":
             if not self._authorized():
@@ -179,7 +196,8 @@ def start(mode: str = "ok", client_id: str = "mock-client-id",
           ) -> Tuple[ThreadingHTTPServer, str, type]:
     handler = type("BoundYouTubeHandler", (MockYouTubeHandler,), {
         "mode": mode, "client_id": client_id, "client_secret": client_secret,
-        "refresh_token": refresh_token, "sessions": {}, "uploads": [], "calls": [],
+        "refresh_token": refresh_token, "sessions": {}, "uploads": [],
+        "comments": [], "calls": [],
     })
     httpd = ThreadingHTTPServer(("127.0.0.1", port), handler)
     return httpd, f"http://127.0.0.1:{httpd.server_address[1]}", handler

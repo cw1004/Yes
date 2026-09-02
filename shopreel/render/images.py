@@ -79,6 +79,26 @@ def download_image(url: str, out: Path, timeout: int = 15) -> Optional[Path]:
         return None
 
 
+def save_card_photo(src: Path, out: Path, size: int = 800,
+                    bg: Tuple[int, int, int] = (255, 255, 255)) -> Optional[Path]:
+    """상품 사진을 정사각 카드 이미지로 저장한다 (링크인바이오 페이지용).
+
+    영상 썸네일에는 자막이 박혀 있어 카드에 쓰면 지저분하다. 상품 사진만 따로 남긴다.
+    잘라내지 않고 흰 배경 위에 맞춰 넣는다(쇼핑몰 사진은 대부분 흰 배경이다).
+    """
+    try:
+        with Image.open(src) as im:
+            photo = im.convert("RGB")
+            photo.thumbnail((size, size), Image.LANCZOS)
+            canvas = Image.new("RGB", (size, size), bg)
+            canvas.paste(photo, ((size - photo.width) // 2, (size - photo.height) // 2))
+            out.parent.mkdir(parents=True, exist_ok=True)
+            canvas.save(out, quality=88)
+        return out
+    except Exception:
+        return None
+
+
 # ------------------------------------------------------------------ 배경 요소
 def _gradient(size: Tuple[int, int], colors: Sequence[str]) -> Image.Image:
     w, h = size
