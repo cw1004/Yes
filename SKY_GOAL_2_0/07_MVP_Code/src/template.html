@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="description" content="SKY GOAL 2.0 — 적응형 AI 난이도 축구 아케이드 MVP">
+<title>SKY GOAL 2.0</title>
+<style>
+/* __STYLE__ */
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="hud" class="hidden" aria-hidden="true">
+  <div class="col">
+    <div class="badge">SCORE <b id="hud-score">0</b></div>
+    <div class="badge">COIN <b id="hud-coin">0</b> · LV <b id="hud-level">1</b></div>
+  </div>
+  <div class="col right">
+    <div class="badge">DIFFICULTY <b id="hud-diff">50</b></div>
+    <div class="badge"><b id="hud-stage">DAY</b> · COMBO <b id="hud-combo">0</b></div>
+  </div>
+</div>
+
+<div id="panel">
+  <!-- 시작 화면 -->
+  <div class="card" id="screen-start">
+    <div class="tag">ADAPTIVE AI ARCADE</div>
+    <h1>SKY GOAL 2.0</h1>
+    <p>탭 / 클릭 / 스페이스로 공을 띄워 움직이는 골문을 통과하세요.<br>
+    플레이 데이터를 분석해 <b>난이도 · 경기장 환경 · 보상</b>이 자동으로 조정됩니다.</p>
+    <div class="grid">
+      <div class="stat">숙련도 S<b id="s-skill">50</b></div>
+      <div class="stat">난이도 D<b id="s-diff">50</b></div>
+      <div class="stat">최고 점수<b id="s-best">0</b></div>
+      <div class="stat">레벨<b id="s-level">1</b></div>
+      <div class="stat">코인<b id="s-coin">0</b></div>
+      <div class="stat">누적 게임<b id="s-games">0</b></div>
+    </div>
+    <button class="btn" id="btn-start" type="button">경기 시작</button>
+    <button class="btn ghost" id="btn-reset" type="button">플레이어 데이터 초기화</button>
+    <p class="small" id="s-storage">진행 상황은 브라우저에 저장됩니다.</p>
+  </div>
+
+  <!-- 결과 화면 -->
+  <div class="card hidden" id="screen-result">
+    <div class="tag" id="r-stage">DAY</div>
+    <h2 id="r-title">GAME OVER</h2>
+    <p id="r-line">점수 0 · 콤보 0 · 퍼펙트 0</p>
+    <div class="grid">
+      <div class="stat">코인<b id="r-coin">+0</b></div>
+      <div class="stat">경험치<b id="r-xp">+0</b></div>
+      <div class="stat">획득 아이템<b id="r-loot">COMMON</b></div>
+      <div class="stat">레벨<b id="r-level">1</b></div>
+      <div class="stat">새 난이도<b id="r-diff">50</b></div>
+      <div class="stat">숙련도<b id="r-skill">50</b></div>
+    </div>
+    <div id="r-statbox" class="hidden">
+      <p class="small">레벨업! 스탯 포인트 <b id="r-points">0</b>점을 배분하세요. (+2/포인트)</p>
+      <div class="statpick">
+        <button type="button" data-stat="control">CONTROL</button>
+        <button type="button" data-stat="power">POWER</button>
+        <button type="button" data-stat="speed">SPEED</button>
+        <button type="button" data-stat="luck">LUCK</button>
+        <button type="button" data-stat="stamina">STAMINA</button>
+      </div>
+    </div>
+    <ul class="reasons" id="r-reasons"></ul>
+    <br>
+    <button class="btn" id="btn-retry" type="button">다시 경기</button>
+    <button class="btn ghost" id="btn-home" type="button">메인으로</button>
+  </div>
+</div>
+
+<script>
+/* __ENGINE__ */
+</script>
+<script>
+/* __GAME__ */
+</script>
+</body>
+</html>

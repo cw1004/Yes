@@ -1,0 +1,43 @@
+{
+  "version": "1.0.0",
+  "playerId": "local-player",
+  "skill": 50,
+  "difficulty": 50,
+  "level": 1,
+  "xp": 0,
+  "coins": 0,
+  "statPoints": 0,
+  "bestScore": 0,
+  "stats": {
+    "control": 50,
+    "power": 50,
+    "speed": 50,
+    "luck": 50,
+    "stamina": 50
+  },
+  "metrics": {
+    "games": 0,
+    "survivalTime": 0,
+    "passCount": 0,
+    "attemptCount": 0,
+    "maxCombo": 0,
+    "tapIntervalCV": 0.25,
+    "recentScores": [],
+    "recentSuccesses": [],
+    "perfectCount": 0,
+    "winStreak": 0,
+    "loseStreak": 0
+  },
+  "inventory": {
+    "common": 0,
+    "rare": 0,
+    "epic": 0,
+    "legendary": 0
+  },
+  "lastRun": {
+    "score": 0,
+    "combo": 0,
+    "difficulty": 50,
+    "stage": "DAY"
+  }
+}

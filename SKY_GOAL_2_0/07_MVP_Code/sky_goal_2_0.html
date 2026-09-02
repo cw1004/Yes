@@ -1,0 +1,1187 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="description" content="SKY GOAL 2.0 — 적응형 AI 난이도 축구 아케이드 MVP">
+<title>SKY GOAL 2.0</title>
+<style>
+:root {
+  --bg: #07111f;
+  --line: rgba(255, 255, 255, 0.16);
+  --ink: #ffffff;
+  --sub: #a9b8ca;
+  --accent: #ff9933;
+  --accent2: #138808;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body {
+  margin: 0; padding: 0; width: 100%; height: 100%;
+  overflow: hidden; background: var(--bg); color: var(--ink);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans KR", sans-serif;
+  overscroll-behavior: none;
+}
+#c { display: block; width: 100%; height: 100%; touch-action: none; }
+
+#hud {
+  position: fixed; top: 10px; left: 10px; right: 10px;
+  display: flex; justify-content: space-between; align-items: flex-start;
+  pointer-events: none; text-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
+}
+#hud .col { display: flex; flex-direction: column; gap: 6px; }
+#hud .col.right { align-items: flex-end; }
+.badge {
+  background: rgba(0, 0, 0, 0.42); border: 1px solid var(--line);
+  border-radius: 12px; padding: 6px 10px; font-size: 13px; line-height: 1.2;
+  backdrop-filter: blur(3px);
+}
+.badge b { font-size: 15px; }
+
+#panel {
+  position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+  background: rgba(4, 10, 20, 0.55); padding: 16px; overflow-y: auto;
+}
+.card {
+  width: min(94vw, 440px);
+  background: rgba(7, 17, 31, 0.94);
+  border: 1px solid var(--line); border-radius: 22px;
+  padding: 22px; box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55);
+}
+h1 { margin: 0 0 6px; font-size: 32px; letter-spacing: 0.5px; }
+h2 { margin: 0 0 6px; font-size: 24px; }
+p { margin: 8px 0; line-height: 1.55; color: #dbe7f7; font-size: 14px; }
+.small { font-size: 12px; color: var(--sub); }
+.tag {
+  display: inline-block; font-size: 11px; letter-spacing: 1px;
+  color: var(--accent); border: 1px solid var(--accent); border-radius: 999px;
+  padding: 2px 9px; margin-bottom: 10px;
+}
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 12px 0; }
+.stat {
+  background: rgba(255, 255, 255, 0.07); border: 1px solid var(--line);
+  border-radius: 12px; padding: 9px 11px; font-size: 12px; color: var(--sub);
+}
+.stat b { display: block; font-size: 18px; color: var(--ink); margin-top: 2px; }
+.btn {
+  width: 100%; padding: 15px; border: 0; border-radius: 14px; cursor: pointer;
+  font-weight: 800; font-size: 17px; color: #0d1b2a;
+  background: linear-gradient(90deg, var(--accent), #ffd28a);
+}
+.btn:active { transform: translateY(1px); }
+.btn.ghost {
+  background: transparent; color: var(--sub);
+  border: 1px solid var(--line); font-size: 13px; font-weight: 600; padding: 10px;
+  margin-top: 8px;
+}
+.statpick { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+.statpick button {
+  flex: 1 1 30%; padding: 9px 6px; font-size: 12px; font-weight: 700; cursor: pointer;
+  border-radius: 10px; border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.08); color: var(--ink);
+}
+.statpick button:disabled { opacity: 0.35; cursor: default; }
+.reasons { margin: 8px 0 0; padding-left: 18px; color: var(--sub); font-size: 12px; }
+.hidden { display: none !important; }
+
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="hud" class="hidden" aria-hidden="true">
+  <div class="col">
+    <div class="badge">SCORE <b id="hud-score">0</b></div>
+    <div class="badge">COIN <b id="hud-coin">0</b> · LV <b id="hud-level">1</b></div>
+  </div>
+  <div class="col right">
+    <div class="badge">DIFFICULTY <b id="hud-diff">50</b></div>
+    <div class="badge"><b id="hud-stage">DAY</b> · COMBO <b id="hud-combo">0</b></div>
+  </div>
+</div>
+
+<div id="panel">
+  <!-- 시작 화면 -->
+  <div class="card" id="screen-start">
+    <div class="tag">ADAPTIVE AI ARCADE</div>
+    <h1>SKY GOAL 2.0</h1>
+    <p>탭 / 클릭 / 스페이스로 공을 띄워 움직이는 골문을 통과하세요.<br>
+    플레이 데이터를 분석해 <b>난이도 · 경기장 환경 · 보상</b>이 자동으로 조정됩니다.</p>
+    <div class="grid">
+      <div class="stat">숙련도 S<b id="s-skill">50</b></div>
+      <div class="stat">난이도 D<b id="s-diff">50</b></div>
+      <div class="stat">최고 점수<b id="s-best">0</b></div>
+      <div class="stat">레벨<b id="s-level">1</b></div>
+      <div class="stat">코인<b id="s-coin">0</b></div>
+      <div class="stat">누적 게임<b id="s-games">0</b></div>
+    </div>
+    <button class="btn" id="btn-start" type="button">경기 시작</button>
+    <button class="btn ghost" id="btn-reset" type="button">플레이어 데이터 초기화</button>
+    <p class="small" id="s-storage">진행 상황은 브라우저에 저장됩니다.</p>
+  </div>
+
+  <!-- 결과 화면 -->
+  <div class="card hidden" id="screen-result">
+    <div class="tag" id="r-stage">DAY</div>
+    <h2 id="r-title">GAME OVER</h2>
+    <p id="r-line">점수 0 · 콤보 0 · 퍼펙트 0</p>
+    <div class="grid">
+      <div class="stat">코인<b id="r-coin">+0</b></div>
+      <div class="stat">경험치<b id="r-xp">+0</b></div>
+      <div class="stat">획득 아이템<b id="r-loot">COMMON</b></div>
+      <div class="stat">레벨<b id="r-level">1</b></div>
+      <div class="stat">새 난이도<b id="r-diff">50</b></div>
+      <div class="stat">숙련도<b id="r-skill">50</b></div>
+    </div>
+    <div id="r-statbox" class="hidden">
+      <p class="small">레벨업! 스탯 포인트 <b id="r-points">0</b>점을 배분하세요. (+2/포인트)</p>
+      <div class="statpick">
+        <button type="button" data-stat="control">CONTROL</button>
+        <button type="button" data-stat="power">POWER</button>
+        <button type="button" data-stat="speed">SPEED</button>
+        <button type="button" data-stat="luck">LUCK</button>
+        <button type="button" data-stat="stamina">STAMINA</button>
+      </div>
+    </div>
+    <ul class="reasons" id="r-reasons"></ul>
+    <br>
+    <button class="btn" id="btn-retry" type="button">다시 경기</button>
+    <button class="btn ghost" id="btn-home" type="button">메인으로</button>
+  </div>
+</div>
+
+<script>
+/*
+ * SKY GOAL 2.0 — Adaptive Difficulty / Economy Engine
+ * 순수 로직 모듈. DOM 의존성이 전혀 없으므로 브라우저와 Node 양쪽에서 동일하게 동작한다.
+ * 브라우저: window.SkyGoalEngine
+ * Node    : module.exports
+ */
+(function (root, factory) {
+  var api = factory();
+  if (typeof module === 'object' && module.exports) module.exports = api;
+  root.SkyGoalEngine = api;
+})(typeof globalThis !== 'undefined' ? globalThis : this, function () {
+  'use strict';
+
+  var VERSION = '1.0.0';
+  var STORAGE_KEY = 'sky_goal_2_0_profile_v1';
+
+  /* ---------------------------------------------------------------- utils */
+
+  function clamp(v, a, b) {
+    if (!isFinite(v)) return a;
+    return Math.max(a, Math.min(b, v));
+  }
+
+  // v를 [a,b] 구간에서 0~100으로 정규화한다.
+  function norm(v, a, b) {
+    if (b === a) return 0;
+    return clamp(((v - a) / (b - a)) * 100, 0, 100);
+  }
+
+  function mean(list) {
+    if (!list || !list.length) return 0;
+    var s = 0;
+    for (var i = 0; i < list.length; i++) s += list[i];
+    return s / list.length;
+  }
+
+  // 변동계수(coefficient of variation) = 표준편차 / 평균
+  function coefficientOfVariation(list) {
+    if (!list || list.length < 2) return 0.25; // 표본 부족 시 기본값
+    var m = mean(list);
+    if (m <= 0) return 0.25;
+    var acc = 0;
+    for (var i = 0; i < list.length; i++) acc += Math.pow(list[i] - m, 2);
+    return Math.sqrt(acc / list.length) / m;
+  }
+
+  function pushCapped(list, value, cap) {
+    list.push(value);
+    while (list.length > cap) list.shift();
+    return list;
+  }
+
+  /* -------------------------------------------------------------- profile */
+
+  function createProfile() {
+    return {
+      version: VERSION,
+      playerId: 'local-player',
+      skill: 50,
+      difficulty: 50,
+      level: 1,
+      xp: 0,
+      coins: 0,
+      statPoints: 0,
+      bestScore: 0,
+      stats: { control: 50, power: 50, speed: 50, luck: 50, stamina: 50 },
+      metrics: {
+        games: 0,
+        survivalTime: 0,
+        passCount: 0,
+        attemptCount: 0,
+        maxCombo: 0,
+        tapIntervalCV: 0.25,
+        recentScores: [],
+        recentSuccesses: [],
+        perfectCount: 0,
+        winStreak: 0,
+        loseStreak: 0
+      },
+      inventory: { common: 0, rare: 0, epic: 0, legendary: 0 },
+      lastRun: { score: 0, combo: 0, difficulty: 50, stage: 'DAY' }
+    };
+  }
+
+  function num(v, fallback, min, max) {
+    var n = typeof v === 'number' ? v : parseFloat(v);
+    if (!isFinite(n)) n = fallback;
+    if (min !== undefined) n = clamp(n, min, max);
+    return n;
+  }
+
+  // 저장 데이터가 손상/구버전이어도 게임이 죽지 않도록 항상 안전한 프로필로 정규화한다.
+  function normalizeProfile(raw) {
+    var base = createProfile();
+    if (!raw || typeof raw !== 'object') return base;
+
+    var stats = raw.stats && typeof raw.stats === 'object' ? raw.stats : {};
+    var m = raw.metrics && typeof raw.metrics === 'object' ? raw.metrics : {};
+    var inv = raw.inventory && typeof raw.inventory === 'object' ? raw.inventory : {};
+    var lr = raw.lastRun && typeof raw.lastRun === 'object' ? raw.lastRun : {};
+
+    function numList(v, cap) {
+      if (!Array.isArray(v)) return [];
+      var out = [];
+      for (var i = 0; i < v.length; i++) {
+        var n = parseFloat(v[i]);
+        if (isFinite(n)) out.push(n);
+      }
+      return out.slice(-cap);
+    }
+
+    return {
+      version: VERSION,
+      playerId: typeof raw.playerId === 'string' ? raw.playerId : base.playerId,
+      skill: num(raw.skill, 50, 0, 100),
+      difficulty: num(raw.difficulty, 50, 10, 95),
+      level: Math.max(1, Math.floor(num(raw.level, 1, 1, 9999))),
+      xp: Math.max(0, num(raw.xp, 0, 0, 1e12)),
+      coins: Math.max(0, Math.floor(num(raw.coins, 0, 0, 1e12))),
+      statPoints: Math.max(0, Math.floor(num(raw.statPoints, 0, 0, 9999))),
+      bestScore: Math.max(0, Math.floor(num(raw.bestScore, 0, 0, 1e9))),
+      stats: {
+        control: num(stats.control, 50, 0, 100),
+        power: num(stats.power, 50, 0, 100),
+        speed: num(stats.speed, 50, 0, 100),
+        luck: num(stats.luck, 50, 0, 100),
+        stamina: num(stats.stamina, 50, 0, 100)
+      },
+      metrics: {
+        games: Math.max(0, Math.floor(num(m.games, 0, 0, 1e9))),
+        survivalTime: Math.max(0, num(m.survivalTime, 0, 0, 1e9)),
+        passCount: Math.max(0, Math.floor(num(m.passCount, 0, 0, 1e9))),
+        attemptCount: Math.max(0, Math.floor(num(m.attemptCount, 0, 0, 1e9))),
+        maxCombo: Math.max(0, Math.floor(num(m.maxCombo, 0, 0, 1e9))),
+        tapIntervalCV: num(m.tapIntervalCV, 0.25, 0, 5),
+        recentScores: numList(m.recentScores, 10),
+        recentSuccesses: numList(m.recentSuccesses, 10),
+        perfectCount: Math.max(0, Math.floor(num(m.perfectCount, 0, 0, 1e9))),
+        winStreak: Math.max(0, Math.floor(num(m.winStreak, 0, 0, 1e6))),
+        loseStreak: Math.max(0, Math.floor(num(m.loseStreak, 0, 0, 1e6)))
+      },
+      inventory: {
+        common: Math.max(0, Math.floor(num(inv.common, 0, 0, 1e9))),
+        rare: Math.max(0, Math.floor(num(inv.rare, 0, 0, 1e9))),
+        epic: Math.max(0, Math.floor(num(inv.epic, 0, 0, 1e9))),
+        legendary: Math.max(0, Math.floor(num(inv.legendary, 0, 0, 1e9)))
+      },
+      lastRun: {
+        score: Math.max(0, Math.floor(num(lr.score, 0, 0, 1e9))),
+        combo: Math.max(0, Math.floor(num(lr.combo, 0, 0, 1e9))),
+        difficulty: num(lr.difficulty, 50, 10, 95),
+        stage: typeof lr.stage === 'string' ? lr.stage : 'DAY'
+      }
+    };
+  }
+
+  /* ------------------------------------------------------- skill / 난이도 */
+
+  // 문서 2장: A(생존) / R(통과율) / C(콤보) / T(탭 안정성) / K(최근 점수)
+  function skillComponents(profile) {
+    var m = profile.metrics;
+    var games = Math.max(1, m.games);
+    var attempts = Math.max(1, m.attemptCount);
+    return {
+      A: norm(m.survivalTime / games, 2, 60),
+      R: norm(m.passCount / attempts, 0.2, 9),          // 시도당 평균 통과 게이트 수
+      C: norm(m.maxCombo, 1, 20),
+      T: norm(1 / (1 + m.tapIntervalCV), 0.45, 0.9),
+      K: norm(mean(m.recentScores), 0, 120)
+    };
+  }
+
+  // S_t = 0.70*S_prev + 0.30*S_raw
+  function computeSkill(profile) {
+    var c = skillComponents(profile);
+    var raw = 0.30 * c.A + 0.25 * c.R + 0.20 * c.C + 0.15 * c.T + 0.10 * c.K;
+    return clamp(0.70 * profile.skill + 0.30 * raw, 0, 100);
+  }
+
+  // 문서 4장: D = clamp(0.85*S + 8 + F, 10, 95), 게임당 변화량 ±5 제한
+  function computeDifficulty(profile, nextSkill, run) {
+    var m = profile.metrics;
+    var F = 0;
+    var reasons = [];
+
+    if (m.winStreak >= 3) { F += 5; reasons.push('3연속 성공 +5'); }
+    if (m.loseStreak >= 3) { F -= 5; reasons.push('3연속 실패 -5'); }
+    if (run && run.earlyDeath) { F -= 3; reasons.push('조기 사망 -3'); }
+    if (run && run.combo >= 10) { F += 4; reasons.push('높은 콤보 +4'); }
+
+    var recent = m.recentSuccesses.slice(-10);
+    var rate = recent.length ? mean(recent) : 0.7;
+    if (recent.length >= 3) {
+      if (rate > 0.80) { F += 5; reasons.push('최근 성공률 > 80% +5'); }
+      else if (rate < 0.65) { F -= 5; reasons.push('최근 성공률 < 65% -5'); }
+      else { reasons.push('성공률 65~80% 유지'); }
+    }
+
+    var target = clamp(0.85 * nextSkill + 8 + F, 10, 95);
+    var delta = clamp(target - profile.difficulty, -5, 5); // 급격한 난이도 점프 방지
+    return {
+      difficulty: clamp(profile.difficulty + delta, 10, 95),
+      target: target,
+      delta: delta,
+      feedback: F,
+      successRate: rate,
+      reasons: reasons
+    };
+  }
+
+  /* ---------------------------------------------------------------- stage */
+
+  var STAGES = [
+    { key: 'DAY',         label: 'DAY',         rain: 0,   wind: 0,   movement: 0.6 },
+    { key: 'SUNSET',      label: 'SUNSET',      rain: 0,   wind: 0,   movement: 0.75 },
+    { key: 'NIGHT',       label: 'NIGHT',       rain: 0,   wind: 0,   movement: 0.9 },
+    { key: 'RAIN',        label: 'RAIN',        rain: 1,   wind: 0.2, movement: 1.0 },
+    { key: 'WIND',        label: 'WIND',        rain: 0.3, wind: 1,   movement: 1.1 },
+    { key: 'STORM',       label: 'STORM',       rain: 1,   wind: 1,   movement: 1.25 },
+    { key: 'WORLD_FINAL', label: 'WORLD FINAL', rain: 0.6, wind: 0.8, movement: 1.35 }
+  ];
+
+  // 문서 3장: 진행도 구간이 기본 스테이지를 정하고, 난이도가 이를 가속한다.
+  //   Stage = progressBand(통과한 골문 수) + floor(difficulty / 25)   (최대 WORLD FINAL)
+  // 진행도 구간: 0~4 DAY / 5~9 SUNSET / 10~19 NIGHT / 20~29 RAIN / 30~49 WIND /
+  //             50~79 STORM / 80+ WORLD FINAL
+  // 점수가 아니라 "통과한 골문 수"를 쓰는 이유: 점수는 콤보·퍼펙트 보너스로
+  // 골문 하나당 20점 이상 오르기 때문에 연출 단계가 몇 초 만에 끝나버린다.
+  function progressBand(progress) {
+    if (progress >= 80) return 6;
+    if (progress >= 50) return 5;
+    if (progress >= 30) return 4;
+    if (progress >= 20) return 3;
+    if (progress >= 10) return 2;
+    if (progress >= 5) return 1;
+    return 0;
+  }
+
+  function stageFor(progress, difficulty) {
+    var v = Math.max(0, progress || 0);
+    var idx = v >= 80
+      ? STAGES.length - 1
+      : progressBand(v) + Math.floor(clamp(difficulty, 0, 95) / 25);
+    return STAGES[clamp(idx, 0, STAGES.length - 1)];
+  }
+
+  /* ------------------------------------------------------- arena / 물리값 */
+
+  // 문서 5장 + 성장 스탯 보정
+  function arenaParams(difficulty, stage, stats) {
+    var d = clamp(difficulty, 10, 95);
+    var s = stats || { control: 50, power: 50, speed: 50, luck: 50, stamina: 50 };
+    var st = stage || STAGES[0];
+
+    var gap = Math.max(145, 220 - 0.9 * d);
+    var speed = 210 + 2.8 * d;
+    var movement = 0.05 * d * st.movement;
+    var wind = Math.max(0, (d - 35) / 60) * st.wind;
+
+    // 스탯 보정: 과도한 이지 모드가 되지 않도록 전부 소폭(±10~20%)으로 제한한다.
+    gap = gap * (1 + (s.control - 50) / 1000);            // CONTROL: 통과 여유
+    speed = speed * (1 - (s.speed - 50) / 1000);          // SPEED  : 체감 속도
+    movement = movement * (1 - (s.control - 50) / 500);   // CONTROL: 골문 흔들림 억제
+
+    return {
+      gap: clamp(gap, 130, 260),
+      speed: clamp(speed, 180, 560),
+      movement: Math.max(0, movement),
+      wind: clamp(wind, 0, 1.2),
+      rain: st.rain,
+      gravity: 950 * (1 - (s.stamina - 50) / 1200),
+      flap: -340 * (1 + (s.power - 50) / 800),
+      perfectWindow: 0.12 + (s.control - 50) / 1000        // gap 대비 퍼펙트 판정 비율
+    };
+  }
+
+  /* ------------------------------------------------------------- 점수/보상 */
+
+  // PerfectBonus = 10 * (1 - error / (gap/2)), 0~10
+  function perfectBonus(error, gap) {
+    if (!(gap > 0)) return 0;
+    return clamp(10 * (1 - Math.abs(error) / (gap / 2)), 0, 10);
+  }
+
+  // Score += 10 + 2*Combo + PerfectBonus
+  function passScore(combo, error, gap) {
+    return Math.round(10 + 2 * Math.max(0, combo) + perfectBonus(error, gap));
+  }
+
+  function coinReward(score) {
+    return Math.round(10 + 25 * Math.log(Math.max(0, score) + 1));
+  }
+
+  function xpReward(score, perfectCount, difficulty) {
+    var base = 20 + Math.max(0, score) * 1.5 + Math.max(0, perfectCount) * 5;
+    return base * (1 + clamp(difficulty, 10, 95) / 200);
+  }
+
+  function xpRequired(level) {
+    return 100 * Math.pow(Math.max(1, level), 1.5);
+  }
+
+  // Common 60 / Rare 25 / Epic 10 / Legendary 5, 고난도 시 Legendary 최대 12%
+  function lootTable(difficulty, luck) {
+    var d = clamp(difficulty, 10, 95);
+    var l = clamp(luck === undefined ? 50 : luck, 0, 100);
+    var legendary = clamp(5 + (d - 50) / 100 * 10 + (l - 50) / 50, 5, 12);
+    var epic = 10;
+    var rare = 25;
+    var common = 100 - legendary - epic - rare;
+    return { common: common, rare: rare, epic: epic, legendary: legendary };
+  }
+
+  function rollLoot(difficulty, luck, rng) {
+    var t = lootTable(difficulty, luck);
+    var r = (rng || Math.random)() * 100;
+    if (r < t.legendary) return 'legendary';
+    if (r < t.legendary + t.epic) return 'epic';
+    if (r < t.legendary + t.epic + t.rare) return 'rare';
+    return 'common';
+  }
+
+  function applyLevelUps(profile) {
+    var gained = 0;
+    var guard = 0;
+    while (profile.xp >= xpRequired(profile.level) && guard++ < 10000) {
+      profile.xp -= xpRequired(profile.level);
+      profile.level += 1;
+      profile.statPoints += 1;
+      gained++;
+    }
+    return gained;
+  }
+
+  function spendStatPoint(profile, statName) {
+    if (profile.statPoints <= 0) return false;
+    if (!Object.prototype.hasOwnProperty.call(profile.stats, statName)) return false;
+    if (profile.stats[statName] >= 100) return false;
+    profile.stats[statName] = clamp(profile.stats[statName] + 2, 0, 100);
+    profile.statPoints -= 1;
+    return true;
+  }
+
+  /* ---------------------------------------------------------- 런 커밋 처리 */
+
+  /**
+   * 한 판이 끝났을 때 프로필을 갱신하고 결과 요약을 돌려준다.
+   * run = { score, combo, passCount, perfectCount, duration, tapIntervals[], difficulty, stage }
+   */
+  function commitRun(profile, run, rng) {
+    var m = profile.metrics;
+    var score = Math.max(0, Math.round(run.score || 0));
+    var combo = Math.max(0, Math.round(run.combo || 0));
+    var duration = Math.max(0, run.duration || 0);
+    var perfect = Math.max(0, Math.round(run.perfectCount || 0));
+    var passes = Math.max(0, Math.round(run.passCount || 0));
+    var success = score >= 10 ? 1 : 0;
+    var earlyDeath = duration < 3 || passes === 0;
+
+    m.games += 1;
+    m.attemptCount += 1;
+    m.survivalTime += duration;
+    m.passCount += passes;
+    m.perfectCount += perfect;
+    m.maxCombo = Math.max(m.maxCombo, combo);
+    if (run.tapIntervals && run.tapIntervals.length >= 2) {
+      m.tapIntervalCV = coefficientOfVariation(run.tapIntervals);
+    }
+    pushCapped(m.recentScores, score, 10);
+    pushCapped(m.recentSuccesses, success, 10);
+    m.winStreak = success ? m.winStreak + 1 : 0;
+    m.loseStreak = success ? 0 : m.loseStreak + 1;
+
+    profile.bestScore = Math.max(profile.bestScore, score);
+
+    var coins = coinReward(score);
+    var xp = xpReward(score, perfect, run.difficulty !== undefined ? run.difficulty : profile.difficulty);
+    profile.coins += coins;
+    profile.xp += xp;
+    var levelsGained = applyLevelUps(profile);
+
+    var loot = rollLoot(
+      run.difficulty !== undefined ? run.difficulty : profile.difficulty,
+      profile.stats.luck,
+      rng
+    );
+    profile.inventory[loot] += 1;
+
+    var nextSkill = computeSkill(profile);
+    profile.skill = nextSkill;
+    var diff = computeDifficulty(profile, nextSkill, { combo: combo, earlyDeath: earlyDeath });
+    var previousDifficulty = profile.difficulty;
+    profile.difficulty = diff.difficulty;
+
+    profile.lastRun = {
+      score: score,
+      combo: combo,
+      difficulty: previousDifficulty,
+      stage: run.stage || stageFor(passes, previousDifficulty).key
+    };
+
+    return {
+      score: score,
+      combo: combo,
+      perfectCount: perfect,
+      coins: coins,
+      xp: xp,
+      loot: loot,
+      levelsGained: levelsGained,
+      previousDifficulty: previousDifficulty,
+      difficulty: profile.difficulty,
+      difficultyDelta: profile.difficulty - previousDifficulty,
+      skill: nextSkill,
+      successRate: diff.successRate,
+      reasons: diff.reasons,
+      earlyDeath: earlyDeath
+    };
+  }
+
+  /* -------------------------------------------------------------- storage */
+
+  // localStorage 가 막힌 환경(file:// 시크릿 모드 등)에서도 게임이 죽지 않게 한다.
+  function createStorage(backend) {
+    var store = backend;
+    if (store === undefined) {
+      try {
+        store = typeof localStorage !== 'undefined' ? localStorage : null;
+        if (store) {
+          store.setItem('__sg_probe__', '1');
+          store.removeItem('__sg_probe__');
+        }
+      } catch (e) {
+        store = null;
+      }
+    }
+    var memory = {};
+    return {
+      persistent: !!store,
+      load: function () {
+        try {
+          var raw = store ? store.getItem(STORAGE_KEY) : memory[STORAGE_KEY];
+          return normalizeProfile(raw ? JSON.parse(raw) : null);
+        } catch (e) {
+          return createProfile();
+        }
+      },
+      save: function (profile) {
+        var payload = JSON.stringify(profile);
+        try {
+          if (store) store.setItem(STORAGE_KEY, payload);
+          else memory[STORAGE_KEY] = payload;
+          return true;
+        } catch (e) {
+          memory[STORAGE_KEY] = payload;
+          return false;
+        }
+      },
+      reset: function () {
+        try {
+          if (store) store.removeItem(STORAGE_KEY);
+        } catch (e) { /* ignore */ }
+        delete memory[STORAGE_KEY];
+        return createProfile();
+      }
+    };
+  }
+
+  return {
+    VERSION: VERSION,
+    STORAGE_KEY: STORAGE_KEY,
+    STAGES: STAGES,
+    clamp: clamp,
+    norm: norm,
+    mean: mean,
+    coefficientOfVariation: coefficientOfVariation,
+    createProfile: createProfile,
+    normalizeProfile: normalizeProfile,
+    skillComponents: skillComponents,
+    computeSkill: computeSkill,
+    computeDifficulty: computeDifficulty,
+    progressBand: progressBand,
+    stageFor: stageFor,
+    arenaParams: arenaParams,
+    perfectBonus: perfectBonus,
+    passScore: passScore,
+    coinReward: coinReward,
+    xpReward: xpReward,
+    xpRequired: xpRequired,
+    lootTable: lootTable,
+    rollLoot: rollLoot,
+    applyLevelUps: applyLevelUps,
+    spendStatPoint: spendStatPoint,
+    commitRun: commitRun,
+    createStorage: createStorage
+  };
+});
+
+</script>
+<script>
+/*
+ * SKY GOAL 2.0 — 게임 셸 (렌더링 / 입력 / 화면 전환)
+ * 로직은 전부 SkyGoalEngine 에 있고, 이 파일은 그것을 화면에 연결한다.
+ */
+(function () {
+  'use strict';
+
+  var E = window.SkyGoalEngine;
+  if (!E) { console.error('SkyGoalEngine 을 찾을 수 없습니다.'); return; }
+
+  /* ------------------------------------------------------------ DOM 참조 */
+
+  var $ = function (id) { return document.getElementById(id); };
+  var canvas = $('c');
+  var ctx = canvas.getContext('2d');
+  var panel = $('panel');
+  var hud = $('hud');
+  var screenStart = $('screen-start');
+  var screenResult = $('screen-result');
+
+  /* ---------------------------------------------------------- 상태 변수 */
+
+  var storage = E.createStorage();
+  var profile = storage.load();
+
+  var W = 0, H = 0, groundY = 0;
+  var state = 'idle';          // idle | ready | playing | over
+  var run = null;
+  var ball = null;
+  var gates = [];
+  var sparks = [];
+  var arena = null;
+  var stage = E.STAGES[0];
+  var lastFrame = 0;
+  var lastTapAt = 0;
+  var elapsed = 0;
+  var lastEndReason = null;
+  var lastMid = null;
+
+  var GATE_W = 54;
+  var GATE_SPACING = 260;
+
+  /* ------------------------------------------------------------- 캔버스 */
+
+  function resize() {
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = canvas.clientWidth || window.innerWidth;
+    H = canvas.clientHeight || window.innerHeight;
+    canvas.width = Math.max(1, Math.round(W * dpr));
+    canvas.height = Math.max(1, Math.round(H * dpr));
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    groundY = H * 0.9;
+    if (ball) ball.x = Math.min(ball.x, W * 0.45);
+  }
+  window.addEventListener('resize', resize);
+  window.addEventListener('orientationchange', resize);
+
+  /* ---------------------------------------------------------- 화면 전환 */
+
+  function showStart() {
+    state = 'idle';
+    run = null;
+    ball = null;
+    gates = [];
+    sparks = [];
+    stage = E.stageFor(0, profile.difficulty);
+    arena = E.arenaParams(profile.difficulty, stage, profile.stats);
+    refreshStartScreen();
+    screenResult.classList.add('hidden');
+    screenStart.classList.remove('hidden');
+    panel.classList.remove('hidden');
+    hud.classList.add('hidden');
+  }
+
+  function refreshStartScreen() {
+    $('s-skill').textContent = Math.round(profile.skill);
+    $('s-diff').textContent = Math.round(profile.difficulty);
+    $('s-best').textContent = profile.bestScore;
+    $('s-level').textContent = profile.level;
+    $('s-coin').textContent = profile.coins;
+    $('s-games').textContent = profile.metrics.games;
+    $('s-storage').textContent = storage.persistent
+      ? '진행 상황은 이 브라우저에 저장됩니다.'
+      : '이 환경에서는 저장이 차단되어 이번 세션에서만 기록이 유지됩니다.';
+  }
+
+  function updateHud() {
+    $('hud-score').textContent = run ? run.score : 0;
+    $('hud-coin').textContent = profile.coins;
+    $('hud-level').textContent = profile.level;
+    $('hud-diff').textContent = Math.round(run ? run.difficulty : profile.difficulty);
+    $('hud-stage').textContent = stage.label;
+    $('hud-combo').textContent = run ? run.combo : 0;
+  }
+
+  /* -------------------------------------------------------------- 게임 */
+
+  // 다음 골문은 "직전 골문에서 실제로 도달 가능한 높이" 안에서만 생성한다.
+  // (상승은 탭 연타로만 가능하므로 하강보다 여유를 좁게 잡는다)
+  function makeGate(x) {
+    var margin = arena.gap / 2 + 40;
+    var lo = margin;
+    var hi = Math.max(margin + 20, groundY - margin);
+    var travel = GATE_SPACING / arena.speed;              // 골문 사이 이동 시간(초)
+    var climb = Math.abs(arena.flap) * travel * 0.55;     // 그 시간에 오를 수 있는 높이
+    if (lastMid !== null) {
+      lo = Math.max(lo, lastMid - climb);
+      hi = Math.min(hi, lastMid + climb * 1.6);           // 낙하는 더 쉬우므로 여유를 준다
+    }
+    if (hi <= lo) { lo = margin; hi = Math.max(margin + 20, groundY - margin); }
+    var mid = lo + Math.random() * (hi - lo);
+    lastMid = mid;
+    return {
+      x: x,
+      baseMid: mid,
+      mid: mid,
+      gap: arena.gap,
+      amp: arena.movement * 12,
+      speed: 0.7 + Math.random() * 0.6,
+      phase: Math.random() * Math.PI * 2,
+      passed: false
+    };
+  }
+
+  function startRun() {
+    stage = E.stageFor(0, profile.difficulty);
+    arena = E.arenaParams(profile.difficulty, stage, profile.stats);
+    run = {
+      score: 0,
+      combo: 0,
+      passCount: 0,
+      perfectCount: 0,
+      duration: 0,
+      tapIntervals: [],
+      difficulty: profile.difficulty,
+      stage: stage.key
+    };
+    ball = { x: W * 0.26, y: groundY * 0.5, vy: 0, vx: 0, spin: 0 };
+    lastMid = ball.y;                 // 첫 골문은 공 높이 근처에서 시작한다
+    gates = [];
+    sparks = [];
+    for (var i = 0; i < 4; i++) gates.push(makeGate(W + 220 + i * GATE_SPACING));
+    elapsed = 0;
+    lastTapAt = 0;
+    state = 'ready';                  // 첫 입력 전까지 공이 떠 있는 준비 상태
+    panel.classList.add('hidden');
+    hud.classList.remove('hidden');
+    updateHud();
+  }
+
+  function flap() {
+    if (state === 'ready') {
+      state = 'playing';
+      lastTapAt = performance.now();
+      ball.vy = arena.flap;
+      return;
+    }
+    if (state !== 'playing') return;
+    var now = performance.now();
+    if (lastTapAt) run.tapIntervals.push(now - lastTapAt);
+    lastTapAt = now;
+    ball.vy = arena.flap;
+    ball.spin = -0.5;
+  }
+
+  function addSparks(x, y, n, color) {
+    for (var i = 0; i < n; i++) {
+      sparks.push({
+        x: x, y: y,
+        vx: (Math.random() - 0.5) * 220,
+        vy: (Math.random() - 0.5) * 220,
+        life: 0.45 + Math.random() * 0.35,
+        age: 0,
+        color: color
+      });
+    }
+  }
+
+  function refreshStage() {
+    var next = E.stageFor(run.passCount, run.difficulty);
+    if (next.key !== stage.key) {
+      stage = next;
+      arena = E.arenaParams(run.difficulty, stage, profile.stats);
+      run.stage = stage.key;
+    }
+  }
+
+  function update(dt) {
+    if (state === 'ready') {
+      // 준비 상태: 공이 살짝 위아래로 떠 있고 게이트는 멈춰 있다.
+      ball.y += Math.sin(performance.now() / 300) * 18 * dt;
+      return;
+    }
+    if (state !== 'playing') return;
+
+    elapsed += dt;
+    run.duration = elapsed;
+
+    // 공 물리
+    ball.vy += arena.gravity * dt;
+    ball.y += ball.vy * dt;
+    ball.spin += (ball.vy / 900) * dt * 6;
+
+    // 바람: 좌우로 밀리는 힘 (스테이지/난이도 기반)
+    if (arena.wind > 0) {
+      var gust = Math.sin(elapsed * 1.3) * 0.6 + Math.sin(elapsed * 0.37) * 0.4;
+      ball.vx += gust * arena.wind * 90 * dt;
+    }
+    ball.vx *= Math.pow(0.15, dt);
+    ball.x += ball.vx * dt;
+    ball.x = E.clamp(ball.x, W * 0.14, W * 0.46);
+
+    // 게이트 이동 / 판정
+    for (var i = gates.length - 1; i >= 0; i--) {
+      var g = gates[i];
+      g.x -= arena.speed * dt;
+      g.mid = g.baseMid + Math.sin(elapsed * g.speed + g.phase) * g.amp;
+      g.mid = E.clamp(g.mid, g.gap / 2 + 24, groundY - g.gap / 2 - 24);
+
+      var top = g.mid - g.gap / 2;
+      var bottom = g.mid + g.gap / 2;
+
+      // 통과 판정
+      if (!g.passed && g.x + GATE_W < ball.x) {
+        g.passed = true;
+        var error = Math.abs(ball.y - g.mid);
+        var gained = E.passScore(run.combo, error, g.gap);
+        run.score += gained;
+        run.combo += 1;
+        run.passCount += 1;
+        if (error <= g.gap * arena.perfectWindow) {
+          run.perfectCount += 1;
+          addSparks(ball.x, ball.y, 14, '255,215,0');
+        } else {
+          addSparks(g.x + GATE_W, g.mid, 6, '255,255,255');
+        }
+        refreshStage();
+        updateHud();
+      }
+
+      // 충돌 판정
+      if (ball.x + 15 > g.x && ball.x - 15 < g.x + GATE_W &&
+          (ball.y - 15 < top || ball.y + 15 > bottom)) {
+        return endRun('gate');
+      }
+
+      if (g.x < -GATE_W - 20) {
+        gates.splice(i, 1);
+        var rightMost = 0;
+        for (var k = 0; k < gates.length; k++) rightMost = Math.max(rightMost, gates[k].x);
+        gates.push(makeGate(Math.max(W + 120, rightMost + GATE_SPACING)));
+      }
+    }
+
+    // 천장 / 바닥
+    if (ball.y - 15 <= 0) return endRun('ceiling');
+    if (ball.y + 15 >= groundY) return endRun('ground');
+
+    // 파티클
+    for (var s = sparks.length - 1; s >= 0; s--) {
+      var p = sparks[s];
+      p.age += dt;
+      if (p.age >= p.life) { sparks.splice(s, 1); continue; }
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.vy += 300 * dt;
+    }
+  }
+
+  function endRun(reason) {
+    if (state !== 'playing') return;
+    state = 'over';
+    lastEndReason = reason || 'manual';
+    addSparks(ball.x, ball.y, 22, '255,120,60');
+    var summary = E.commitRun(profile, run);
+    storage.save(profile);
+    showResult(summary);
+  }
+
+  /* ---------------------------------------------------------- 결과 화면 */
+
+  function showResult(sum) {
+    $('r-stage').textContent = stage.label;
+    $('r-title').textContent = sum.score >= profile.bestScore && sum.score > 0 ? 'NEW BEST!' : 'GAME OVER';
+    $('r-line').textContent = '점수 ' + sum.score + ' · 콤보 ' + sum.combo + ' · 퍼펙트 ' + sum.perfectCount;
+    $('r-coin').textContent = '+' + sum.coins;
+    $('r-xp').textContent = '+' + Math.round(sum.xp);
+    $('r-loot').textContent = sum.loot.toUpperCase();
+    $('r-level').textContent = profile.level;
+    $('r-diff').textContent = Math.round(sum.difficulty) +
+      ' (' + (sum.difficultyDelta >= 0 ? '+' : '') + sum.difficultyDelta.toFixed(1) + ')';
+    $('r-skill').textContent = Math.round(sum.skill);
+
+    var list = $('r-reasons');
+    list.innerHTML = '';
+    var reasons = sum.reasons.slice();
+    reasons.push('최근 성공률 ' + Math.round(sum.successRate * 100) + '%');
+    for (var i = 0; i < reasons.length; i++) {
+      var li = document.createElement('li');
+      li.textContent = reasons[i];
+      list.appendChild(li);
+    }
+
+    refreshStatBox();
+    screenStart.classList.add('hidden');
+    screenResult.classList.remove('hidden');
+    panel.classList.remove('hidden');
+    hud.classList.add('hidden');
+  }
+
+  function refreshStatBox() {
+    var box = $('r-statbox');
+    var buttons = box.querySelectorAll('button[data-stat]');
+    $('r-points').textContent = profile.statPoints;
+    for (var i = 0; i < buttons.length; i++) {
+      var name = buttons[i].getAttribute('data-stat');
+      buttons[i].disabled = profile.statPoints <= 0 || profile.stats[name] >= 100;
+      buttons[i].textContent = name.toUpperCase() + ' ' + Math.round(profile.stats[name]);
+    }
+    box.classList.toggle('hidden', profile.statPoints <= 0);
+  }
+
+  /* -------------------------------------------------------------- 렌더 */
+
+  var SKY = {
+    DAY: ['#53b9ff', '#d8f3ff'],
+    SUNSET: ['#ff7e3f', '#ffd9a0'],
+    NIGHT: ['#08152f', '#274b73'],
+    RAIN: ['#2e4457', '#7d94a5'],
+    WIND: ['#3d6f8e', '#cfe6f2'],
+    STORM: ['#0b1622', '#3a4b5c'],
+    WORLD_FINAL: ['#1a0b2e', '#ff9933']
+  };
+
+  function drawBackground() {
+    var pair = SKY[stage.key] || SKY.DAY;
+    var g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, pair[0]);
+    g.addColorStop(1, pair[1]);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+
+    // 원경 관중석
+    ctx.fillStyle = 'rgba(0,0,0,0.18)';
+    ctx.fillRect(0, groundY - 60, W, 60);
+
+    if (stage.rain > 0) {
+      ctx.strokeStyle = 'rgba(255,255,255,' + (0.18 + 0.22 * stage.rain) + ')';
+      ctx.lineWidth = 1;
+      var t = performance.now() / 5;
+      for (var i = 0; i < 90; i++) {
+        var x = (i * 97 + t) % (W + 40) - 20;
+        var y = (i * 53 + t * 1.6) % H;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x - 7, y + 20);
+        ctx.stroke();
+      }
+    }
+
+    if (stage.wind > 0.5) {
+      ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+      ctx.lineWidth = 2;
+      for (var w = 0; w < 5; w++) {
+        var wy = (w * 137 + (performance.now() / 6) % H) % H;
+        ctx.beginPath();
+        ctx.moveTo((performance.now() / 3 + w * 200) % (W + 300) - 150, wy);
+        ctx.lineTo((performance.now() / 3 + w * 200) % (W + 300) - 60, wy);
+        ctx.stroke();
+      }
+    }
+
+    // 잔디
+    ctx.fillStyle = '#1d6b39';
+    ctx.fillRect(0, groundY, W, H - groundY);
+    ctx.fillStyle = 'rgba(255,255,255,0.08)';
+    for (var s = 0; s < W; s += 60) ctx.fillRect(s, groundY, 30, H - groundY);
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    ctx.fillRect(0, groundY, W, 2);
+  }
+
+  function drawGate(g) {
+    var top = g.mid - g.gap / 2;
+    var bottom = g.mid + g.gap / 2;
+    ctx.fillStyle = 'rgba(255,255,255,0.95)';
+    ctx.fillRect(g.x, 0, GATE_W, top);
+    ctx.fillRect(g.x, bottom, GATE_W, groundY - bottom);
+    ctx.fillStyle = '#ff9933';
+    ctx.fillRect(g.x - 4, top - 10, GATE_W + 8, 10);
+    ctx.fillStyle = '#138808';
+    ctx.fillRect(g.x - 4, bottom, GATE_W + 8, 10);
+    // 골문 네트 느낌
+    ctx.strokeStyle = 'rgba(0,0,0,0.10)';
+    ctx.lineWidth = 1;
+    for (var y = 10; y < top; y += 14) {
+      ctx.beginPath(); ctx.moveTo(g.x, y); ctx.lineTo(g.x + GATE_W, y); ctx.stroke();
+    }
+    for (var y2 = bottom + 14; y2 < groundY; y2 += 14) {
+      ctx.beginPath(); ctx.moveTo(g.x, y2); ctx.lineTo(g.x + GATE_W, y2); ctx.stroke();
+    }
+  }
+
+  function drawBall() {
+    ctx.save();
+    ctx.translate(ball.x, ball.y);
+    ctx.rotate(ball.spin);
+    ctx.beginPath();
+    ctx.arc(0, 0, 15, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = '#16202c';
+    ctx.stroke();
+    ctx.fillStyle = '#16202c';
+    ctx.beginPath();
+    ctx.moveTo(0, -7); ctx.lineTo(6.5, -2); ctx.lineTo(4, 6); ctx.lineTo(-4, 6); ctx.lineTo(-6.5, -2);
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawSparks() {
+    for (var i = 0; i < sparks.length; i++) {
+      var p = sparks[i];
+      var a = 1 - p.age / p.life;
+      ctx.fillStyle = 'rgba(' + p.color + ',' + a.toFixed(3) + ')';
+      ctx.fillRect(p.x - 2, p.y - 2, 4, 4);
+    }
+  }
+
+  function drawReadyHint() {
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.fillRect(0, H * 0.42, W, 74);
+    ctx.fillStyle = '#fff';
+    ctx.textAlign = 'center';
+    ctx.font = '700 22px system-ui, sans-serif';
+    ctx.fillText('TAP TO START', W / 2, H * 0.42 + 32);
+    ctx.font = '13px system-ui, sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,0.8)';
+    ctx.fillText('탭 · 클릭 · 스페이스로 공을 띄우세요', W / 2, H * 0.42 + 56);
+    ctx.textAlign = 'start';
+  }
+
+  function render() {
+    drawBackground();
+    for (var i = 0; i < gates.length; i++) drawGate(gates[i]);
+    drawSparks();
+    if (ball) drawBall();
+    if (state === 'ready') drawReadyHint();
+  }
+
+  /* ------------------------------------------------------------ 루프 */
+
+  function frame(now) {
+    var dt = lastFrame ? (now - lastFrame) / 1000 : 0;
+    lastFrame = now;
+    dt = Math.min(dt, 1 / 30);             // 탭 전환 후 큰 점프 방지
+    if (state === 'ready' || state === 'playing') update(dt);
+    if (state !== 'idle') render();
+    else drawBackground();
+    requestAnimationFrame(frame);
+  }
+
+  document.addEventListener('visibilitychange', function () {
+    lastFrame = 0;
+    if (document.hidden && state === 'playing') state = 'ready';   // 자동 일시정지
+  });
+
+  /* ------------------------------------------------------------ 입력 */
+
+  function onPointerDown(e) {
+    if (state === 'ready' || state === 'playing') {
+      e.preventDefault();
+      flap();
+    }
+  }
+  canvas.addEventListener('pointerdown', onPointerDown);
+  canvas.addEventListener('touchstart', function (e) { e.preventDefault(); }, { passive: false });
+  window.addEventListener('keydown', function (e) {
+    if (e.code === 'Space' || e.code === 'ArrowUp' || e.key === ' ') {
+      if (state === 'ready' || state === 'playing') { e.preventDefault(); flap(); }
+      else if (state === 'idle' || state === 'over') { e.preventDefault(); startRun(); }
+    }
+  });
+
+  $('btn-start').addEventListener('click', startRun);
+  $('btn-retry').addEventListener('click', startRun);
+  $('btn-home').addEventListener('click', showStart);
+  $('btn-reset').addEventListener('click', function () {
+    if (!window.confirm('플레이어 데이터를 초기화할까요?')) return;
+    profile = storage.reset();
+    storage.save(profile);
+    showStart();
+  });
+  var statButtons = screenResult.querySelectorAll('button[data-stat]');
+  for (var b = 0; b < statButtons.length; b++) {
+    statButtons[b].addEventListener('click', function () {
+      if (E.spendStatPoint(profile, this.getAttribute('data-stat'))) {
+        storage.save(profile);
+        refreshStatBox();
+      }
+    });
+  }
+
+  /* ------------------------------------------------------------ 시작 */
+
+  resize();
+  showStart();
+  requestAnimationFrame(frame);
+
+  // 자동화 테스트/디버깅용 훅
+  window.SkyGoal = {
+    engine: E,
+    getProfile: function () { return profile; },
+    getState: function () { return state; },
+    getRun: function () { return run; },
+    start: startRun,
+    flap: flap,
+    forceEnd: function () { if (state === 'ready') state = 'playing'; endRun(); },
+    home: showStart,
+    debug: function () {
+      return {
+        ball: ball ? { x: ball.x, y: ball.y, vy: ball.vy } : null,
+        gates: gates.map(function (g) { return { x: g.x, mid: g.mid, gap: g.gap, passed: g.passed }; }),
+        arena: arena,
+        stage: stage.key,
+        gateWidth: GATE_W,
+        endReason: lastEndReason,
+        size: { w: W, h: H, groundY: groundY }
+      };
+    }
+  };
+})();
+
+</script>
+</body>
+</html>
