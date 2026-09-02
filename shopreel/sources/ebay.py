@@ -55,7 +55,7 @@ class EbaySource(Source):
         }
         data = http_json(f"{SEARCH_URL}?{qs(params)}", headers=headers)
         out: List[Product] = []
-        for r in (data.get("itemSummaries") or [])[:limit]:
+        for i, r in enumerate((data.get("itemSummaries") or [])[:limit], 1):
             price = r.get("price") or {}
             orig = (r.get("marketingPrice") or {}).get("originalPrice") or {}
             out.append(self.product(
@@ -66,9 +66,9 @@ class EbaySource(Source):
                 price=to_float(price.get("value")),
                 orig_price=to_float(orig.get("value")),
                 currency=str(price.get("currency") or "USD"),
-                rating=4.6,
-                reviews=to_int(r.get("watchCount")),
-                sold=to_int(r.get("watchCount")) * 3,
+                rank=i,                              # watchCount 내림차순 정렬 결과
+                highlights=([f"{to_int(r.get('watchCount')):,}명이 관심 등록"]
+                            if r.get("watchCount") else []),
                 category=str(((r.get("categories") or [{}])[0]).get("categoryName", "")),
                 shop=str((r.get("seller") or {}).get("username", "")),
                 raw=r,

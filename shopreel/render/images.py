@@ -151,7 +151,12 @@ def build_background(out: Path, product: Product, photo: Optional[Path],
 
     if src is not None:
         blurred = _cover(src, (w, h)).filter(ImageFilter.GaussianBlur(38))
-        blurred = Image.blend(blurred, Image.new("RGB", (w, h), hex_rgb(colors[0])), 0.45)
+        # 쇼핑몰 상품 사진은 대부분 흰 배경이라 그대로 깔면 배경이 밋밋해진다.
+        # 밝을수록 카테고리 색을 더 섞어 시리즈 톤을 유지한다.
+        from PIL import ImageStat
+        brightness = sum(ImageStat.Stat(blurred).mean[:3]) / 3.0
+        mix = 0.45 + min(0.32, max(0.0, (brightness - 150) / 105.0) * 0.32)
+        blurred = Image.blend(blurred, Image.new("RGB", (w, h), hex_rgb(colors[0])), mix)
         canvas.alpha_composite(blurred.convert("RGBA"))
 
     # 제품 카드 (비트별로 크기/위치 살짝 변화 → 정지 화면 느낌 제거)
@@ -194,6 +199,11 @@ def build_background(out: Path, product: Product, photo: Optional[Path],
 
 
 # ------------------------------------------------------------------ 텍스트 오버레이
+def _same(a: str, b: str) -> bool:
+    strip = lambda t: "".join(ch for ch in (t or "") if ch.isalnum())  # noqa: E731
+    return strip(a) == strip(b)
+
+
 def _wrap(draw: ImageDraw.ImageDraw, text: str, f: ImageFont.FreeTypeFont,
           max_w: int) -> List[str]:
     if not text:
@@ -258,6 +268,11 @@ def render_overlay(out: Path, size: Tuple[int, int], *, caption: str, badge: str
     img.alpha_composite(grad, (0, h - grad.height))
 
     y = int(h * 0.70)
+
+    # 큰 텍스트와 자막이 같은 내용이면 자막은 생략한다 (같은 값이 두 번 보이지 않게)
+    big_text = price if beat == "PRICE" else (rating if beat == "PROOF" else "")
+    if big_text and caption and _same(caption, big_text):
+        caption = ""
 
     # PRICE 비트는 가격을 크게
     if beat == "PRICE" and price:

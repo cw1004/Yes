@@ -14,7 +14,7 @@ from typing import Dict, List, Optional
 
 from . import compliance
 from .config import BEAT_ORDER, Config
-from .models import Beat, Product, Script
+from .models import Beat, Product, Script, source_label
 
 # 언어별 초당 글자 수 (내레이션 길이 상한 계산용)
 CHARS_PER_SEC: Dict[str, float] = {"ko": 5.2, "en": 14.0}
@@ -58,13 +58,38 @@ CTA_EN = [
 TAGS_BY_CAT: Dict[str, List[str]] = {
     "주방용품": ["#주방템", "#자취템", "#살림템"],
     "생활가전": ["#생활템", "#가성비", "#여름템"],
+    "가전디지털": ["#가전추천", "#디지털템", "#가성비가전"],
+    "생활용품": ["#생활템", "#살림템", "#자취템"],
+    "홈인테리어": ["#홈인테리어", "#자취방", "#집꾸미기"],
     "사무/PC": ["#데스크테리어", "#사무템", "#생산성"],
     "자동차용품": ["#차량용품", "#드라이브", "#카템"],
     "캠핑/아웃도어": ["#캠핑용품", "#차박", "#캠린이"],
+    "스포츠/레저": ["#운동템", "#홈트", "#레저용품"],
     "반려동물": ["#댕댕이", "#냥스타그램", "#펫용품"],
+    "반려동물용품": ["#댕댕이", "#냥스타그램", "#펫용품"],
+    "뷰티": ["#뷰티템", "#데일리템", "#파우치템"],
+    "식품": ["#먹킷리스트", "#간편식", "#자취요리"],
+    "출산/유아동": ["#육아템", "#아기용품", "#육아꿀템"],
 }
-BASE_TAGS_KO = ["#쇼핑추천", "#꿀템", "#해외직구", "#shorts", "#릴스추천"]
-BASE_TAGS_EN = ["#amazonfinds", "#tiktokmademebuyit", "#gadgets", "#shorts", "#dealoftheday"]
+
+# 소스별 태그 — 국내 배송과 해외직구를 섞지 않는다
+TAGS_BY_SOURCE: Dict[str, List[str]] = {
+    "coupang": ["#쿠팡", "#쿠팡추천", "#로켓배송"],
+    "aliexpress": ["#알리익스프레스", "#해외직구", "#알리템"],
+    "amazon": ["#아마존", "#해외직구", "#amazonfinds"],
+    "rakuten": ["#라쿠텐", "#해외직구", "#일본직구"],
+    "ebay": ["#이베이", "#해외직구"],
+}
+BASE_TAGS_KO = ["#쇼핑추천", "#꿀템", "#shorts", "#릴스추천"]
+BASE_TAGS_EN = ["#tiktokmademebuyit", "#gadgets", "#shorts", "#dealoftheday"]
+
+
+# 배송·혜택 문구는 셀링포인트가 아니라 조건이다 (자막·PROBLEM 단계에서 제외)
+PERK_WORDS = ("배송", "무료", "쿠폰", "적립", "할인", "shipping", "free", "coupon", "off")
+
+
+def _is_perk(text: str) -> bool:
+    return any(w in text.lower() for w in PERK_WORDS)
 
 
 def _fit(text: str, max_chars: int) -> str:
@@ -81,6 +106,17 @@ def _fit(text: str, max_chars: int) -> str:
     return out or text[:max_chars].rstrip()
 
 
+def short_title(title: str, limit: int = 22) -> str:
+    """상품명을 단어 단위로 줄인다 (중간에서 잘리지 않게)."""
+    words = re.sub(r"\s+", " ", (title or "").strip()).split()
+    out = ""
+    for w in words:
+        if len(out) + len(w) + 1 > limit:
+            break
+        out = f"{out} {w}".strip()
+    return out or (title or "")[:limit]
+
+
 def _caption(text: str, limit: int = 22) -> str:
     """화면 자막 — 짧을수록 좋다."""
     text = re.sub(r"\s+", " ", (text or "").strip())
@@ -94,7 +130,8 @@ def max_chars(seconds: float, lang: str) -> int:
 
 def hashtags(p: Product, lang: str) -> List[str]:
     base = BASE_TAGS_KO if lang == "ko" else BASE_TAGS_EN
-    tags = TAGS_BY_CAT.get(p.category, []) + base
+    source_tags = TAGS_BY_SOURCE.get(p.source, []) if lang == "ko" else []
+    tags = TAGS_BY_CAT.get(p.category, []) + source_tags + base
     if p.shop:
         slug = re.sub(r"[^0-9A-Za-z가-힣]", "", p.shop)
         if slug:
@@ -105,6 +142,31 @@ def hashtags(p: Product, lang: str) -> List[str]:
             seen.add(t.lower())
             out.append(t)
     return compliance.ensure_tags(out[:12], lang)
+
+
+def _proof_caption(p: Product, lang: str) -> str:
+    """PROOF 자막 — 화면에 크게 나가는 배지와 중복되지 않게 고른다."""
+    feature = next((h for h in p.highlights if not _is_perk(h)), "")
+    if feature:
+        return feature
+    if p.highlights:
+        return p.highlights[0]
+    if p.category:
+        return f"{p.category} 베스트" if lang == "ko" else f"top in {p.category}"
+    return short_title(p.title, 22)
+
+
+def proof_badge(p: Product, lang: str) -> str:
+    """화면에 크게 띄울 근거 한 조각 (없는 값은 만들지 않는다)."""
+    if p.rating and p.reviews:
+        return f"★{p.rating:.1f} · {p.reviews:,}"
+    if p.rating:
+        return f"★{p.rating:.1f}"
+    if p.rank:
+        return f"인기 {p.rank}위" if lang == "ko" else f"#{p.rank} best seller"
+    if p.sold:
+        return f"{p.sold:,}개 판매" if lang == "ko" else f"{p.sold:,} sold"
+    return ""
 
 
 def _proof_text(p: Product, lang: str) -> str:
@@ -118,7 +180,9 @@ def _proof_text(p: Product, lang: str) -> str:
             bits.append(f"최근 {p.sold_delta:,}개 추가 판매")
         elif p.sold:
             bits.append(f"누적 {p.sold:,}개 판매")
-        head = ", ".join(bits) + "." if bits else "후기가 빠르게 쌓이는 제품입니다."
+        if not bits and p.rank:
+            bits.append(f"{source_label(p.source, 'ko')} 인기 순위 {p.rank}위")
+        head = ", ".join(bits) + "." if bits else "지금 많이 담고 있는 상품입니다."
         if p.highlights:
             head += " " + " ".join(h.rstrip(".") + "." for h in p.highlights[:2])
         return head
@@ -130,26 +194,29 @@ def _proof_text(p: Product, lang: str) -> str:
         bits.append(f"{p.sold_delta:,} sold just this cycle")
     elif p.sold:
         bits.append(f"{p.sold:,} sold")
-    head = ", ".join(bits) + "." if bits else "Reviews are stacking up fast."
+    if not bits and p.rank:
+        bits.append(f"ranked #{p.rank} on {source_label(p.source, 'en')} right now")
+    head = ", ".join(bits) + "." if bits else "This one keeps selling out."
     if p.highlights:
         head += " " + " ".join(h.rstrip(".") + "." for h in p.highlights[:2])
     return head
 
 
 def _price_text(p: Product, cfg: Config) -> str:
-    now = p.price_text(cfg.currency_symbol)
-    was = ""
-    if p.orig_price > p.price > 0:
-        tmp = Product(source=p.source, product_id="", title="", url="",
-                      price=p.orig_price, currency=p.currency)
-        was = tmp.price_text(cfg.currency_symbol)
+    """가격 내레이션. 통화 기호 대신 읽을 수 있는 단어를 쓰고 할인율을 앞세운다."""
+    now = p.spoken_price(cfg.lang)
+    was = p.spoken_price(cfg.lang, p.orig_price) if p.orig_price > p.price > 0 else ""
     if cfg.lang == "ko":
-        if was and p.discount:
-            return f"정가 {was}에서 지금 {now}. {p.discount:.0f}퍼센트 할인입니다."
-        return f"지금 가격은 {now} 입니다. 변동될 수 있으니 링크에서 확인하세요." if now else \
+        if p.discount and was:
+            return f"지금 {p.discount:.0f}퍼센트 할인. {was}이 {now}."
+        if p.discount:
+            return f"지금 {p.discount:.0f}퍼센트 할인, {now}."
+        return f"지금 {now}. 가격은 바뀔 수 있으니 링크에서 확인하세요." if now else \
             "가격은 링크에서 확인하세요."
-    if was and p.discount:
-        return f"Was {was}, now {now}. That's {p.discount:.0f} percent off."
+    if p.discount and was:
+        return f"{p.discount:.0f} percent off right now. {was} down to {now}."
+    if p.discount:
+        return f"{p.discount:.0f} percent off right now — {now}."
     return f"It is {now} right now. Price can change, so check the link." if now else \
         "Check the live price at the link."
 
@@ -166,8 +233,9 @@ def build_script_template(p: Product, cfg: Config) -> Script:
                                         disc=int(p.discount or 20))
     problem_pool = PROBLEM_KO if lang == "ko" else PROBLEM_EN
     problem = rng.choice(problem_pool)
-    if p.highlights:
-        problem += " " + p.highlights[0].rstrip(".") + "."
+    feature_line = next((h for h in p.highlights if not _is_perk(h)), "")
+    if feature_line:
+        problem += " " + feature_line.rstrip(".") + "."
     proof = _proof_text(p, lang)
     price = _price_text(p, cfg)
     cta_pool = CTA_KO if lang == "ko" else CTA_EN
@@ -176,12 +244,20 @@ def build_script_template(p: Product, cfg: Config) -> Script:
     raw = {"HOOK": hook, "PROBLEM": problem, "PROOF": proof, "PRICE": price, "CTA": cta}
     captions = {
         "HOOK": _caption(hook),
-        "PROBLEM": _caption(p.highlights[0] if p.highlights else problem),
-        "PROOF": _caption(f"★{p.rating:.1f} · {p.reviews:,}" if p.rating else proof, 24),
+        "PROBLEM": short_title(p.title, 22),
+        # 큰 배지(★평점 / 인기 N위)와 겹치지 않는 정보를 자막에 둔다
+        "PROOF": _caption(_proof_caption(p, lang), 24),
+        # 가격 자체는 화면에 크게 따로 나가므로, 자막에는 비교 정보(정가)를 둔다
         "PRICE": _caption(
-            (f"{p.discount:.0f}% ↓ {p.price_text(cfg.currency_symbol)}"
-             if p.discount else p.price_text(cfg.currency_symbol)) or price, 24),
-        "CTA": compliance.short_disclosure(lang),
+            (f"정가 {p.price_text(cfg.currency_symbol, p.orig_price)}"
+             if cfg.lang == "ko" else
+             f"was {p.price_text(cfg.currency_symbol, p.orig_price)}")
+            if p.orig_price > p.price > 0 else short_title(p.title, 22), 24),
+        # 하단에 광고 고지가 상시 노출되므로 CTA 자막은 가격을 한 번 더 각인한다
+        "CTA": _caption(
+            (f"{p.price_text(cfg.currency_symbol)} · {p.discount:.0f}%↓"
+             if p.discount else p.price_text(cfg.currency_symbol))
+            or short_title(p.title, 22), 24),
     }
     visuals = {
         "HOOK": "제품 클로즈업 · 빠른 줌인",

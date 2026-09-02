@@ -17,9 +17,9 @@ from india2030 import ffmpeg as ff
 from india2030 import video as vid
 from india2030.providers import tts as ttsprov
 
-from .. import compliance
+from .. import compliance, scriptgen
 from ..config import Config
-from ..models import Product, Script
+from ..models import Product, Script, source_label
 from . import images as imgprov
 
 
@@ -47,7 +47,7 @@ def prepare_visuals(product: Product, script: Script, cfg: Config,
             badge=badge,
             price=product.price_text(cfg.currency_symbol),
             discount=(f"-{product.discount:.0f}%" if product.discount else ""),
-            rating=(f"★ {product.rating:.1f}" if product.rating else ""),
+            rating=scriptgen.proof_badge(product, cfg.lang),
             accent=accent,
             font_path=font_path,
             watermark=cfg.watermark,
@@ -60,13 +60,19 @@ def prepare_visuals(product: Product, script: Script, cfg: Config,
 
 
 def _badge_text(product: Product, cfg: Config) -> str:
+    """배지에는 소스가 실제로 준 값만 쓴다."""
+    label = source_label(product.source, cfg.lang)
     if cfg.lang == "ko":
         if product.sold_delta:
-            return f"실시간 인기 · 최근 {product.sold_delta:,}개 판매"
-        return f"실시간 인기 · {product.source.upper()}"
+            return f"{label} 실시간 인기 · 최근 {product.sold_delta:,}개 판매"
+        if product.rank:
+            return f"{label} 인기 {product.rank}위"
+        return f"{label} 실시간 인기"
     if product.sold_delta:
-        return f"TRENDING · {product.sold_delta:,} sold now"
-    return f"TRENDING · {product.source.upper()}"
+        return f"{label} TRENDING · {product.sold_delta:,} sold now"
+    if product.rank:
+        return f"{label} · #{product.rank} best seller"
+    return f"{label} TRENDING"
 
 
 def prepare_audio(script: Script, cfg: Config, workdir: Path) -> Tuple[List[Optional[Path]], str]:

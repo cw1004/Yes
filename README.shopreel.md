@@ -121,6 +121,43 @@ source shopreel.env
 python3 -m shopreel run --sources aliexpress,amazon --publish youtube,tiktok
 ```
 
+### 5-1. 쿠팡 파트너스로 바로 확인해 보기 (키 없이)
+
+쿠팡 오픈 API 를 흉내 내면서 **요청의 CEA HMAC 서명을 실제로 검증하는** 목 서버가 들어 있습니다.
+여기서 통과하면 실제 키로 바꿔도 같은 코드가 그대로 돕니다.
+
+```bash
+make shop-coupang               # 또는  python3 -m tools.coupang_demo --top 1 --fast
+```
+
+```
+■ API 호출 서명 검증
+  ○ GET  /v1/products/bestcategories/1016        ok
+  ○ POST /v1/deeplink                            ok
+■ 결과
+  영상   output/coupang-demo/video/xxxx.mp4 (30초)
+  제휴링크 https://link.coupang.com/a/209012?subId=c97f33a24c&utm_medium=youtube...
+```
+
+실제 키가 생기면 목 서버만 빼면 됩니다.
+
+```bash
+export COUPANG_ACCESS_KEY=... COUPANG_SECRET_KEY=...
+python3 -m shopreel run --sources coupang --publish dryrun
+```
+
+쿠팡을 붙일 때 알아 둘 점
+
+- **쿠팡은 평점·리뷰·판매량을 주지 않습니다.** 없는 값을 지어내지 않고 API 가 주는
+  **인기 순위(rank)** 만 신호로 씁니다. 화면에도 "쿠팡 인기 3위"로 나가고,
+  평점 배지는 평점을 주는 소스(알리·아마존)에서만 나옵니다.
+  그래서 쿠팡을 쓸 때는 평점 필터를 꺼야 합니다: `"min_rating": 0, "min_reviews": 0`
+- 상품 URL 은 **딥링크 API 로 파트너스 추적 링크(`link.coupang.com/a/...`)로 자동 변환**되고,
+  플랫폼별 `subId` 가 붙어 유튜브/틱톡 성과가 따로 집계됩니다. 딥링크가 실패해도
+  원본 URL 로 계속 진행합니다.
+- 엔드포인트는 `COUPANG_ENDPOINT` 로 고릅니다: `bestcategories`(기본) · `goldbox`(골드박스 특가) · `search`.
+- 할인율은 쿠팡이 준 `discountRate` 를 그대로 씁니다(쇼핑몰 표시값과 화면이 어긋나지 않게).
+
 ---
 
 ## 6. 업로드 연결
@@ -229,6 +266,9 @@ shopreel/
   pipeline.py      전체 흐름
   scheduler.py     주기 실행
   cli.py           명령줄
+tools/
+  mock_coupang.py  쿠팡 오픈 API 목 서버 (서명 검증 포함)
+  coupang_demo.py  쿠팡 연동 시연 (키 없이 전체 파이프라인)
 ```
 
 테스트: `make test` (렌더링 없이 1초대에 끝납니다)

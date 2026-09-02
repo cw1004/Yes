@@ -38,8 +38,8 @@ DEFAULT_AFFILIATE: Dict[str, Dict[str, str]] = {
     "aliexpress": {"tag_env": "ALIEXPRESS_AFF_KEY",
                    "template": "https://s.click.aliexpress.com/deep_link.htm"
                                "?aff_short_key={tag}&dl_target_url={url_enc}"},
-    "coupang": {"tag_env": "COUPANG_PARTNERS_ID",
-                "template": "https://link.coupang.com/re/AFFSDP?lptag={tag}&pageKey={pid}"},
+    # 쿠팡은 딥링크 API 가 이미 추적 링크를 주므로 URL 을 다시 만들지 않고 subId 만 붙인다
+    "coupang": {"tag_env": "COUPANG_PARTNERS_ID", "template": "{url}", "tag_param": "lptag"},
     "ebay": {"tag_env": "EBAY_EPN_CAMPAIGN",
              "template": "https://www.ebay.com/sch/i.html?_nkw={pid}&mkcid=1&campid={tag}"},
     "rakuten": {"tag_env": "RAKUTEN_AFF_ID", "template": "{url}?scid={tag}"},

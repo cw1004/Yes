@@ -44,9 +44,9 @@ class RakutenSource(Source):
                 images=[i.split("?")[0] for i in images[:4]],
                 price=to_float(r.get("itemPrice")),
                 currency="JPY",
-                rating=to_float(r.get("reviewAverage")) or 4.5,
+                rating=to_float(r.get("reviewAverage")),
                 reviews=to_int(r.get("reviewCount")),
-                sold=max(0, (100 - rank) * 50),      # 랭킹을 인기 신호로 환산
+                rank=rank,                           # 랭킹 API 가 주는 실제 순위
                 category=str(r.get("genreId", "")),
                 shop=str(r.get("shopName", "")),
                 raw=r,

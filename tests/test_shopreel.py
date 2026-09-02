@@ -63,6 +63,21 @@ class ComplianceTest(unittest.TestCase):
         self.assertTrue(body.startswith("이 영상은 제휴 링크"))
         self.assertEqual(body, compliance.caption_with_disclosure(body, "ko"))
 
+    def test_disclosure_not_skipped_by_common_characters(self):
+        # '이', '#광고' 같은 조각이 우연히 들어 있어도 표기는 반드시 붙어야 한다
+        for body in ("코시 접이식 LED 스탠드", "이 제품은 인기 상품", "광고 문구가 아닌 본문"):
+            out = compliance.caption_with_disclosure(body, "ko")
+            self.assertTrue(out.startswith("이 영상은 제휴 링크"), body)
+        self.assertTrue(compliance.has_disclosure(
+            compliance.caption_with_disclosure("본문", "ko"), "ko"))
+
+    def test_trailing_ad_hashtag_does_not_count_as_disclosure(self):
+        # 본문 끝 해시태그는 '더보기'에 가려지므로 앞선 표기로 인정하지 않는다
+        body = "상품 설명\n가격: 23,900원\n\n#광고 #꿀템"
+        self.assertFalse(compliance.has_disclosure(body, "ko"))
+        self.assertTrue(compliance.caption_with_disclosure(body, "ko")
+                        .startswith("이 영상은 제휴 링크"))
+
     def test_ad_tags_forced_to_front(self):
         tags = compliance.ensure_tags(["#꿀템"], "ko")
         self.assertEqual(tags[0], "#광고")
@@ -135,6 +150,13 @@ class ScriptTest(unittest.TestCase):
         body = scriptgen.build_description(sample_product(), cfg, "https://t.example/r/abc")
         self.assertTrue(body.startswith("이 영상은 제휴 링크"))
         self.assertIn("https://t.example/r/abc", body)
+        self.assertIn("#광고", body)
+
+    def test_description_keeps_disclosure_for_any_product_title(self):
+        cfg = Config()
+        for title in ("코시 접이식 LED 스탠드", "이 상품", "광고판 조명"):
+            body = scriptgen.build_description(sample_product(title=title), cfg, "")
+            self.assertTrue(body.startswith("이 영상은 제휴 링크"), title)
 
     def test_english_script(self):
         cfg = Config(lang="en", duration=15.0)

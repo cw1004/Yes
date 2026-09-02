@@ -8,7 +8,8 @@ CAPTION ?=            # 비우면 내레이션과 동일 (예: CAPTION=ko)
 LANG_OPT = --lang $(NARRATION) $(if $(CAPTION),--caption-lang $(CAPTION),)
 
 .PHONY: help setup check scripts all hindi fast test clean \
-        shop-check shop-trends shop-make shop-run shop-auto shop-serve shop-report
+        shop-check shop-trends shop-make shop-run shop-auto shop-serve shop-report \
+        shop-coupang
 
 help:            ## 사용 가능한 명령 보기
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -65,3 +66,6 @@ shop-serve:      ## 클릭 추적 서버 실행
 
 shop-report:     ## 클릭·주문·수익 리포트
 	$(PY) -m shopreel report --days $(DAYS)
+
+shop-coupang:    ## 쿠팡 파트너스 연동 시연 (키 없이, 서명까지 검증)
+	$(PY) -m tools.coupang_demo --top $(TOP) --duration $(SECS) --fast

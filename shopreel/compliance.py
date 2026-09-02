@@ -89,9 +89,27 @@ def ensure_tags(tags: List[str], lang: str = "ko") -> List[str]:
     return [t for t in required if t.lower() not in have] + list(tags)
 
 
+def _squash(text: str) -> str:
+    return re.sub(r"\s+", "", (text or "")).lower()
+
+
+def has_disclosure(body: str, lang: str = "ko", custom: Optional[str] = None) -> bool:
+    """본문 앞부분에 이미 광고 표기가 있는지 확인한다.
+
+    표기는 '더보기'에 가려지면 안 되므로 **맨 앞 두 줄**만 본다.
+    본문 끝에 붙은 #광고 해시태그는 앞선 표기로 인정하지 않는다.
+    또 앞 단어 하나로 판정하면 '이' 같은 흔한 글자에 걸려 표기가 통째로 빠질 수 있어
+    표기 문구 자체(공백 제거)로 대조한다.
+    """
+    head = _squash("\n".join((body or "").splitlines()[:2]))
+    note = _squash(disclosure(lang, custom))
+    if note and note[:20] in head:
+        return True
+    return any(_squash(tag) in head for tag in DISCLOSURE_TAGS.get(lang, []))
+
+
 def caption_with_disclosure(body: str, lang: str = "ko", custom: Optional[str] = None) -> str:
     """게시글 본문 맨 앞에 표기를 넣는다 (플랫폼 정책상 '더보기' 뒤로 숨기면 안 됨)."""
-    note = disclosure(lang, custom)
-    if note.split()[0].lower() in body.lower()[:120]:
+    if has_disclosure(body, lang, custom):
         return body
-    return f"{note}\n\n{body}".strip()
+    return f"{disclosure(lang, custom)}\n\n{body}".strip()

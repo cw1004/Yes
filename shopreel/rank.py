@@ -11,7 +11,7 @@ from __future__ import annotations
 import math
 import time
 from difflib import SequenceMatcher
-from typing import Dict, Iterable, List, Optional
+from typing import Dict, Iterable, List, Optional, Tuple
 
 from .compliance import is_allowed
 from .config import Config
@@ -21,6 +21,7 @@ WEIGHTS: Dict[str, float] = {
     "velocity": 3.0,     # 판매량 증가 속도
     "volume": 1.2,       # 누적 판매량
     "social": 1.5,       # 평점 × 리뷰 수
+    "rank": 2.0,         # 플랫폼 인기 순위 (판매량을 안 주는 소스용)
     "discount": 1.3,     # 할인율
     "commission": 1.6,   # 제휴 수수료
     "freshness": 0.8,    # 신선도
@@ -33,26 +34,37 @@ def _log(x: float) -> float:
 
 
 def score(p: Product, epc: Optional[Dict[str, float]] = None, now: Optional[float] = None) -> float:
-    """0~100 정규화 점수."""
+    """0~100 정규화 점수.
+
+    소스마다 주는 정보가 다르다(쿠팡은 평점·판매량이 없고 순위만 준다).
+    없는 신호는 0점으로 깎지 않고 **분모에서도 빼서**, 정보량이 다른 소스끼리도
+    공평하게 비교되게 한다.
+    """
     now = now or time.time()
     epc = epc or {}
-
-    velocity = _log(p.sold_delta * 10) / 4.0                      # 0~1
-    volume = _log(p.sold) / 5.0                                   # 0~1
-    social = (min(p.rating, 5.0) / 5.0) * (_log(p.reviews) / 4.0)  # 0~1
-    discount = min(p.discount, 70.0) / 70.0                       # 0~1
-    commission = min(p.commission, 30.0) / 30.0                   # 0~1
     age_h = max(0.0, (now - p.collected_at) / 3600.0)
-    freshness = 1.0 / (1.0 + age_h / 12.0)                        # 12시간 반감
 
+    signals: List[Tuple[str, float]] = [
+        ("discount", min(p.discount, 70.0) / 70.0),
+        ("freshness", 1.0 / (1.0 + age_h / 12.0)),      # 12시간 반감
+    ]
+    if p.sold or p.sold_delta:
+        signals.append(("velocity", _log(p.sold_delta * 10) / 4.0))
+        signals.append(("volume", _log(p.sold) / 5.0))
+    if p.reviews:
+        signals.append(("social", (min(p.rating, 5.0) / 5.0 if p.rating else 0.5)
+                        * (_log(p.reviews) / 4.0)))
+    if p.rank:
+        signals.append(("rank", max(0.0, 1.0 - (min(p.rank, 100) - 1) / 100.0)))
+    if p.commission:
+        signals.append(("commission", min(p.commission, 30.0) / 30.0))
     cat_epc = epc.get(p.category, 0.0)
-    epc_boost = min(cat_epc / 0.5, 1.0) if cat_epc > 0 else 0.0
+    if cat_epc > 0:
+        signals.append(("epc", min(cat_epc / 0.5, 1.0)))
 
-    total = (WEIGHTS["velocity"] * velocity + WEIGHTS["volume"] * volume
-             + WEIGHTS["social"] * social + WEIGHTS["discount"] * discount
-             + WEIGHTS["commission"] * commission + WEIGHTS["freshness"] * freshness
-             + WEIGHTS["epc"] * epc_boost)
-    return round(total / sum(WEIGHTS.values()) * 100, 2)
+    total = sum(WEIGHTS[name] * value for name, value in signals)
+    denom = sum(WEIGHTS[name] for name, _ in signals) or 1.0
+    return round(total / denom * 100, 2)
 
 
 def passes_filter(p: Product, cfg: Config) -> bool:
