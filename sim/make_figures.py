@@ -10,6 +10,8 @@ import matplotlib.pyplot as plt
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "results")
+FIGOUT = os.path.join(HERE, "results", "figures")
+os.makedirs(FIGOUT, exist_ok=True)
 d = np.load(os.path.join(OUT, "figure_data.npz"))
 R = json.load(open(os.path.join(OUT, "embodiment_results.json")))
 
@@ -66,7 +68,7 @@ ax.set_xlabel("Calibrated failure probability  $P_{fail}$  (logit scale)")
 ax.set_ylabel("Epistemic uncertainty $U_{epis}$ = mutual information [nat]")
 ax.set_title("FIG. 5  Uncertainty gating in the $P_{fail}$–$U_{epis}$ plane")
 ax.legend(loc="lower left", fontsize=7.2, framealpha=0.93, markerscale=2.6)
-fig.tight_layout(); fig.savefig(os.path.join(OUT, "fig05_gating_plane.png"))
+fig.tight_layout(); fig.savefig(os.path.join(FIGOUT, "fig05_gating_plane.png"))
 plt.close(fig)
 
 # ============================================================ 도 13
@@ -153,10 +155,10 @@ e.set_title("(d) Gating operating curve, all OOD samples\n"
             "(AI-side detector only; monitor permissive excluded)", fontsize=9)
 e.set_ylim(-3, 103); e.legend(fontsize=7.2, loc="lower right")
 
-fig.suptitle("FIG. 13  Simulation-based validation of calibration, thresholds and gating",
+fig.suptitle("FIG. 15  Simulation-based validation of calibration, thresholds and gating",
              fontsize=10.5, y=0.995)
 fig.tight_layout(rect=[0, 0, 1, 0.975])
-fig.savefig(os.path.join(OUT, "fig13_validation.png"))
+fig.savefig(os.path.join(FIGOUT, "fig15_validation.png"))
 plt.close(fig)
-print("생성:", os.path.join(OUT, "fig05_gating_plane.png"))
-print("생성:", os.path.join(OUT, "fig13_validation.png"))
+print("생성:", os.path.join(FIGOUT, "fig05_gating_plane.png"))
+print("생성:", os.path.join(FIGOUT, "fig15_validation.png"))
