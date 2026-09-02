@@ -1,0 +1,88 @@
+name: tests
+
+on:
+  # PR 이 열린 브랜치는 pull_request 가 이미 잡습니다. push 까지 '**' 로 두면
+  # 같은 커밋에 대해 워크플로가 두 번 돌아 러너 시간이 두 배로 나갑니다.
+  # 그래서 push 는 기본 브랜치에만, 나머지는 PR 이벤트로 커버합니다.
+  push:
+    branches: ['claude/india-2030-video-generator-coz8kp']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # 스캘퍼는 표준 라이브러리만 쓰므로 의존성 설치 없이 먼저 빠르게 돌립니다.
+  scalper:
+    name: scalper (py${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.10', '3.11', '3.12', '3.13']
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: 서드파티 없이 import 되는지
+        run: python -c "import scalper, scalper.cli, scalper.engine, scalper.server; print(scalper.__version__)"
+
+      - name: 단위 테스트 (신호 + 실전 실행부)
+        run: python -m unittest discover -s tests -p 'test_scalper*.py' -v
+
+      - name: 실전 경로 안전장치 확인
+        run: |
+          # 키가 없으면 주문 경로가 열리면 안 됩니다.
+          if python -m scalper live --iterations 1; then
+            echo "실패: 키 없이도 live 가 실행됐습니다"; exit 1
+          fi
+          # 실계좌는 환경변수 없이 열리면 안 됩니다.
+          if ALPACA_API_KEY=x ALPACA_API_SECRET=y python -m scalper live --real; then
+            echo "실패: SCALPER_ALLOW_LIVE 없이 실계좌가 열렸습니다"; exit 1
+          fi
+          echo "실계좌 잠금 정상"
+
+
+      - name: 오프라인 백테스트
+        run: python -m scalper backtest NVDA TSLA --offline --bars 300
+
+      - name: 대시보드 스모크 테스트
+        run: |
+          python -m scalper run --offline --port 8788 &
+          server_pid=$!
+          trap 'kill $server_pid 2>/dev/null || true' EXIT
+
+          for _ in $(seq 1 30); do
+            curl -sf http://127.0.0.1:8788/api/health >/dev/null && break
+            sleep 1
+          done
+
+          curl -sf http://127.0.0.1:8788/api/health
+          curl -sf http://127.0.0.1:8788/ -o index.out
+          curl -sf http://127.0.0.1:8788/api/state -o state.json
+          python .github/scripts/check_state.py state.json index.out
+
+  # 영상 파이프라인 테스트는 pillow 만 있으면 돕니다 (ffmpeg·TTS 불필요).
+  pipeline:
+    name: india2030 파이프라인
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 테스트 의존성 설치
+        run: pip install --disable-pip-version-check pillow
+
+      - name: 전체 테스트
+        run: python -m unittest discover -s tests -v

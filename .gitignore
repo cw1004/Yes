@@ -9,3 +9,7 @@ assets/stock/*
 !assets/stock/.gitkeep
 !assets/**/README.md
 .DS_Store
+
+# 스캘퍼 실전 상태 파일 (계좌 정보가 들어갑니다)
+.scalper_state.json
+.scalper_halt
