@@ -9,3 +9,6 @@ assets/stock/*
 !assets/stock/.gitkeep
 !assets/**/README.md
 .DS_Store
+shopreel.config.json
+shopreel.env
+log/

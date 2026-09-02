@@ -1,0 +1,52 @@
+{
+  "out_dir": "output/shopreel",
+
+  "aspect": "9:16",
+  "fps": 30,
+  "duration": 30.0,
+  "preset": "medium",
+  "crf": 20,
+  "watermark": "SHOPREEL",
+  "subtitle": true,
+  "bgm": null,
+  "bgm_gain_db": -20.0,
+
+  "lang": "ko",
+  "currency_symbol": "",
+  "disclosure": null,
+
+  "script_provider": "template",
+  "llm_model": "claude-opus-5",
+
+  "tts_provider": "auto",
+  "tts_voice": null,
+
+  "sources": ["demo"],
+  "source_limit": 40,
+  "top_n": 3,
+  "min_price": 5.0,
+  "max_price": 300.0,
+  "min_rating": 4.3,
+  "min_reviews": 50,
+  "min_commission": 0.0,
+  "min_discount": 0.0,
+  "deny_keywords": [],
+  "allow_categories": [],
+  "repost_after_days": 30,
+
+  "tracker_base": "http://localhost:8787",
+  "affiliate": {
+    "amazon": {},
+    "aliexpress": {},
+    "coupang": {}
+  },
+  "utm_source": "shopreel",
+
+  "publish_to": ["dryrun"],
+  "daily_limit": {"youtube": 10, "tiktok": 10, "instagram": 8, "facebook": 10, "dryrun": 999},
+  "public_video_base": null,
+  "schedule_minutes": 180,
+
+  "workers": 4,
+  "seed": 20260101
+}

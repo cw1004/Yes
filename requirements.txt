@@ -7,3 +7,6 @@ gTTS>=2.5.0            # 무료 대안
 
 # 선택
 imageio-ffmpeg>=0.4.9  # 시스템에 ffmpeg 이 없을 때 대체 바이너리
+
+# SHOPREEL (소셜커머스 자동화)은 추가 의존성이 없습니다.
+# 수집·업로드·추적 서버 모두 표준 라이브러리(urllib/sqlite3/http.server)만 사용합니다.

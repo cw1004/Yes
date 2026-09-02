@@ -1,0 +1,234 @@
+# SHOPREEL — 소셜커머스 인기상품 자동 영상·업로드·수익화
+
+전 세계 소셜커머스에서 **지금 잘 팔리는 상품**을 실시간으로 긁어와 → 제휴(어필리에이트)
+링크를 붙이고 → 숏폼 영상을 자동 생성해 → SNS에 자동 업로드하고 → 클릭·주문·수수료까지
+추적하는 **한 개 명령으로 도는 파이프라인**입니다.
+
+```
+python3 -m shopreel run            # 수집 → 영상 → 업로드 1회
+python3 -m shopreel auto --every 180   # 3시간마다 무한 반복
+```
+
+API 키가 하나도 없어도 데모 데이터로 전체 흐름이 끝까지 돕니다.
+(영상 렌더링 엔진은 같은 저장소의 `india2030` 패키지를 재사용합니다.)
+
+---
+
+## 1. 전체 구조
+
+```
+[수집]  aliexpress · amazon · coupang · rakuten · ebay · custom(직접 만든 수집기)
+          │  실시간 판매량 증가분(sold_delta) · 평점 · 할인율 · 수수료율
+          ▼
+[선별]  금지 카테고리 제외 → 필터 → 점수화 → 중복 제거 → 최근 제작분 제외
+          │  ※ 수익 데이터(카테고리 EPC)가 점수에 되먹임됨
+          ▼
+[링크]  제휴 링크 생성 + 플랫폼별 추적코드 발급   내도메인/r/<code> → 302 → 제휴 링크
+          ▼
+[대본]  HOOK → PROBLEM → PROOF → PRICE → CTA   (템플릿 또는 Claude)
+          ▼
+[영상]  제품 카드 + 켄번즈 + 가격 배지 + 자막 + 내레이션 + 광고 표기  → mp4 (9:16)
+          ▼
+[업로드] YouTube Shorts · TikTok · Instagram Reels · Facebook  (일일 한도 준수)
+          ▼
+[수익]  클릭 기록 → 전환 웹훅/CSV → 리포트 → 다음 제작 우선순위에 반영
+```
+
+핵심 원칙 3가지
+
+1. **키가 없어도 멈추지 않는다.** 소스·TTS·업로드 어느 하나가 없어도 폴백으로 계속 진행합니다.
+2. **광고 표기는 코드로 강제한다.** 화면·본문·해시태그 세 곳에 자동으로 들어갑니다.
+3. **조회수가 아니라 수익을 최적화한다.** 클릭당 수익(EPC)이 좋은 카테고리가 다음에 먼저 만들어집니다.
+
+---
+
+## 2. 설치
+
+```bash
+# 1) ffmpeg (필수)
+sudo apt-get install -y ffmpeg      # 또는 pip install imageio-ffmpeg
+# 2) 파이썬 패키지
+pip install -r requirements.txt
+# 3) 점검
+python3 -m shopreel check
+```
+
+`check` 는 렌더링 환경 / 소스 키 / 업로드 키 / 현재 설정을 한 화면에 보여 줍니다.
+
+---
+
+## 3. 5분 시작 (키 없이)
+
+```bash
+python3 -m shopreel trends                       # 지금 인기 상품 순위 보기
+python3 -m shopreel run --top 1 --duration 15    # 1편 만들어 업로드 패키지 생성
+```
+
+결과물
+
+| 경로 | 내용 |
+| --- | --- |
+| `output/shopreel/video/*.mp4` | 완성 영상 (1080×1920) |
+| `output/shopreel/video/*.jpg` | 썸네일 |
+| `output/shopreel/script/*.json` | 상품 정보 + 대본 |
+| `output/shopreel/upload/<code>/` | 업로드 패키지 (영상·썸네일·문구·해시태그) |
+| `output/shopreel/report/run_*.json` | 실행 리포트 |
+| `output/shopreel/shopreel.db` | 상품·영상·게시·클릭·수익 기록 |
+
+---
+
+## 4. 명령어
+
+| 명령 | 설명 |
+| --- | --- |
+| `shopreel check` | 환경·키·설정 점검 |
+| `shopreel sources` | 수집 소스 상태 |
+| `shopreel trends [--json]` | 실시간 인기 상품 수집·순위 |
+| `shopreel make --top 3` | 영상만 생성 (업로드 안 함) |
+| `shopreel run` | 수집 → 영상 → 업로드 1회 |
+| `shopreel auto --every 180 [--runs 8]` | 주기 자동 실행 |
+| `shopreel publish` | 대기·실패한 업로드 재시도 |
+| `shopreel serve --port 8787` | 클릭 추적 리다이렉트 서버 |
+| `shopreel report --days 30` | 클릭·주문·수익 리포트 |
+| `shopreel import-revenue report.csv --network amazon` | 제휴 네트워크 전환 CSV 반영 |
+| `shopreel links` | 최근 만든 영상과 추적 링크 |
+| `shopreel init` | 설정 파일 생성 |
+
+자주 쓰는 옵션: `--sources`, `--publish`, `--top`, `--duration`, `--lang ko|en`,
+`--script template|llm`, `--tts`, `--preset veryfast --crf 28`(빠른 미리보기), `--dry-run`.
+
+---
+
+## 5. 실제 데이터 연결 (소스 키)
+
+`shopreel.env.example` 를 복사해 필요한 것만 채우고 `source` 하면 됩니다.
+
+| 소스 | 필요한 것 | 발급처 |
+| --- | --- | --- |
+| `aliexpress` | APP_KEY / APP_SECRET / TRACKING_ID | AliExpress 제휴 오픈 플랫폼 |
+| `amazon` | ACCESS_KEY / SECRET_KEY / ASSOC_TAG | Amazon Associates + PA-API 5.0 |
+| `coupang` | ACCESS_KEY / SECRET_KEY | 쿠팡 파트너스 오픈 API |
+| `rakuten` | APP_ID (+ AFF_ID) | 라쿠텐 웹서비스 |
+| `ebay` | CLIENT_ID / CLIENT_SECRET | eBay Developers (+ EPN) |
+| `custom` | `SHOPREEL_CUSTOM_URL` | 직접 만든 수집기 / n8n / Apify 등이 뱉는 JSON |
+
+> **공식 API 가 없는 플랫폼(틱톡샵·쇼피 등)은 `custom` 소스로 붙이세요.**
+> 사이트를 무단 스크래핑하면 이용약관 위반이 될 수 있습니다. 공식 제휴 API 또는
+> 데이터 제공 사업자를 쓰는 것을 권장합니다.
+
+```bash
+source shopreel.env
+python3 -m shopreel run --sources aliexpress,amazon --publish youtube,tiktok
+```
+
+---
+
+## 6. 업로드 연결
+
+| 플랫폼 | 필요한 것 | 비고 |
+| --- | --- | --- |
+| YouTube | CLIENT_ID / CLIENT_SECRET / REFRESH_TOKEN | Data API v3, 재개형 업로드. AI 생성 고지 자동 표기 |
+| TikTok | ACCESS_TOKEN | 기본은 **초안함** 업로드. 바로 게시는 심사 통과 앱(`TIKTOK_DIRECT_POST=1`) |
+| Instagram | IG_USER_ID / IG_ACCESS_TOKEN + 공개 영상 URL | Graph API 는 로컬 파일이 아닌 URL 을 받습니다 |
+| Facebook | FB_PAGE_ID / FB_PAGE_TOKEN | 페이지 동영상 직접 업로드 |
+| `dryrun` | 없음 | 업로드하지 않고 패키지만 생성 (기본값) |
+
+- 자격증명이 없으면 **에러가 아니라 `skipped`** 로 기록됩니다.
+- 업로드 실패·대기 건은 `shopreel publish` 로 재시도합니다.
+- 플랫폼별 **일일 업로드 한도**(`daily_limit`)를 넘으면 자동으로 건너뜁니다. 계정 보호용이니
+  무리하게 올리지 마세요.
+
+---
+
+## 7. 링크·수익 추적
+
+```bash
+python3 -m shopreel serve --port 8787       # 추적 서버
+```
+
+| 엔드포인트 | 용도 |
+| --- | --- |
+| `GET /r/<code>` | 클릭 기록 후 제휴 링크로 302 |
+| `POST /postback` | 제휴 네트워크 전환 웹훅 (`code`, `order_id`, `amount`, `commission`) |
+| `GET /stats` | 요약 JSON |
+| `GET /health` | 헬스체크 |
+
+- 실서비스에서는 앞단에 nginx/Cloudflare 를 두고 HTTPS 를 종단한 뒤,
+  `tracker_base` 를 실제 도메인(`https://link.내도메인.com`)으로 바꾸세요.
+- 웹훅이 없는 네트워크는 CSV 리포트를 내려받아 `shopreel import-revenue` 로 넣으면 됩니다.
+  헤더 이름이 달라도(SubId / u1 / customid …) 알아서 인식합니다.
+- 클릭 IP 는 원문 저장 없이 솔트 해시로만 기록합니다.
+
+수익 구조: **조회수 → 클릭 → 주문 → 수수료**. 리포트는 각 단계 전환율과
+플랫폼·상품·카테고리별 성과를 보여 주고, 카테고리 EPC 는 다음 실행의 상품 선정에 반영됩니다.
+
+---
+
+## 8. 24시간 자동화
+
+한 프로세스로 돌리기
+
+```bash
+python3 -m shopreel auto --every 180        # 3시간마다, Ctrl+C 로 종료
+```
+
+크론으로 돌리기
+
+```cron
+0 */3 * * *  cd /path/to/repo && . ./shopreel.env && python3 -m shopreel run >> log/run.log 2>&1
+5 4   * * *  cd /path/to/repo && . ./shopreel.env && python3 -m shopreel publish >> log/retry.log 2>&1
+```
+
+추적 서버는 `systemd` 나 `pm2` 로 상시 실행해 두세요.
+
+---
+
+## 9. 반드시 지켜야 할 것
+
+- **광고 표기 의무.** 제휴 링크가 있는 콘텐츠는 대가성을 명확히 밝혀야 합니다(공정위
+  추천·보증 심사지침, FTC Endorsement Guides). 이 파이프라인은 화면·본문·해시태그
+  세 곳에 자동으로 넣지만, 문구가 각 나라·플랫폼 기준에 맞는지는 직접 확인하세요.
+- **금지 카테고리 자동 제외.** 의약품·건강 표방, 성인용품, 무기, 담배/전자담배, 도박,
+  위조품, 몰래카메라 등은 제작 대상에서 빠집니다(`compliance.py`에서 조정).
+- **과장 표현 자동 완화.** "최저가 보장", "100% 효과", "guaranteed" 같은 단정 표현은
+  대본 생성 시 완화됩니다.
+- **상품 이미지 저작권.** 제휴 프로그램이 허용하는 범위에서만 상품 이미지를 사용하세요.
+  이미지가 없거나 사용이 곤란하면 절차적으로 그린 카드가 대신 쓰입니다.
+- **플랫폼 정책.** 대량 자동 게시는 스팸으로 간주될 수 있습니다. 일일 한도를 지키고,
+  같은 상품을 반복 게시하지 마세요(`repost_after_days` 기본 30일).
+- **AI 생성 고지.** YouTube 업로드 시 합성 미디어 플래그를 자동으로 설정합니다.
+
+---
+
+## 10. 품질을 올리는 순서
+
+1. `--script llm` (ANTHROPIC_API_KEY) — 상품별 카피가 확 달라집니다.
+2. TTS 업그레이드 — `pip install edge-tts` (무료) 또는 `ELEVENLABS_API_KEY`.
+3. `assets/bgm/` 에 배경음악을 넣고 `--bgm assets/bgm`.
+4. `min_commission`, `min_discount` 를 올려 **수익성 높은 상품만** 제작.
+5. 2주쯤 데이터가 쌓이면 `shopreel report` 로 이기는 카테고리를 확인하고
+   `allow_categories` 로 좁히기.
+
+## 11. 구조
+
+```
+shopreel/
+  config.py        설정(길이·비트 배분·필터·한도)
+  models.py        Product / Script / VideoAsset / PostResult
+  sources/         수집 소스 (aliexpress, amazon, coupang, rakuten, ebay, custom, demo)
+  rank.py          점수화·필터·중복 제거 (+ 수익 피드백)
+  compliance.py    광고 표기·금지 카테고리·과장 표현
+  affiliate.py     제휴 링크 + 플랫폼별 추적코드
+  scriptgen.py     5단계 대본 + 제목/본문/해시태그
+  providers/llm.py Claude 대본(선택)
+  render/          제품 카드 이미지 + 영상 조립(india2030 엔진 재사용)
+  publish/         youtube · tiktok · instagram · facebook · dryrun
+  tracker.py       클릭 리다이렉트 + 전환 웹훅 서버
+  revenue.py       수익 집계·CSV 임포트·리포트
+  store.py         SQLite 기록
+  pipeline.py      전체 흐름
+  scheduler.py     주기 실행
+  cli.py           명령줄
+```
+
+테스트: `make test` (렌더링 없이 1초대에 끝납니다)
