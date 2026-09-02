@@ -5,7 +5,9 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import tempfile
+import time
 import threading
 import unittest
 import urllib.error
@@ -317,6 +319,108 @@ class TrackerTest(unittest.TestCase):
         payload = json.loads(urllib.request.urlopen(req).read().decode())
         self.assertTrue(payload["ok"])
         self.assertEqual(self.store.summary(1)["orders"], 1)
+
+
+class DeploymentTest(unittest.TestCase):
+    """배포 산출물이 코드와 어긋나지 않는지 확인한다."""
+
+    root = Path(__file__).resolve().parent.parent
+
+    def test_config_template_loads(self):
+        raw = (self.root / "deploy" / "shopreel.config.template.json").read_text(
+            encoding="utf-8").replace("__DOMAIN__", "link.example.com")
+        cfg = Config.from_dict(json.loads(raw))
+        self.assertEqual(cfg.tracker_base, "https://link.example.com")
+        self.assertEqual(cfg.out_dir, Path("/var/lib/shopreel"))
+        self.assertEqual(cfg.extra, {})           # 오타·폐기된 항목이 없어야 한다
+        self.assertLessEqual(cfg.daily_limit["youtube"], 6)
+
+    def test_env_template_is_systemd_compatible(self):
+        """systemd EnvironmentFile 은 export 접두사를 지원하지 않는다."""
+        lines = (self.root / "deploy" / "shopreel.env.template").read_text(
+            encoding="utf-8").splitlines()
+        for line in lines:
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
+            self.assertNotIn("export ", stripped, line)
+            self.assertIn("=", line, line)
+
+    def test_systemd_units_point_at_the_real_cli(self):
+        unit = (self.root / "deploy" / "systemd" / "shopreel-tracker.service").read_text(
+            encoding="utf-8")
+        self.assertIn("-m shopreel serve", unit)
+        self.assertIn("ReadWritePaths=/var/lib/shopreel", unit)
+        run = (self.root / "deploy" / "systemd" / "shopreel-run.service").read_text(
+            encoding="utf-8")
+        self.assertIn("-m shopreel run", run)
+        backup = (self.root / "deploy" / "systemd" / "shopreel-backup.service").read_text(
+            encoding="utf-8")
+        self.assertIn("-m shopreel prune", backup)
+
+    def test_install_script_replacements_match_the_units(self):
+        """install.sh 가 치환하는 문자열이 실제 유닛에 존재해야 한다."""
+        units = "".join((self.root / "deploy" / "systemd" / name).read_text(encoding="utf-8")
+                        for name in ("shopreel-tracker.service", "shopreel-run.service",
+                                     "shopreel-backup.service"))
+        for needle in ("/opt/shopreel", "--port 8787", "User=shopreel"):
+            self.assertIn(needle, units, needle)
+
+
+class ReadinessTest(unittest.TestCase):
+    def warnings(self, **kw) -> str:
+        from shopreel.cli import readiness_warnings
+        return " / ".join(readiness_warnings(Config(**kw)))
+
+    def test_instagram_needs_public_https(self):
+        text = self.warnings(publish_to=["instagram"], tracker_base="http://localhost:8787")
+        self.assertIn("공개 영상 URL", text)
+        clean = self.warnings(publish_to=["instagram"],
+                              tracker_base="https://link.example.com")
+        self.assertNotIn("공개 영상 URL", clean)
+
+    def test_http_tracker_is_flagged(self):
+        self.assertIn("https", self.warnings(publish_to=["youtube"],
+                                             tracker_base="http://link.example.com"))
+
+    def test_youtube_quota_limit_is_flagged(self):
+        text = self.warnings(publish_to=["youtube"], tracker_base="https://x.example.com",
+                             daily_limit={"youtube": 20})
+        self.assertIn("하루 6건", text)
+
+    def test_dryrun_only_setup_is_quiet_about_tracker(self):
+        text = self.warnings(publish_to=["dryrun"], tracker_base="http://localhost:8787")
+        self.assertNotIn("링크인바이오", text)
+
+
+class ServeShutdownTest(unittest.TestCase):
+    """systemd 는 정지·재시작 때 SIGTERM 을 보낸다 — 깨끗이 끝나야 한다."""
+
+    def test_sigterm_exits_cleanly(self):
+        import signal
+        import subprocess
+        import urllib.request
+
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        proc = subprocess.Popen(
+            [sys.executable, "-m", "shopreel", "serve", "--host", "127.0.0.1",
+             "--port", "8873", "--out", tmp.name],
+            cwd=str(Path(__file__).resolve().parent.parent),
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        self.addCleanup(proc.kill)
+        for _ in range(50):
+            try:
+                urllib.request.urlopen("http://127.0.0.1:8873/health", timeout=1).read()
+                break
+            except Exception:
+                time.sleep(0.2)
+        else:
+            self.fail("서버가 뜨지 않았습니다")
+
+        proc.send_signal(signal.SIGTERM)
+        self.assertEqual(proc.wait(timeout=15), 0)
+        self.assertIn("종료", proc.stdout.read())
 
 
 class PipelineDryRunTest(unittest.TestCase):

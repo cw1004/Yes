@@ -1,0 +1,33 @@
+[Unit]
+Description=SHOPREEL 1회 실행 (수집 → 영상 → 업로드)
+Documentation=https://github.com/cw1004/Yes/blob/main/README.shopreel.md
+After=network-online.target shopreel-tracker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=shopreel
+Group=shopreel
+WorkingDirectory=/opt/shopreel
+EnvironmentFile=/etc/shopreel/shopreel.env
+ExecStart=/usr/bin/python3 -m shopreel run --config /etc/shopreel/shopreel.config.json
+
+# 영상 렌더링은 CPU 를 오래 쓴다 — 대화형 응답을 방해하지 않도록 우선순위를 낮춘다
+Nice=10
+CPUSchedulingPolicy=batch
+IOSchedulingClass=idle
+TimeoutStartSec=3600
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=shopreel-run
+
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/shopreel
+LockPersonality=yes
+
+[Install]
+WantedBy=multi-user.target

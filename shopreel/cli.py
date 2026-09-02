@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 import sys
 import time
@@ -110,8 +111,39 @@ def cmd_check(args: argparse.Namespace) -> int:
     print(f"  영상        : {cfg.duration:.0f}초 · {cfg.aspect} · {cfg.fps}fps")
     print(f"  언어        : {cfg.lang} / 대본 {cfg.script_provider}")
     print(f"  추적 링크   : {cfg.tracker_base}/r/<code>")
+    print(f"  링크인바이오: {cfg.tracker_base}/shop")
     print(f"  일일 한도   : {cfg.daily_limit}")
+
+    warnings = readiness_warnings(cfg)
+    if warnings:
+        print()
+        print("■ 확인이 필요합니다")
+        for w in warnings:
+            print(f"  ! {w}")
     return 0
+
+
+def readiness_warnings(cfg: Config) -> List[str]:
+    """운영 전에 걸리기 쉬운 설정을 미리 잡아 준다."""
+    out: List[str] = []
+    base = (cfg.tracker_base or "").rstrip("/")
+    local = any(h in base for h in ("localhost", "127.0.0.1", "0.0.0.0")) or not base
+
+    if "instagram" in cfg.publish_to and not (base.startswith("https://") and not local):
+        out.append("인스타그램은 공개 영상 URL 이 필요합니다. tracker_base 를 공개 "
+                   "https 도메인으로 두거나 PUBLIC_VIDEO_BASE 를 지정하세요")
+    if local and cfg.publish_to != ["dryrun"]:
+        out.append(f"tracker_base 가 외부에서 접근할 수 없는 주소입니다: {base or '(비어 있음)'} "
+                   "— 링크인바이오와 클릭 추적이 동작하지 않습니다")
+    if base.startswith("http://") and not local:
+        out.append("추적 링크가 http 입니다. SNS 는 http 링크를 신뢰하지 않습니다 — "
+                   "certbot 으로 https 를 붙이세요")
+    if "youtube" in cfg.publish_to and cfg.daily_limit.get("youtube", 0) > 6:
+        out.append(f"유튜브 일일 한도가 {cfg.daily_limit['youtube']}건입니다. 기본 할당량"
+                   "(10,000 유닛)으로는 하루 6건이 한계라 초과분은 실패합니다")
+    if not os.environ.get("SHOPREEL_POSTBACK_SECRET"):
+        out.append("SHOPREEL_POSTBACK_SECRET 이 없습니다 — 전환 웹훅이 무방비로 열립니다")
+    return out
 
 
 # ------------------------------------------------------------------ sources / trends
@@ -200,21 +232,39 @@ def cmd_publish(args: argparse.Namespace) -> int:
 
 
 def cmd_serve(args: argparse.Namespace) -> int:
+    import signal
+    import threading
+
     from .tracker import serve
     cfg = build_config(args)
     cfg.ensure_dirs()
     httpd, addr = serve(cfg, host=args.host, port=args.port)
+    public = (cfg.tracker_base or addr).rstrip("/")
     print(f"추적 서버 시작: {addr}")
-    print(f"  리다이렉트 : {addr}/r/<code>")
-    print(f"  전환 웹훅  : POST {addr}/postback?code=&order_id=&commission=")
-    print(f"  통계       : {addr}/stats")
-    print("Ctrl+C 로 종료")
+    print(f"  링크인바이오 : {public}/shop      ← SNS 프로필 링크에 넣을 주소")
+    print(f"  리다이렉트   : {public}/r/<code>")
+    print(f"  영상 공개 URL: {public}/v/<key>.mp4")
+    print(f"  전환 웹훅    : POST {public}/postback?code=&order_id=&commission=")
+    print(f"  통계         : {addr}/stats")
+    print("Ctrl+C 로 종료", flush=True)
+
+    # systemd 는 정지·재시작 때 SIGTERM 을 보낸다 — 처리 중인 요청을 끝내고 닫는다
+    def stop(signum, frame):                       # noqa: ANN001
+        threading.Thread(target=httpd.shutdown, daemon=True).start()
+
+    for sig in (signal.SIGTERM, signal.SIGINT):
+        try:
+            signal.signal(sig, stop)
+        except ValueError:
+            pass
+
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
-        print("\n종료")
+        pass
     finally:
         httpd.server_close()
+    print("종료")
     return 0
 
 
@@ -248,6 +298,35 @@ def cmd_links(args: argparse.Namespace) -> int:
     for r in rows:
         when = time.strftime("%m-%d %H:%M", time.localtime(r["created_at"]))
         print(f"{when}  {Path(r['path']).name}  {r['link']}")
+    return 0
+
+
+def cmd_prune(args: argparse.Namespace) -> int:
+    """오래된 영상·업로드 패키지를 지운다 (DB 기록과 수익 데이터는 유지)."""
+    cfg = build_config(args)
+    cutoff = time.time() - args.days * 86400
+    targets: List[Path] = []
+    for folder in (cfg.video_dir, cfg.out_dir / "upload", cfg.work_dir):
+        if folder.exists():
+            targets.extend(f for f in folder.rglob("*") if f.is_file()
+                           and f.stat().st_mtime < cutoff)
+    freed = sum(f.stat().st_size for f in targets)
+    if args.dry_run or cfg.dry_run:
+        print(f"삭제 대상 {len(targets)}개 · {freed / 1e6:.1f}MB (실제로 지우지 않음)")
+        return 0
+    for f in targets:
+        try:
+            f.unlink()
+        except OSError:
+            pass
+    for folder in (cfg.out_dir / "upload", cfg.work_dir):
+        for d in sorted((p for p in folder.rglob("*") if p.is_dir()), reverse=True) \
+                if folder.exists() else []:
+            try:
+                d.rmdir()          # 빈 디렉터리만 정리된다
+            except OSError:
+                pass
+    print(f"{len(targets)}개 삭제 · {freed / 1e6:.1f}MB 확보 ({args.days}일 이전)")
     return 0
 
 
@@ -308,6 +387,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = add("links", "최근 만든 영상과 추적 링크", cmd_links)
     p.add_argument("--limit", type=int, default=20)
+
+    p = add("prune", "오래된 영상·업로드 패키지 정리 (기록은 유지)", cmd_prune)
+    p.add_argument("--days", type=int, default=30, help="이 일수보다 오래된 파일 삭제")
 
     p = add("init", "설정 파일 생성", cmd_init)
     p.add_argument("path", nargs="?", help="생성할 경로")

@@ -1,0 +1,22 @@
+[Unit]
+Description=SHOPREEL 데이터베이스 백업 + 오래된 영상 정리
+
+[Service]
+Type=oneshot
+User=shopreel
+Group=shopreel
+ExecStart=/opt/shopreel/deploy/backup.sh
+# 영상은 하루 20~30편이면 한 달에 1~2GB 쌓인다. 기록은 DB 에 남으므로 파일만 정리한다.
+ExecStart=/usr/bin/python3 -m shopreel prune --config /etc/shopreel/shopreel.config.json --days 30
+WorkingDirectory=/opt/shopreel
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=shopreel-backup
+
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/shopreel /var/backups/shopreel
+
+[Install]
+WantedBy=multi-user.target

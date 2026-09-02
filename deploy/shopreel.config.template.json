@@ -1,0 +1,31 @@
+{
+  "out_dir": "/var/lib/shopreel",
+  "tracker_base": "https://__DOMAIN__",
+
+  "aspect": "9:16",
+  "fps": 30,
+  "duration": 30.0,
+  "preset": "medium",
+  "crf": 20,
+  "watermark": "SHOPREEL",
+  "lang": "ko",
+
+  "script_provider": "template",
+  "tts_provider": "auto",
+
+  "sources": ["coupang"],
+  "source_limit": 40,
+  "top_n": 3,
+  "min_price": 5000,
+  "max_price": 300000,
+  "min_rating": 0,
+  "min_reviews": 0,
+  "min_discount": 15,
+  "repost_after_days": 30,
+
+  "publish_to": ["youtube", "instagram"],
+  "daily_limit": {"youtube": 5, "tiktok": 10, "instagram": 8, "facebook": 10, "dryrun": 999},
+
+  "workers": 4,
+  "seed": 20260101
+}

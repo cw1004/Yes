@@ -1,0 +1,27 @@
+[Unit]
+Description=SHOPREEL 대기·실패 업로드 재시도
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=shopreel
+Group=shopreel
+WorkingDirectory=/opt/shopreel
+EnvironmentFile=/etc/shopreel/shopreel.env
+ExecStart=/usr/bin/python3 -m shopreel publish --config /etc/shopreel/shopreel.config.json
+TimeoutStartSec=1800
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=shopreel-retry
+
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/shopreel
+LockPersonality=yes
+
+[Install]
+WantedBy=multi-user.target

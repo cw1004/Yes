@@ -1,0 +1,41 @@
+[Unit]
+Description=SHOPREEL 추적 서버 (링크인바이오 · 클릭 추적 · 전환 웹훅)
+Documentation=https://github.com/cw1004/Yes/blob/main/README.shopreel.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=shopreel
+Group=shopreel
+WorkingDirectory=/opt/shopreel
+EnvironmentFile=/etc/shopreel/shopreel.env
+ExecStart=/usr/bin/python3 -m shopreel serve --config /etc/shopreel/shopreel.config.json --host 127.0.0.1 --port 8787
+Restart=always
+RestartSec=3
+KillSignal=SIGTERM
+TimeoutStopSec=20
+
+# 로그는 저널로 (journalctl -u shopreel-tracker -f)
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=shopreel-tracker
+
+# 보안 강화 — 쓰기는 상태 디렉터리에만 허용
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ReadWritePaths=/var/lib/shopreel
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

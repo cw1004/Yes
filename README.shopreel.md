@@ -94,6 +94,7 @@ python3 -m shopreel run --top 1 --duration 15    # 1편 만들어 업로드 패�
 | `shopreel report --days 30` | 클릭·주문·수익 리포트 |
 | `shopreel import-revenue report.csv --network amazon` | 제휴 네트워크 전환 CSV 반영 |
 | `shopreel links` | 최근 만든 영상과 추적 링크 |
+| `shopreel prune --days 30` | 오래된 영상·패키지 정리 (기록은 유지) |
 | `shopreel init` | 설정 파일 생성 |
 
 자주 쓰는 옵션: `--sources`, `--publish`, `--top`, `--duration`, `--lang ko|en`,
@@ -177,40 +178,6 @@ python3 -m shopreel run --sources coupang --publish dryrun
 - 플랫폼별 **일일 업로드 한도**(`daily_limit`)를 넘으면 자동으로 건너뜁니다. 계정 보호용이니
   무리하게 올리지 마세요.
 
-### 6-2. 인스타그램 릴스 붙이기
-
-**필요한 것**
-
-1. 인스타그램 **프로페셔널 계정**(비즈니스/크리에이터) + 페이스북 페이지 연결
-2. Meta 앱 생성 → `instagram_content_publish`, `pages_show_list` 권한
-3. `IG_USER_ID`(인스타그램 비즈니스 계정 ID), `IG_ACCESS_TOKEN`(장기 토큰)
-4. **영상 공개 URL** — Graph API 는 로컬 파일을 받지 않습니다
-
-```bash
-export IG_USER_ID=... IG_ACCESS_TOKEN=...
-python3 -m shopreel run --sources coupang --publish instagram
-```
-
-**영상 공개 URL은 추적 서버가 대신합니다**
-
-별도 스토리지(S3/R2)를 붙이지 않아도, `shopreel serve` 로 띄운 추적 서버를 공개
-도메인에 두면 그 서버가 영상을 서빙합니다. `tracker_base` 를 실제 도메인으로 두면
-`https://내도메인/v/<key>.mp4` 가 자동으로 사용됩니다. (로컬 주소는 인스타그램
-서버가 접근할 수 없으므로 게시하지 않고 `queued` 로 남깁니다.)
-
-원하면 `PUBLIC_VIDEO_BASE=https://cdn.내도메인.com/reels` 로 따로 지정할 수 있습니다.
-
-**자동으로 처리되는 것**
-
-- 컨테이너 생성 → **인코딩 완료까지 대기**(점점 간격을 늘려 최대 5분) → 게시 → 퍼머링크 조회
-- 커버 이미지 지점 지정(`IG_THUMB_OFFSET`, 기본 2초), 피드 동시 노출(`IG_SHARE_TO_FEED`)
-- 3초 미만 영상은 릴스 요건 미달이라 게시하지 않습니다
-- 일일 게시 한도·속도 제한(code 4/17/32 등)은 실패가 아니라 `queued` → `shopreel publish` 로 재시도
-
-> **페이스북 릴스 동시 게시**는 Graph API 가 자동으로 해 주지 않습니다. 인스타그램 앱의
-> 계정 센터에서 "Facebook에 릴스 공유"를 켜 두면 인스타에 올린 릴스가 페이스북에도
-> 함께 올라갑니다. 페이스북 페이지에 직접 올리려면 `--publish facebook` 을 함께 쓰세요.
-
 ### 6-1. 유튜브 붙이기 (한 번만 하면 계속 자동)
 
 **1) 키 발급**
@@ -287,6 +254,40 @@ make shop-youtube        # 쿠팡 수집 → 영상 제작 → 유튜브 업로�
 
 ---
 
+### 6-2. 인스타그램 릴스 붙이기
+
+**필요한 것**
+
+1. 인스타그램 **프로페셔널 계정**(비즈니스/크리에이터) + 페이스북 페이지 연결
+2. Meta 앱 생성 → `instagram_content_publish`, `pages_show_list` 권한
+3. `IG_USER_ID`(인스타그램 비즈니스 계정 ID), `IG_ACCESS_TOKEN`(장기 토큰)
+4. **영상 공개 URL** — Graph API 는 로컬 파일을 받지 않습니다
+
+```bash
+export IG_USER_ID=... IG_ACCESS_TOKEN=...
+python3 -m shopreel run --sources coupang --publish instagram
+```
+
+**영상 공개 URL은 추적 서버가 대신합니다**
+
+별도 스토리지(S3/R2)를 붙이지 않아도, `shopreel serve` 로 띄운 추적 서버를 공개
+도메인에 두면 그 서버가 영상을 서빙합니다. `tracker_base` 를 실제 도메인으로 두면
+`https://내도메인/v/<key>.mp4` 가 자동으로 사용됩니다. (로컬 주소는 인스타그램
+서버가 접근할 수 없으므로 게시하지 않고 `queued` 로 남깁니다.)
+
+원하면 `PUBLIC_VIDEO_BASE=https://cdn.내도메인.com/reels` 로 따로 지정할 수 있습니다.
+
+**자동으로 처리되는 것**
+
+- 컨테이너 생성 → **인코딩 완료까지 대기**(점점 간격을 늘려 최대 5분) → 게시 → 퍼머링크 조회
+- 커버 이미지 지점 지정(`IG_THUMB_OFFSET`, 기본 2초), 피드 동시 노출(`IG_SHARE_TO_FEED`)
+- 3초 미만 영상은 릴스 요건 미달이라 게시하지 않습니다
+- 일일 게시 한도·속도 제한(code 4/17/32 등)은 실패가 아니라 `queued` → `shopreel publish` 로 재시도
+
+> **페이스북 릴스 동시 게시**는 Graph API 가 자동으로 해 주지 않습니다. 인스타그램 앱의
+> 계정 센터에서 "Facebook에 릴스 공유"를 켜 두면 인스타에 올린 릴스가 페이스북에도
+> 함께 올라갑니다. 페이스북 페이지에 직접 올리려면 `--publish facebook` 을 함께 쓰세요.
+
 ## 7. 링크인바이오 페이지 (인스타·틱톡 수익화의 전제)
 
 인스타그램과 틱톡은 **캡션에 링크를 걸 수 없고 프로필 링크 한 개만** 허용합니다.
@@ -333,7 +334,81 @@ python3 -m shopreel serve --port 8787       # 추적 서버
 
 ---
 
-## 9. 24시간 자동화
+## 9. 배포 — 운영 서버에 올리기
+
+인스타그램 게시와 링크인바이오는 **공개 도메인이 있어야** 동작합니다(로컬 주소는
+인스타그램 서버도, 시청자도 접근할 수 없습니다). 우분투 서버 한 대면 충분합니다.
+
+**필요한 것**: 우분투 22.04+ 서버, 도메인 하나(A 레코드가 서버 IP를 가리켜야 함), ffmpeg
+
+```bash
+sudo apt-get update && sudo apt-get install -y ffmpeg python3-pip nginx certbot python3-certbot-nginx
+sudo git clone <이 저장소> /opt/shopreel
+cd /opt/shopreel
+sudo ./deploy/install.sh --domain link.내도메인.com
+```
+
+설치되는 것
+
+| 유닛 | 역할 | 주기 |
+| --- | --- | --- |
+| `shopreel-tracker.service` | 링크인바이오 · 클릭 추적 · 전환 웹훅 · 영상 공개 URL | 상시 |
+| `shopreel-run.timer` | 수집 → 영상 → 업로드 | 3시간마다 (랜덤 15분 분산) |
+| `shopreel-retry.timer` | 밀린 업로드 재시도 | 매일 17:10 (유튜브 할당량 초기화 직후) |
+| `shopreel-backup.timer` | DB 백업 + 30일 지난 영상 정리 | 매일 03:30 |
+
+nginx는 `/img`, `/v`(이미지·영상)를 파이썬을 거치지 않고 직접 내보내고, 나머지만
+추적 서버로 넘깁니다. `/stats`는 외부에 열지 않습니다.
+
+**마무리 3단계**
+
+```bash
+# 1) API 키 입력  (systemd 형식이라 export 를 쓰지 않습니다)
+sudo nano /etc/shopreel/shopreel.env
+sudo systemctl restart shopreel-tracker
+
+# 2) HTTPS
+sudo certbot --nginx -d link.내도메인.com
+
+# 3) 확인
+sudo -u shopreel python3 -m shopreel check --config /etc/shopreel/shopreel.config.json
+curl -s https://link.내도메인.com/health
+sudo systemctl start shopreel-run.service      # 지금 한 번 돌려 보기
+```
+
+`check` 는 운영 전에 걸리기 쉬운 설정(공개 URL 없음, http 링크, 유튜브 한도 초과,
+웹훅 시크릿 없음)을 미리 잡아 줍니다.
+
+**운영 중 자주 쓰는 명령**
+
+```bash
+systemctl status shopreel-tracker           # 서버 상태
+systemctl list-timers 'shopreel*'           # 다음 실행 시각
+journalctl -u shopreel-run -f               # 제작 로그 실시간
+journalctl -u shopreel-tracker --since today
+sudo -u shopreel python3 -m shopreel report --config /etc/shopreel/shopreel.config.json
+```
+
+**디스크와 백업**
+
+- 영상은 하루 20~30편이면 한 달에 1~2GB 쌓입니다. 백업 타이머가 30일 지난 파일을
+  자동으로 지웁니다(`shopreel prune --days 30`). DB 기록과 수익 데이터는 남습니다.
+- DB 백업은 `/var/backups/shopreel/` 에 14일치 보관됩니다. 복구는 파일을 풀어
+  `/var/lib/shopreel/shopreel.db` 로 되돌리면 끝입니다.
+- **클릭·주문·수익 기록은 다시 만들 수 없습니다.** 서버를 옮길 때 이 DB를 꼭 챙기세요.
+
+**보안 점검**
+
+- `/etc/shopreel/shopreel.env` 는 소유자 `shopreel`, 권한 600 이어야 합니다(설치 스크립트가 설정).
+- 전환 웹훅 시크릿(`SHOPREEL_POSTBACK_SECRET`)과 IP 해시 솔트는 설치 시 자동 생성됩니다.
+  **솔트는 한 번 정하면 바꾸지 마세요**(바꾸면 이전 클릭과 연결이 끊깁니다).
+- 서비스는 `ProtectSystem=strict` 로 돌고 쓰기는 `/var/lib/shopreel` 에만 허용됩니다.
+- 방화벽은 80/443만 열면 됩니다. 추적 서버는 127.0.0.1 에만 바인딩합니다.
+
+## 10. 24시간 자동화
+
+**서버에 배포했다면 9장의 타이머가 이미 이 일을 합니다.** 아래는 서버 없이 개인 PC 에서
+돌릴 때의 방법입니다.
 
 한 프로세스로 돌리기
 
@@ -345,14 +420,15 @@ python3 -m shopreel auto --every 180        # 3시간마다, Ctrl+C 로 종료
 
 ```cron
 0 */3 * * *  cd /path/to/repo && . ./shopreel.env && python3 -m shopreel run >> log/run.log 2>&1
-5 4   * * *  cd /path/to/repo && . ./shopreel.env && python3 -m shopreel publish >> log/retry.log 2>&1
+10 17 * * *  cd /path/to/repo && . ./shopreel.env && python3 -m shopreel publish >> log/retry.log 2>&1
 ```
 
-추적 서버는 `systemd` 나 `pm2` 로 상시 실행해 두세요.
+> 개인 PC 로 돌리면 인스타그램 게시와 링크인바이오는 쓸 수 없습니다(공개 도메인이 필요).
+> 유튜브 업로드와 업로드 패키지 생성(`dryrun`)까지는 문제없이 됩니다.
 
 ---
 
-## 10. 반드시 지켜야 할 것
+## 11. 반드시 지켜야 할 것
 
 - **광고 표기 의무.** 제휴 링크가 있는 콘텐츠는 대가성을 명확히 밝혀야 합니다(공정위
   추천·보증 심사지침, FTC Endorsement Guides). 이 파이프라인은 화면·본문·해시태그
@@ -369,7 +445,7 @@ python3 -m shopreel auto --every 180        # 3시간마다, Ctrl+C 로 종료
 
 ---
 
-## 11. 품질을 올리는 순서
+## 12. 품질을 올리는 순서
 
 1. `--script llm` (ANTHROPIC_API_KEY) — 상품별 카피가 확 달라집니다.
 2. TTS 업그레이드 — `pip install edge-tts` (무료) 또는 `ELEVENLABS_API_KEY`.
@@ -378,7 +454,7 @@ python3 -m shopreel auto --every 180        # 3시간마다, Ctrl+C 로 종료
 5. 2주쯤 데이터가 쌓이면 `shopreel report` 로 이기는 카테고리를 확인하고
    `allow_categories` 로 좁히기.
 
-## 12. 구조
+## 13. 구조
 
 ```
 shopreel/
@@ -399,6 +475,11 @@ shopreel/
   pipeline.py      전체 흐름
   scheduler.py     주기 실행
   cli.py           명령줄
+deploy/
+  install.sh       서버 설치 (systemd + nginx)
+  systemd/         상시 서버 · 정기 실행 · 재시도 · 백업 유닛
+  nginx/           리버스 프록시 + 정적 서빙 설정
+  backup.sh        DB 백업
 tools/
   mock_coupang.py  쿠팡 오픈 API 목 서버 (서명 검증 포함)
   mock_youtube.py  유튜브 Data API 목 서버 (재개형 업로드·할당량 오류 재현)

@@ -1,0 +1,12 @@
+[Unit]
+Description=SHOPREEL 재시도 (유튜브 할당량이 초기화되는 시각 이후)
+
+[Timer]
+# 유튜브 할당량은 태평양 시간 자정(한국 오후 4~5시)에 초기화된다.
+# 한국 기준 오후 5시 10분에 밀린 업로드를 다시 시도한다.
+OnCalendar=*-*-* 17:10:00
+RandomizedDelaySec=10min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
