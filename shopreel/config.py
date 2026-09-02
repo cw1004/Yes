@@ -111,8 +111,9 @@ class Config:
 
     # ---------- 업로드 ----------
     publish_to: List[str] = field(default_factory=lambda: ["dryrun"])
+    # 유튜브는 업로드 1건이 약 1,600 유닛을 쓴다(기본 할당량 10,000 → 하루 6건).
     daily_limit: Dict[str, int] = field(default_factory=lambda: {
-        "youtube": 10, "tiktok": 10, "instagram": 8, "facebook": 10, "dryrun": 999,
+        "youtube": 5, "tiktok": 10, "instagram": 8, "facebook": 10, "dryrun": 999,
     })
     public_video_base: Optional[str] = None  # 인스타그램 등 URL 업로드용 공개 베이스 URL
     schedule_minutes: int = 180              # auto 모드 실행 간격(분)

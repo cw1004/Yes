@@ -43,7 +43,7 @@
   "utm_source": "shopreel",
 
   "publish_to": ["dryrun"],
-  "daily_limit": {"youtube": 10, "tiktok": 10, "instagram": 8, "facebook": 10, "dryrun": 999},
+  "daily_limit": {"youtube": 5, "tiktok": 10, "instagram": 8, "facebook": 10, "dryrun": 999},
   "public_video_base": null,
   "schedule_minutes": 180,
 

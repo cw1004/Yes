@@ -164,7 +164,7 @@ python3 -m shopreel run --sources coupang --publish dryrun
 
 | 플랫폼 | 필요한 것 | 비고 |
 | --- | --- | --- |
-| YouTube | CLIENT_ID / CLIENT_SECRET / REFRESH_TOKEN | Data API v3, 재개형 업로드. AI 생성 고지 자동 표기 |
+| YouTube | CLIENT_ID / CLIENT_SECRET / REFRESH_TOKEN | Data API v3 재개형 업로드. 아래 6-1 참고 |
 | TikTok | ACCESS_TOKEN | 기본은 **초안함** 업로드. 바로 게시는 심사 통과 앱(`TIKTOK_DIRECT_POST=1`) |
 | Instagram | IG_USER_ID / IG_ACCESS_TOKEN + 공개 영상 URL | Graph API 는 로컬 파일이 아닌 URL 을 받습니다 |
 | Facebook | FB_PAGE_ID / FB_PAGE_TOKEN | 페이지 동영상 직접 업로드 |
@@ -174,6 +174,63 @@ python3 -m shopreel run --sources coupang --publish dryrun
 - 업로드 실패·대기 건은 `shopreel publish` 로 재시도합니다.
 - 플랫폼별 **일일 업로드 한도**(`daily_limit`)를 넘으면 자동으로 건너뜁니다. 계정 보호용이니
   무리하게 올리지 마세요.
+
+### 6-1. 유튜브 붙이기 (한 번만 하면 계속 자동)
+
+**1) 키 발급**
+
+1. [Google Cloud Console](https://console.cloud.google.com/) → 프로젝트 생성
+2. **YouTube Data API v3** 사용 설정
+3. OAuth 동의 화면 구성 → 아래 '토큰 만료' 항목을 꼭 읽고 **앱 게시(프로덕션)** 까지 하세요
+4. 사용자 인증 정보 → OAuth 클라이언트 ID → **데스크톱 앱** 생성
+5. refresh token 발급 (브라우저가 한 번 열립니다)
+
+```bash
+export YOUTUBE_CLIENT_ID=... YOUTUBE_CLIENT_SECRET=...
+python3 -m tools.youtube_auth --save shopreel.env     # 원격 서버면 --paste
+python3 -m shopreel check                             # youtube 가 ○ 로 바뀌면 완료
+```
+
+**2) 업로드**
+
+```bash
+python3 -m shopreel run --sources coupang --publish youtube
+python3 -m shopreel auto --every 240 --publish youtube   # 4시간마다 자동
+```
+
+**3) 키 없이 먼저 확인해 보기**
+
+유튜브 API 목 서버로 토큰 갱신 → 재개형 세션 → 청크 전송 → 썸네일까지 그대로 태워 봅니다.
+받은 바이트가 원본 파일과 같은지(sha1)까지 확인하므로, 여기서 통과하면 실제 업로드도 같습니다.
+
+```bash
+make shop-youtube        # 쿠팡 수집 → 영상 제작 → 유튜브 업로드 전 구간
+```
+
+```
+■ 유튜브 업로드 검증
+  video id   vid_8846875e
+  전송 크기  888,750 bytes (sha1 8846875e1df0…)
+  제목       40% 할인 | 코시 접이식 LED 스탠드 무단조절 USB 충전식 #shorts
+  공개설정   public · AI고지 True
+  썸네일     79,186 bytes
+```
+
+**4) 실무에서 꼭 걸리는 3가지**
+
+| 함정 | 내용 | 대응 |
+| --- | --- | --- |
+| **할당량** | 업로드 1건이 약 **1,600 유닛**, 기본 일일 할당량은 10,000 → **하루 6건이 한계** | `daily_limit.youtube` 기본값을 5로 잡아 뒀습니다. 더 올리려면 Google 에 할당량 증액을 신청하세요. 할당량 초과는 실패가 아니라 `queued` 로 기록되고 `shopreel publish` 로 재시도됩니다 |
+| **토큰 만료** | OAuth 동의 화면이 **테스트 모드면 refresh token 이 7일 뒤 만료**됩니다 | 동의 화면을 **프로덕션으로 게시**하세요. 만료되면 `python3 -m tools.youtube_auth` 로 재발급 |
+| **썸네일** | `thumbnails.set` 은 **채널 인증(전화번호 확인)** 이 끝나야 됩니다 | 인증 전이면 `YOUTUBE_THUMBNAIL=0`. 썸네일이 실패해도 영상 업로드 자체는 성공합니다 |
+
+그 외 자동으로 처리되는 것
+
+- 세로 9:16 영상은 본문에 `#Shorts` 를 붙여 쇼츠로 분류되게 합니다.
+- **AI 생성 고지**(`containsSyntheticMedia`)와 아동용 아님(`selfDeclaredMadeForKids=false`)을 항상 설정합니다.
+- 제목 100자, 본문 5,000자 제한에 맞춰 자동으로 자릅니다.
+- 8MB 청크로 나눠 올리고, 끊기면 서버에 진행 지점을 물어 **이어서 전송**합니다(5xx 는 지수 백오프로 5회 재시도).
+- 예약 발행: `YOUTUBE_PUBLISH_AT=2026-09-10T09:00:00Z` (비공개로 올라가 그 시각에 공개됩니다).
 
 ---
 
@@ -268,7 +325,9 @@ shopreel/
   cli.py           명령줄
 tools/
   mock_coupang.py  쿠팡 오픈 API 목 서버 (서명 검증 포함)
-  coupang_demo.py  쿠팡 연동 시연 (키 없이 전체 파이프라인)
+  mock_youtube.py  유튜브 Data API 목 서버 (재개형 업로드·할당량 오류 재현)
+  coupang_demo.py  쿠팡→영상→유튜브 전 구간 시연 (키 없이)
+  youtube_auth.py  유튜브 refresh token 발급 도우미
 ```
 
 테스트: `make test` (렌더링 없이 1초대에 끝납니다)
