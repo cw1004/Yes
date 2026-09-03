@@ -258,7 +258,20 @@ def build_parser() -> argparse.ArgumentParser:
     sp = sub.add_parser("check", help="실행 환경 점검")
     common(sp)
     sp.set_defaults(func=cmd_check)
+
+    sp = sub.add_parser("studio", help="브라우저 실행 화면 열기")
+    sp.add_argument("--port", type=int, default=8500, help="포트 (기본 8500)")
+    sp.add_argument("--host", default="127.0.0.1", help="바인딩 주소 (기본 127.0.0.1)")
+    sp.add_argument("--out", default="output", help="출력 폴더 (기본 output)")
+    sp.add_argument("--no-browser", action="store_true", help="브라우저를 자동으로 열지 않음")
+    sp.set_defaults(func=cmd_studio)
     return p
+
+
+def cmd_studio(args) -> int:
+    from .studio import serve
+    return serve(port=args.port, out_dir=args.out,
+                 open_browser=not args.no_browser, host=args.host)
 
 
 def main(argv: List[str] = None) -> int:
