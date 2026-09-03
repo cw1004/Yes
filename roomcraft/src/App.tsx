@@ -243,8 +243,11 @@ export default function App() {
     if (aiIntervalRef.current) window.clearInterval(aiIntervalRef.current);
     aiIntervalRef.current = window.setInterval(() => {
       if (logIndex < logs.length) {
-        setAiLogs(prev => [...prev, logs[logIndex]]);
+        // Read the line before advancing: React runs the updater later, so a
+        // closure over logIndex would append the *next* line instead.
+        const line = logs[logIndex];
         logIndex += 1;
+        setAiLogs(prev => [...prev, line]);
         return;
       }
       if (aiIntervalRef.current) {
@@ -677,7 +680,7 @@ export default function App() {
                             setScriptText(e.target.value);
                             setScriptEdited(true);
                           }}
-                          className="mt-3 min-h-[200px] w-full resize-none rounded-2xl border border-black/10 bg-[#FAF7F2] p-4 text-[14px] leading-6 outline-none focus:border-[#8B5A2B] focus:bg-white"
+                          className="mt-3 min-h-[240px] w-full resize-none rounded-2xl border border-black/10 bg-[#FAF7F2] p-4 text-[14px] leading-6 outline-none focus:border-[#8B5A2B] focus:bg-white"
                         />
                         <div className="mt-2 text-right text-[11px] tabular-nums opacity-40">{scriptText.length}자 · 9:16 최적화</div>
                       </div>
@@ -737,7 +740,7 @@ export default function App() {
                           </div>
                         </div>
 
-                        <div className="absolute inset-0 flex flex-col justify-center gap-3 p-3 pt-16">
+                        <div className="absolute inset-0 flex flex-col justify-center gap-3 p-3 pb-[132px] pt-16">
                           <div className="overflow-hidden rounded-2xl">
                             <div className="flex gap-3" style={{ animation: 'slideX 6s ease-in-out infinite' }}>
                               {[...product.images, ...product.images].map((img, i) => (
