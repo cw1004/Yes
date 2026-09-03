@@ -7,12 +7,18 @@
   "scripts": {
     "build": "node build.mjs && node build.mjs --cdn",
     "smoke": "node tools/smoke.mjs dist/Roomcraft-Auto-Factory-V3.html",
-    "assets": "python3 tools/prepare_assets.py"
+    "assets": "python3 tools/prepare_assets.py",
+    "serve": "node server/index.mjs",
+    "bundle": "node server/cli.mjs"
   },
   "devDependencies": {
     "esbuild": "^0.28.2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "tailwindcss": "^3.4.19"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.123.0",
+    "zod": "^4.5.4"
   }
 }

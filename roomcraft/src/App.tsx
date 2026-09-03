@@ -56,6 +56,10 @@ const SPECS = [
   { k: '재질', v: '오크 원목' },
 ];
 
+// 공정위 추천·보증 심사지침: 제휴 링크가 걸린 콘텐츠는 대가성을 표시해야 합니다.
+// 영상 자막·캡션·랜딩 페이지 세 곳 모두에 들어갑니다.
+const DISCLOSURE = '이 게시물은 제휴 링크를 포함하며, 구매 시 수수료를 받습니다.';
+
 const RENDER_SLATE = '1080 × 1920 · H.264 · 12s · 30fps';
 
 const LOGS_BASE = [
@@ -132,6 +136,11 @@ const STEPS = [
   { k: 1, no: '02', label: 'STUDIO', sub: '영상 스튜디오' },
   { k: 2, no: '03', label: 'PUBLISH', sub: 'SNS 발행' },
 ];
+
+// Set at build time to the deployed gateway (see server/). Empty in the
+// standalone demo build, where links fall back to the raw product page.
+const GATEWAY_ORIGIN = '';
+const DEMO_BUNDLE_ID = 'demo';
 
 const won = (n: number) => `₩${Math.max(0, Math.round(n)).toLocaleString('ko-KR')}`;
 
@@ -230,18 +239,20 @@ export default function App() {
     return 'Unknown';
   };
 
+  // Links point at our own gateway, never straight at the affiliate URL. The
+  // caption of a published video can never be edited, so the destination has to
+  // stay editable behind a stable address — and the click gets attributed to a
+  // (bundle, slot) pair on the way through. server/index.mjs serves these.
   const makeAffiliate = (url: string): string => {
-    // Demo build: keep the original URL so the buy button opens a page that exists.
-    // In production swap this for the Coupang Partners / Amazon Associates converted link.
-    return url || '';
+    if (!url) return '';
+    if (!GATEWAY_ORIGIN) return url; // 데모: 게이트웨이가 없으면 원본으로
+    return `${GATEWAY_ORIGIN}/go/${DEMO_BUNDLE_ID}/0`;
   };
 
-  const openBuyLink = () => {
-    const target = product?.affiliate || product?.originalLink;
-    if (!target) return;
-    window.open(target, '_blank', 'noopener,noreferrer');
-    showToast('구매 페이지를 새 탭에서 열었습니다');
-  };
+  // A real anchor, not window.open: middle-click and "open in new tab" work,
+  // no popup blocker, and rel="sponsored" is the standard marking for a paid
+  // link — some affiliate programmes require it.
+  const buyHref = product?.affiliate || product?.originalLink || '';
 
   const makeScript = (title: string, price: number, orig: number, off: number, tIdx: number): string => {
     const tpl = TEMPLATES[tIdx] ?? TEMPLATES[0];
@@ -255,7 +266,7 @@ export default function App() {
   };
 
   const makeCaption = (title: string, price: number, off: number): string =>
-    `${title} - 원룸 끝판왕\n\n${won(price)}부터 (${off}% OFF)\n접이식이라 이사할 때도 그대로.\n\n#원룸인테리어 #접이식책상 #자취방꾸미기 #원목책상 #룸크래프트 #roomcraft #1인가구 #자취템 #데스크셋업\n\n🔗 프로필 링크에서 최저가 확인`;
+    `${title} - 원룸 끝판왕\n\n${won(price)}부터 (${off}% OFF)\n접이식이라 이사할 때도 그대로.\n\n#원룸인테리어 #접이식책상 #자취방꾸미기 #원목책상 #룸크래프트 #roomcraft #1인가구 #자취템 #데스크셋업\n\n🔗 프로필 링크에서 최저가 확인\n\n${DISCLOSURE}`;
 
   // IMPORT action
   const handleAnalyze = () => {
@@ -592,9 +603,9 @@ export default function App() {
                       </div>
                     </div>
                     <div className="mt-6 flex flex-wrap gap-3">
-                      <button type="button" onClick={openBuyLink} className={btnGhost}>
+                      <a href={buyHref} target="_blank" rel="sponsored noopener noreferrer" className={btnGhost}>
                         구매 페이지 열기 ↗
-                      </button>
+                      </a>
                       <button type="button" onClick={() => setActiveTab(1)} className={btnPrimary}>
                         스튜디오로 →
                       </button>
@@ -769,9 +780,14 @@ export default function App() {
                             <div className="font-mono text-[9px] uppercase tracking-label text-muted">Today only</div>
                             <div className="text-[16px] font-bold tabular-nums">{won(livePrice)}</div>
                           </div>
-                          <button type="button" onClick={openBuyLink} className="bg-ink px-3 py-2 text-[11px] font-bold text-plate transition hover:bg-black">
+                          <a
+                            href={buyHref}
+                            target="_blank"
+                            rel="sponsored noopener noreferrer"
+                            className="bg-ink px-3 py-2 text-[11px] font-bold text-plate transition hover:bg-black"
+                          >
                             구매하기
-                          </button>
+                          </a>
                         </div>
                         <div className="mt-2 h-px w-full bg-rule">
                           <div className="h-px bg-oak" style={{ width: `${Math.min(100, discount)}%` }} />
@@ -1041,9 +1057,9 @@ export default function App() {
               ))}
             </ul>
             <div className="mt-6 flex flex-wrap justify-end gap-3">
-              <button type="button" onClick={openBuyLink} className={btnGhost}>
+              <a href={buyHref} target="_blank" rel="sponsored noopener noreferrer" className={btnGhost}>
                 구매 페이지 열기 ↗
-              </button>
+              </a>
               <button
                 type="button"
                 onClick={() => {
