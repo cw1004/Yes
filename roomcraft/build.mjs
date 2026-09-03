@@ -66,7 +66,7 @@ const reactTags = umd
 const html = `<title>${TITLE}</title>
 <meta name="description" content="상품 링크 하나로 영상·캡션·SNS 발행까지 잇는 ROOMCRAFT 워크플로 데모">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+KR:wght@400;500;700;900&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+KR:wght@400;500;700&family=Noto+Serif+KR:wght@700&display=swap">
 <style>${css}</style>
 
 <div id="root"></div>

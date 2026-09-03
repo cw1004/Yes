@@ -6,22 +6,53 @@
   html {
     -webkit-text-size-adjust: 100%;
   }
+
   body {
-    /* ROOMCRAFT commits to one visual world: the cream studio ground.
-       Painted explicitly so the page holds on any host background. */
-    background-color: #FAF7F2;
-    color: #121212;
+    /* ROOMCRAFT commits to one visual world — a warm greige sheet — so the
+       ground is painted explicitly and holds on any host background. */
+    background-color: theme('colors.paper');
+    color: theme('colors.ink');
     color-scheme: light;
-    font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', Pretendard, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    font-size: 16px;
-    line-height: 24px;
+    font-family: theme('fontFamily.sans');
+    font-size: 15px;
+    line-height: 1.6;
+    font-feature-settings: 'kern';
+    /* Korean does not break inside a word; without this the browser splits
+       단어 mid-token and the ragged edge reads as broken typesetting. */
+    word-break: keep-all;
+    overflow-wrap: break-word;
   }
-  code, pre, .font-mono {
-    font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  h1, h2, h3 {
+    text-wrap: balance;
   }
+
   :focus-visible {
-    outline: 2px solid #8B5A2B;
+    outline: 1.5px solid theme('colors.oak');
     outline-offset: 2px;
+  }
+
+  ::selection {
+    background: rgba(117, 84, 45, 0.16);
+  }
+}
+
+@layer components {
+  /* An eyebrow does the work a card border used to do: it names the section
+     and sets it apart without drawing a box. Korean gets the sans cut — mono
+     with Latin letter-spacing pulls 한글 apart into loose syllables. */
+  .eyebrow {
+    @apply text-[11px] font-bold tracking-[0.04em] text-muted;
+  }
+
+  .eyebrow-en {
+    @apply font-mono text-[10px] uppercase tracking-label text-muted;
+  }
+
+  /* Hairlines carry the structure. Elevation is reserved for the 9:16
+     preview and for overlays — the two things that really sit above the sheet. */
+  .sheet {
+    @apply border-t border-rule pt-5;
   }
 }
 
@@ -39,6 +70,11 @@
   0%   { transform: translateX(-4%); }
   50%  { transform: translateX(4%); }
   100% { transform: translateX(-4%); }
+}
+
+@keyframes riseIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -9,7 +9,6 @@ import shelf2Img from '../assets/shelf2_cutout.webp';
 type ProductImage = {
   src: string;
   label: string;
-  swatch: string;
   grain: number;
 };
 
@@ -36,9 +35,9 @@ type QueueItem = {
 };
 
 const PRODUCT_IMAGES: ProductImage[] = [
-  { src: deskImg, label: '원목 데스크 800', swatch: '#D8C3A5', grain: 94 },
-  { src: chairImg, label: '접이식 체어', swatch: '#C9A67D', grain: 92 },
-  { src: lampImg, label: '펜던트 조명', swatch: '#E8DDD0', grain: 90 },
+  { src: deskImg, label: '원목 데스크 800', grain: 94 },
+  { src: chairImg, label: '접이식 체어', grain: 92 },
+  { src: lampImg, label: '펜던트 조명', grain: 90 },
 ];
 
 const ROOM_ITEMS = [
@@ -49,6 +48,16 @@ const ROOM_ITEMS = [
   { src: chairImg, name: '접이식 체어', style: { left: '50%', bottom: '2%', width: '18%' } },
 ];
 
+// The figures a furniture catalogue would print, and the ones the script quotes.
+const SPECS = [
+  { k: '상판', v: '800 × 500 mm' },
+  { k: '접은 두께', v: '90 mm' },
+  { k: '내하중', v: '80 kg' },
+  { k: '재질', v: '오크 원목' },
+];
+
+const RENDER_SLATE = '1080 × 1920 · H.264 · 12s · 30fps';
+
 const LOGS_BASE = [
   '플랫폼 감지: {PLATFORM}',
   '이미지 분석: 원목 질감 94%',
@@ -58,9 +67,9 @@ const LOGS_BASE = [
 ];
 
 const TEMPLATES = [
-  { id: 'A', name: '가격비교', label: 'A. 가격비교', desc: '정가 대비 할인율 강조' },
-  { id: 'B', name: '조립타임랩스', label: 'B. 조립타임랩스', desc: '10초 조립, 원룸 변신' },
-  { id: 'C', name: '스펙강조', label: 'C. 스펙강조', desc: '원목·내하중·접이식 포인트' },
+  { id: 'A', name: '가격비교', desc: '정가 대비 할인율' },
+  { id: 'B', name: '조립타임랩스', desc: '10초 조립, 원룸 변신' },
+  { id: 'C', name: '스펙강조', desc: '원목·내하중·접이식' },
 ];
 
 const MOCK_QUEUE: QueueItem[] = [
@@ -112,26 +121,50 @@ const STATUS_KO: Record<QueueStatus, string> = {
   Posted: '발행완료',
 };
 
+const STATUS_TONE: Record<QueueStatus, string> = {
+  Imported: 'text-muted',
+  'Video Done': 'text-wait',
+  Posted: 'text-go',
+};
+
+const STEPS = [
+  { k: 0, no: '01', label: 'IMPORT', sub: '제품 가져오기' },
+  { k: 1, no: '02', label: 'STUDIO', sub: '영상 스튜디오' },
+  { k: 2, no: '03', label: 'PUBLISH', sub: 'SNS 발행' },
+];
+
 const won = (n: number) => `₩${Math.max(0, Math.round(n)).toLocaleString('ko-KR')}`;
+
+// The demo product the page opens with, so the first frame shows the tool working.
+const SAMPLE_LINK = EXAMPLE_LINKS[0];
+const SAMPLE_PRODUCT: Product = {
+  title: 'ROOMCRAFT 원목 접이식 데스크 800',
+  price: 39000,
+  originalPrice: 59000,
+  platform: 'Coupang',
+  images: PRODUCT_IMAGES,
+  affiliate: SAMPLE_LINK,
+  originalLink: SAMPLE_LINK,
+};
 
 const RoomScene = ({ compact }: { compact?: boolean }) => (
   <div
-    className="relative w-full overflow-hidden rounded-[18px] border border-black/10"
-    style={{ aspectRatio: '4/3', background: 'linear-gradient(#F3EDE4 0%, #EFE7DB 62%, #E2D5C2 62%, #DCCCB6 100%)' }}
+    className="relative w-full overflow-hidden"
+    style={{ aspectRatio: '4/3', background: 'linear-gradient(#EAE6DE 0%, #E6E1D8 62%, #D8D0C3 62%, #D2C9BA 100%)' }}
   >
-    <div className="pointer-events-none absolute inset-0" style={{ background: 'radial-gradient(120% 80% at 40% 20%, rgba(255,255,255,0.55), transparent 60%)' }} />
+    <div className="pointer-events-none absolute inset-0" style={{ background: 'radial-gradient(110% 75% at 42% 18%, rgba(255,255,255,0.5), transparent 62%)' }} />
     {ROOM_ITEMS.map(item => (
       <img
         key={item.name}
         src={item.src}
         alt={item.name}
         className="absolute select-none"
-        style={{ ...item.style, filter: 'drop-shadow(0 12px 14px rgba(60,40,20,0.20))' }}
+        style={{ ...item.style, filter: 'drop-shadow(0 10px 12px rgba(40,30,16,0.18))' }}
       />
     ))}
     {compact && (
-      <div className="absolute left-3 top-3 rounded-full bg-white/90 px-3 py-1 text-[10px] font-bold tracking-[0.12em] shadow-sm backdrop-blur">
-        {ROOM_ITEMS.length} ITEMS PLACED
+      <div className="absolute left-0 top-0 bg-ink px-2.5 py-1 font-mono text-[10px] tracking-label text-plate">
+        {ROOM_ITEMS.length} ITEMS
       </div>
     )}
   </div>
@@ -142,12 +175,12 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<number>(0);
 
   // IMPORT
-  const [linkInput, setLinkInput] = useState<string>('');
-  const [product, setProduct] = useState<Product | null>(null);
+  const [linkInput, setLinkInput] = useState<string>(SAMPLE_LINK);
+  const [product, setProduct] = useState<Product | null>(SAMPLE_PRODUCT);
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
-  const [aiLogs, setAiLogs] = useState<string[]>([]);
-  const [editTitle, setEditTitle] = useState<string>('');
-  const [editPrice, setEditPrice] = useState<string>('');
+  const [aiLogs, setAiLogs] = useState<string[]>(LOGS_BASE.map(l => l.replace('{PLATFORM}', SAMPLE_PRODUCT.platform)));
+  const [editTitle, setEditTitle] = useState<string>(SAMPLE_PRODUCT.title);
+  const [editPrice, setEditPrice] = useState<string>(String(SAMPLE_PRODUCT.price));
   const aiIntervalRef = useRef<number | null>(null);
 
   // STUDIO
@@ -178,6 +211,7 @@ export default function App() {
   const liveTitle = editTitle || product?.title || '';
   const livePrice = editPrice ? parseInt(editPrice, 10) || 0 : product?.price ?? 0;
   const originalPrice = product?.originalPrice ?? 0;
+  const saved = Math.max(0, originalPrice - livePrice);
   const discount = originalPrice > 0 && livePrice > 0 ? Math.max(0, Math.round((1 - livePrice / originalPrice) * 100)) : 0;
 
   const showToast = (msg: string) => {
@@ -334,106 +368,98 @@ export default function App() {
 
   const selectedCount = useMemo(() => Object.values(sns).filter(Boolean).length, [sns]);
   const selectedChannels = CHANNELS.filter(c => sns[c.key]);
-  const tabs = [
-    { k: 0, label: 'IMPORT', sub: '제품 가져오기', ko: '가져오기' },
-    { k: 1, label: 'STUDIO', sub: '영상 스튜디오', ko: '스튜디오' },
-    { k: 2, label: 'PUBLISH', sub: 'SNS 발행', ko: '발행' },
-  ];
+
+  const stepState = (k: number) => {
+    if (k === 0) return product ? '완료' : '대기';
+    if (k === 1) return videoDone ? '완료' : isGenerating ? `${videoProgress}%` : '대기';
+    return selectedCount > 0 ? `${selectedCount} 채널` : '대기';
+  };
+
+  const btnPrimary =
+    'inline-flex items-center justify-center gap-2 bg-ink px-5 py-3 text-[13px] font-bold text-plate transition hover:bg-black disabled:bg-rule disabled:text-muted';
+  const btnGhost =
+    'inline-flex items-center justify-center gap-2 border border-rule px-5 py-3 text-[13px] font-semibold transition hover:border-ink';
+  const field =
+    'w-full border-b border-rule bg-transparent py-2.5 text-[15px] outline-none transition focus:border-ink';
 
   return (
-    <div className="min-h-screen w-full antialiased selection:bg-[#8B5A2B]/20" style={{ backgroundColor: '#FAF7F2', color: '#121212' }}>
-      {/* Header */}
-      <header className="sticky top-0 z-30 border-b border-black/10 backdrop-blur-xl" style={{ backgroundColor: 'rgba(250,247,242,0.85)' }}>
-        <div className="mx-auto flex max-w-[1440px] items-center justify-between px-5 py-4 md:px-8">
-          <div className="flex items-center gap-4">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#121212] text-[11px] font-bold tracking-widest text-white">RC</div>
-            <div className="leading-none">
-              <div className="text-[13px] font-black tracking-[0.18em]">ROOMCRAFT.WORLD</div>
-              <div className="mt-0.5 text-[11px] font-medium tracking-[0.12em] opacity-60">AUTO FACTORY — V3</div>
-            </div>
+    <div className="min-h-screen w-full bg-paper text-ink antialiased">
+      {/* Masthead */}
+      <header className="sticky top-0 z-30 border-b border-rule bg-paper/92 backdrop-blur">
+        <div className="mx-auto flex max-w-[1360px] items-center justify-between gap-4 px-5 py-3.5 md:px-8">
+          <div className="flex items-baseline gap-3">
+            <span className="font-serif text-[16px] font-bold tracking-tight">ROOMCRAFT</span>
+            <span className="hidden font-mono text-[10px] tracking-label text-muted sm:inline">AUTO FACTORY V3</span>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="hidden items-center gap-2 rounded-full border border-black/10 bg-white px-3 py-1.5 text-[11px] md:flex">
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
-              <span className="font-semibold tracking-wide">LIVE ENGINE</span>
-              <span className="tabular-nums opacity-60">{aiLogs.length}/5 logs</span>
-            </div>
-            <div className="flex items-center gap-2 rounded-full bg-[#121212] px-4 py-1.5 text-[11px] font-semibold tracking-wide text-white">
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#C9A67D]" />
-              LIVE
-            </div>
+          <div className="flex items-center gap-5 font-mono text-[10px] tracking-label text-muted">
+            <span className="hidden sm:inline">
+              LOGS <span className="tabular-nums text-ink">{String(aiLogs.length).padStart(2, '0')}/05</span>
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-1 w-1 rounded-full bg-go" />
+              ENGINE LIVE
+            </span>
           </div>
         </div>
       </header>
 
-      <div className="mx-auto grid max-w-[1440px] grid-cols-1 md:grid-cols-[220px_1fr_360px] md:gap-6">
-        {/* Left nav — desktop */}
-        <aside className="hidden border-r border-black/5 px-4 py-6 md:sticky md:top-[65px] md:flex md:h-[calc(100vh-65px)] md:flex-col md:justify-between">
-          <div>
-            <div className="mb-6 px-2 text-[11px] font-bold tracking-[0.14em] opacity-40">WORKFLOW</div>
-            <div className="flex flex-col gap-2">
-              {tabs.map(tab => (
-                <button
-                  key={tab.k}
-                  type="button"
-                  onClick={() => setActiveTab(tab.k)}
-                  aria-current={activeTab === tab.k ? 'step' : undefined}
-                  className={`flex w-full flex-col items-start rounded-2xl border px-4 py-3 text-left transition-all ${
-                    activeTab === tab.k ? 'border-[#8B5A2B] bg-white shadow-sm' : 'border-transparent hover:bg-white/60'
-                  }`}
-                >
-                  <div className="flex w-full items-center justify-between">
-                    <span className={`text-[12px] font-black tracking-[0.12em] ${activeTab === tab.k ? 'text-[#8B5A2B]' : 'opacity-70'}`}>{tab.label}</span>
-                    <span className={`h-2 w-2 rounded-full ${activeTab === tab.k ? 'bg-[#8B5A2B]' : 'bg-black/10'}`} />
-                  </div>
-                  <span className="mt-1 text-[13px] font-medium opacity-80">{tab.sub}</span>
-                </button>
-              ))}
+      <div className="mx-auto grid max-w-[1360px] grid-cols-1 md:grid-cols-[188px_1fr] lg:grid-cols-[188px_1fr_296px]">
+        {/* Step ledger. The numbering is honest — this really is a sequence. */}
+        <nav className="hidden border-r border-rule md:sticky md:top-[53px] md:block md:h-[calc(100vh-53px)] md:py-7">
+          {STEPS.map(step => {
+            const on = activeTab === step.k;
+            return (
+              <button
+                key={step.k}
+                type="button"
+                onClick={() => setActiveTab(step.k)}
+                aria-current={on ? 'step' : undefined}
+                className={`group flex w-full items-start gap-3 border-l-2 py-3.5 pl-5 pr-4 text-left transition ${
+                  on ? 'border-oak bg-plate' : 'border-transparent hover:bg-plate/60'
+                }`}
+              >
+                <span className={`mt-0.5 font-mono text-[10px] tabular-nums ${on ? 'text-oak' : 'text-muted'}`}>{step.no}</span>
+                <span className="flex-1">
+                  <span className={`block text-[12px] font-bold tracking-label ${on ? '' : 'text-muted'}`}>{step.label}</span>
+                  <span className="mt-0.5 block text-[12px] text-muted">{step.sub}</span>
+                </span>
+                <span className={`mt-0.5 font-mono text-[10px] tabular-nums ${stepState(step.k) === '완료' ? 'text-go' : 'text-muted'}`}>
+                  {stepState(step.k) === '완료' ? '✓' : ''}
+                </span>
+              </button>
+            );
+          })}
+
+          {product && (
+            <div className="mt-8 px-5">
+              <div className="eyebrow">현재 제품</div>
+              <div className="mt-3 flex h-[72px] items-end justify-center bg-plate">
+                <img src={product.images[0].src} alt="" className="max-h-full w-auto object-contain" />
+              </div>
+              <div className="mt-3 font-serif text-[13px] font-bold leading-snug">{liveTitle}</div>
+              <div className="mt-1 font-mono text-[11px] tabular-nums text-muted">
+                {product.platform} · {won(livePrice)}
+              </div>
             </div>
+          )}
+        </nav>
 
-            <div className="mt-8 rounded-2xl border border-black/5 bg-white p-4 shadow-sm">
-              <div className="text-[11px] font-bold tracking-wide opacity-50">현재 제품</div>
-              {product ? (
-                <div className="mt-3">
-                  <div className="flex h-[64px] items-end justify-center rounded-xl bg-[#F3EDE4] p-1">
-                    <img src={product.images[0].src} alt={liveTitle} className="max-h-full w-auto object-contain" />
-                  </div>
-                  <div className="mt-3 line-clamp-2 text-[13px] font-semibold leading-5">{liveTitle}</div>
-                  <div className="mt-1 text-[12px] tabular-nums opacity-60">{product.platform} · {won(livePrice)}</div>
-                </div>
-              ) : (
-                <div className="mt-3 text-[13px] opacity-50">아직 가져온 제품이 없습니다.</div>
-              )}
-            </div>
-          </div>
-
-          <div className="px-2 py-4 text-[11px] opacity-40">
-            <div>Build v3.0</div>
-            <div className="mt-1">© ROOMCRAFT.WORLD</div>
-          </div>
-        </aside>
-
-        {/* Center */}
-        <main className="min-h-[calc(100vh-140px)] px-4 pb-28 pt-6 md:px-6 md:pb-6 md:pt-8">
+        {/* Sheet */}
+        <main className="min-h-[calc(100vh-53px)] px-5 pb-28 pt-8 md:px-9 md:pb-16 lg:border-r lg:border-rule">
           {/* ── IMPORT ── */}
           {activeTab === 0 && (
-            <div className="mx-auto max-w-[720px]">
-              <div className="mb-8">
-                <h1 className="text-[28px] font-extrabold leading-[1.15] tracking-[-0.02em] [text-wrap:balance]">
-                  제품 링크를 붙여넣으면<br />AI가 나머지를 처리합니다.
-                </h1>
-                <p className="mt-3 max-w-[560px] text-[14px] leading-6 opacity-60">
-                  쿠팡, 아마존, 알리익스프레스, 이베이 링크를 분석해 제목·가격·SEO·스크립트까지 자동 생성합니다.
-                </p>
-              </div>
+            <div className="mx-auto max-w-[640px]">
+              <h1 className="font-serif text-[30px] font-bold leading-[1.25] tracking-tight">
+                링크 하나면<br />나머지는 공장이 합니다.
+              </h1>
+              <p className="mt-3 max-w-[52ch] text-[14px] text-muted">
+                쿠팡·아마존·알리익스프레스·이베이 상품 페이지를 읽어 제목, 가격, SEO 키워드, 촬영 스크립트까지 만들어 둡니다.
+              </p>
 
-              <div className="rounded-[20px] border border-black/10 bg-white p-4 shadow-sm md:p-5">
-                <div className="flex items-center justify-between">
-                  <div className="text-[11px] font-bold tracking-[0.12em] opacity-50">PRODUCT LINK</div>
-                  <div className="text-[11px] opacity-40">지원: Coupang · Amazon · AliExpress · eBay</div>
-                </div>
+              <section className="sheet mt-8">
+                <div className="eyebrow-en">Product link</div>
                 <form
-                  className="mt-3 flex flex-col gap-3 md:flex-row"
+                  className="mt-2 flex items-end gap-3"
                   onSubmit={e => {
                     e.preventDefault();
                     handleAnalyze();
@@ -443,45 +469,16 @@ export default function App() {
                     id="product-link-input"
                     value={linkInput}
                     onChange={e => setLinkInput(e.target.value)}
-                    placeholder="쿠팡, 아마존, 알리, 이베이 링크를 붙여넣으세요"
-                    className="h-[48px] w-full flex-1 rounded-full border border-black/10 bg-[#FAF7F2] px-5 text-[14px] outline-none transition focus:border-[#8B5A2B] focus:bg-white"
+                    placeholder="상품 페이지 주소를 붙여넣으세요"
+                    className={`${field} font-mono text-[13px]`}
                   />
-                  <button
-                    type="submit"
-                    disabled={isAnalyzing || !linkInput.trim()}
-                    className="h-[48px] shrink-0 rounded-full bg-[#121212] px-6 text-[14px] font-semibold text-white transition hover:bg-black disabled:opacity-30"
-                  >
-                    {isAnalyzing ? '분석 중...' : '분석하기'}
+                  <button type="submit" disabled={isAnalyzing || !linkInput.trim()} className={`${btnPrimary} shrink-0 whitespace-nowrap`}>
+                    {isAnalyzing ? '분석 중' : '분석'}
                   </button>
                 </form>
 
-                {(aiLogs.length > 0 || isAnalyzing) && (
-                  <div className="mt-5 rounded-2xl bg-[#121212] p-4 text-white">
-                    <div className="mb-3 flex items-center gap-2 text-[11px] font-bold tracking-[0.12em] opacity-60">
-                      <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
-                      AI ENGINE LOG
-                    </div>
-                    <div className="space-y-2 font-mono text-[13px] leading-5">
-                      {aiLogs.map((log, i) => (
-                        <div key={`log-${i}`} className="flex gap-3">
-                          <span className="tabular-nums opacity-40">{String(i + 1).padStart(2, '0')}</span>
-                          <span>{log}</span>
-                        </div>
-                      ))}
-                      {isAnalyzing && (
-                        <div className="flex gap-3 opacity-60">
-                          <span className="tabular-nums opacity-40">{String(aiLogs.length + 1).padStart(2, '0')}</span>
-                          <span className="inline-flex items-center gap-2">
-                            <span className="h-3 w-3 animate-spin rounded-full border border-white/30 border-t-white" /> 처리 중...
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                <div className="mt-4 flex flex-wrap items-center gap-2 text-[11px]">
-                  <span className="opacity-40">예시:</span>
+                <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 font-mono text-[11px]">
+                  <span className="text-muted">예시</span>
                   {EXAMPLE_LINKS.map(ex => (
                     <button
                       key={ex}
@@ -490,123 +487,141 @@ export default function App() {
                         setLinkInput(ex);
                         showToast(`예시 적용: ${ex.replace('https://www.', '')}`);
                       }}
-                      className={`rounded-full border px-3 py-1 transition ${
-                        linkInput === ex ? 'border-[#8B5A2B] bg-[#8B5A2B] text-white' : 'border-black/10 bg-[#FAF7F2] hover:bg-white'
-                      }`}
+                      className={`underline-offset-4 transition hover:text-ink hover:underline ${linkInput === ex ? 'text-oak underline' : 'text-muted'}`}
                     >
-                      {linkInput === ex ? '✓ ' : ''}
                       {ex.replace('https://www.', '')}
                     </button>
                   ))}
                 </div>
-              </div>
+              </section>
+
+              {(aiLogs.length > 0 || isAnalyzing) && (
+                <section className="mt-6 bg-ink px-5 py-4 text-plate">
+                  <div className="font-mono text-[10px] uppercase tracking-label text-plate/45">Engine log</div>
+                  <ol className="mt-3 space-y-1.5 font-mono text-[12px]">
+                    {aiLogs.map((log, i) => (
+                      <li key={`log-${i}`} className="flex gap-4" style={{ animation: 'riseIn 220ms ease-out' }}>
+                        <span className="tabular-nums text-plate/35">{String(i + 1).padStart(2, '0')}</span>
+                        <span>{log}</span>
+                      </li>
+                    ))}
+                    {isAnalyzing && (
+                      <li className="flex gap-4 text-plate/50">
+                        <span className="tabular-nums text-plate/35">{String(aiLogs.length + 1).padStart(2, '0')}</span>
+                        <span>처리 중…</span>
+                      </li>
+                    )}
+                  </ol>
+                </section>
+              )}
 
               {product ? (
                 <>
-                  <div className="mt-6 rounded-[20px] border border-black/10 bg-white p-5 shadow-sm">
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <div className="inline-flex items-center gap-2 rounded-full bg-[#8B5A2B]/10 px-3 py-1 text-[11px] font-bold tracking-wide text-[#8B5A2B]">
-                          <span className="h-1.5 w-1.5 rounded-full bg-[#8B5A2B]" />
-                          {product.platform} 감지됨
-                        </div>
-                        <h2 className="mt-3 max-w-[420px] text-[18px] font-bold leading-6 tracking-[-0.01em]">{liveTitle}</h2>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-[12px] tabular-nums opacity-50 line-through">{won(originalPrice)}</div>
-                        <div className="text-[18px] font-black tabular-nums">{won(livePrice)}</div>
-                        <div className="mt-1 inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-bold tabular-nums text-emerald-700">{discount}% OFF</div>
-                      </div>
+                  {/* Product sheet */}
+                  <section className="sheet mt-10">
+                    <div className="flex items-baseline justify-between gap-4">
+                      <div className="eyebrow">{product.platform} · 감지됨</div>
+                      <div className="font-mono text-[11px] tabular-nums text-muted">IMG 3 · SPEC 4</div>
                     </div>
 
-                    <div className="mt-5 grid grid-cols-3 gap-3">
+                    <h2 className="mt-3 font-serif text-[22px] font-bold leading-snug">{liveTitle}</h2>
+
+                    <div className="mt-3 flex items-baseline gap-3">
+                      <span className="text-[26px] font-bold tabular-nums">{won(livePrice)}</span>
+                      <span className="font-mono text-[12px] tabular-nums text-muted line-through">{won(originalPrice)}</span>
+                      {discount > 0 && (
+                        <span className="font-mono text-[12px] tabular-nums text-go">
+                          −{discount}% · {won(saved)} 절약
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="mt-6 grid grid-cols-3 gap-px bg-rule">
                       {product.images.map((img, idx) => (
-                        <figure key={img.label} className="group relative overflow-hidden rounded-2xl border border-black/5" style={{ backgroundColor: img.swatch, aspectRatio: '4/3' }}>
-                          <img src={img.src} alt={img.label} className="absolute inset-0 h-full w-full object-contain p-2 transition duration-300 group-hover:scale-105" />
-                          <figcaption className="absolute bottom-2 left-2 rounded-full bg-white/90 px-2 py-1 text-[10px] font-bold">IMG {idx + 1}</figcaption>
-                          <div className="absolute inset-0 flex items-center justify-center bg-black/25 opacity-0 transition group-hover:opacity-100">
-                            <div className="rounded-full bg-black/75 px-3 py-1 text-[11px] text-white">원목 질감 {img.grain}%</div>
-                          </div>
+                        <figure key={img.label} className="group relative bg-plate" style={{ aspectRatio: '4/3' }}>
+                          <img src={img.src} alt={img.label} className="absolute inset-0 h-full w-full object-contain p-4 transition duration-500 group-hover:scale-[1.06]" />
+                          <figcaption className="absolute bottom-0 left-0 right-0 flex items-center justify-between px-2 py-1.5 font-mono text-[10px] text-muted">
+                            <span className="tabular-nums">{String(idx + 1).padStart(2, '0')}</span>
+                            <span className="tabular-nums opacity-0 transition group-hover:opacity-100">질감 {img.grain}%</span>
+                          </figcaption>
                         </figure>
                       ))}
                     </div>
 
-                    <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
-                      <div>
-                        <label htmlFor="edit-title" className="text-[11px] font-bold tracking-wide opacity-50">제품명 (편집 가능)</label>
-                        <input
-                          id="edit-title"
-                          value={editTitle}
-                          onChange={e => setEditTitle(e.target.value)}
-                          className="mt-2 w-full rounded-xl border border-black/10 bg-[#FAF7F2] px-4 py-3 text-[14px] font-medium outline-none focus:border-[#8B5A2B] focus:bg-white"
-                        />
-                      </div>
-                      <div>
-                        <label htmlFor="edit-price" className="text-[11px] font-bold tracking-wide opacity-50">판매가 (편집 가능)</label>
+                    {/* The measured figures the script quotes — printed like a catalogue. */}
+                    <dl className="mt-6 grid grid-cols-2 gap-x-8 sm:grid-cols-4">
+                      {SPECS.map(s => (
+                        <div key={s.k} className="border-t border-rule py-2.5">
+                          <dt className="font-mono text-[10px] uppercase tracking-label text-muted">{s.k}</dt>
+                          <dd className="mt-0.5 font-mono text-[13px] tabular-nums">{s.v}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </section>
+
+                  {/* Editable fields */}
+                  <section className="sheet mt-10">
+                    <div className="eyebrow">편집</div>
+                    <div className="mt-3 grid grid-cols-1 gap-x-8 gap-y-5 sm:grid-cols-[1fr_180px]">
+                      <label className="block">
+                        <span className="font-mono text-[10px] uppercase tracking-label text-muted">제품명</span>
+                        <input value={editTitle} onChange={e => setEditTitle(e.target.value)} className={field} />
+                      </label>
+                      <label className="block">
+                        <span className="font-mono text-[10px] uppercase tracking-label text-muted">판매가</span>
                         <input
                           id="edit-price"
                           value={editPrice}
                           onChange={e => setEditPrice(e.target.value.replace(/[^0-9]/g, ''))}
                           inputMode="numeric"
-                          className="mt-2 w-full rounded-xl border border-black/10 bg-[#FAF7F2] px-4 py-3 text-[14px] font-medium tabular-nums outline-none focus:border-[#8B5A2B] focus:bg-white"
+                          className={`${field} font-mono tabular-nums`}
                         />
-                        <div className="mt-1.5 text-[11px] opacity-50">스크립트·캡션·미리보기에 바로 반영됩니다.</div>
+                      </label>
+                    </div>
+                    <p className="mt-2.5 text-[12px] text-muted">고치는 즉시 스크립트·캡션·할인율·미리보기에 반영됩니다.</p>
+                  </section>
+
+                  {/* Affiliate */}
+                  <section className="sheet mt-10">
+                    <div className="eyebrow">제휴 링크</div>
+                    <div className="mt-3 space-y-1.5 font-mono text-[12px]">
+                      <div className="truncate text-muted">{product.originalLink}</div>
+                      <div className="truncate">
+                        <span className="text-oak">↳ </span>
+                        {product.affiliate}
                       </div>
                     </div>
-
-                    <div className="mt-6 rounded-2xl bg-[#FAF7F2] p-4">
-                      <div className="text-[11px] font-bold tracking-wide opacity-50">AFFILIATE LINK PREVIEW</div>
-                      <div className="mt-2 flex flex-col gap-2">
-                        <div className="truncate rounded-xl border border-black/10 bg-white px-3 py-2 text-[12px] opacity-60">{product.originalLink}</div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-[12px]">↓</span>
-                          <span className="text-[11px] font-bold tracking-wide text-[#8B5A2B]">ROOMCRAFT AFFILIATE</span>
-                        </div>
-                        <div className="truncate rounded-xl bg-[#121212] px-3 py-2 font-mono text-[12px] text-white">{product.affiliate}</div>
-                      </div>
-                    </div>
-
-                    <div className="mt-6 flex flex-wrap justify-end gap-2">
-                      <button
-                        type="button"
-                        onClick={openBuyLink}
-                        className="rounded-full border border-black/15 px-5 py-3 text-[13px] font-semibold transition hover:bg-[#FAF7F2]"
-                      >
+                    <div className="mt-6 flex flex-wrap gap-3">
+                      <button type="button" onClick={openBuyLink} className={btnGhost}>
                         구매 페이지 열기 ↗
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => setActiveTab(1)}
-                        className="rounded-full bg-[#8B5A2B] px-6 py-3 text-[13px] font-bold text-white transition hover:bg-[#6F4A24]"
-                      >
-                        스튜디오로 이동 →
+                      <button type="button" onClick={() => setActiveTab(1)} className={btnPrimary}>
+                        스튜디오로 →
                       </button>
                     </div>
-                  </div>
+                  </section>
 
                   {/* Room preview */}
-                  <button
-                    type="button"
-                    onClick={() => setShowRoom(true)}
-                    className="mt-6 block w-full rounded-[20px] border border-black/10 bg-white p-5 text-left shadow-sm transition hover:border-[#8B5A2B]/40 hover:shadow-md"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="text-[11px] font-bold tracking-[0.12em] opacity-50">ROOM PREVIEW — 미니멀</div>
-                      <span className="text-[11px] font-semibold text-[#8B5A2B]">크게 보기 →</span>
-                    </div>
-                    <div className="mt-3">
-                      <RoomScene compact />
-                    </div>
-                    <div className="mt-3 text-[12px] opacity-60">이 제품을 포함한 원룸 구성 {ROOM_ITEMS.length}점. 클릭하면 전체 화면으로 확인합니다.</div>
-                  </button>
+                  <section className="sheet mt-10">
+                    <button type="button" onClick={() => setShowRoom(true)} className="group block w-full text-left">
+                      <div className="flex items-baseline justify-between">
+                        <span className="eyebrow">룸 프리뷰</span>
+                        <span className="font-mono text-[11px] text-muted transition group-hover:text-ink">크게 보기 →</span>
+                      </div>
+                      <div className="mt-3 border border-rule transition group-hover:border-ink">
+                        <RoomScene compact />
+                      </div>
+                      <p className="mt-2.5 text-[12px] text-muted">이 제품을 포함한 원룸 구성 {ROOM_ITEMS.length}점.</p>
+                    </button>
+                  </section>
                 </>
               ) : (
                 !isAnalyzing && (
-                  <div className="mt-6 rounded-[20px] border border-dashed border-black/15 bg-white/60 p-10 text-center">
-                    <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#FAF7F2] text-[20px]">📦</div>
-                    <div className="mt-3 text-[14px] font-semibold">아직 분석된 제품이 없습니다</div>
-                    <div className="mt-1 text-[13px] opacity-50">링크를 붙여넣고 분석하기를 눌러주세요.</div>
-                  </div>
+                  <section className="sheet mt-10">
+                    <p className="py-8 text-center text-[13px] text-muted">
+                      분석된 제품이 없습니다. 링크를 붙여넣고 분석을 누르세요.
+                    </p>
+                  </section>
                 )
               )}
             </div>
@@ -614,205 +629,170 @@ export default function App() {
 
           {/* ── STUDIO ── */}
           {activeTab === 1 && (
-            <div className="mx-auto max-w-[960px]">
+            <div className="mx-auto max-w-[900px]">
               {!product ? (
-                <div className="rounded-[20px] border border-dashed border-black/15 bg-white p-12 text-center">
-                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#FAF7F2] text-[20px]">🎬</div>
-                  <div className="mt-4 text-[16px] font-bold">먼저 제품을 가져오세요</div>
-                  <div className="mt-2 text-[13px] opacity-60">IMPORT 탭에서 링크를 분석하면 스튜디오가 활성화됩니다.</div>
-                  <button type="button" onClick={() => setActiveTab(0)} className="mt-6 rounded-full bg-[#121212] px-5 py-2.5 text-[13px] font-semibold text-white">
-                    IMPORT로 이동
+                <div className="border-t border-rule py-16 text-center">
+                  <p className="text-[14px] font-bold">먼저 제품을 가져오세요</p>
+                  <p className="mt-2 text-[13px] text-muted">IMPORT에서 링크를 분석하면 스튜디오가 열립니다.</p>
+                  <button type="button" onClick={() => setActiveTab(0)} className={`${btnGhost} mt-6`}>
+                    IMPORT로
                   </button>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_340px]">
+                <div className="grid grid-cols-1 gap-10 lg:grid-cols-[1fr_300px]">
                   <div>
-                    <div className="mb-6 flex items-center justify-between gap-3">
-                      <h2 className="text-[20px] font-bold tracking-[-0.01em]">영상 스튜디오</h2>
-                      <div className="truncate text-[11px] opacity-50">{liveTitle} 편집 중</div>
-                    </div>
+                    <h2 className="font-serif text-[24px] font-bold tracking-tight">영상 스튜디오</h2>
 
-                    <div className="rounded-[20px] border border-black/10 bg-white p-4 shadow-sm">
-                      <div className="text-[11px] font-bold tracking-[0.12em] opacity-50">TEMPLATE</div>
-                      <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-3">
-                        {TEMPLATES.map((t, idx) => (
-                          <button
-                            key={t.id}
-                            type="button"
-                            onClick={() => {
-                              setTemplateIdx(idx);
-                              setScriptEdited(false);
-                              setScriptText(makeScript(liveTitle, livePrice, originalPrice, discount, idx));
-                              setVideoDone(false);
-                              setVideoProgress(0);
-                            }}
-                            className={`rounded-2xl border p-3 text-left transition ${
-                              templateIdx === idx ? 'border-[#8B5A2B] bg-[#8B5A2B]/5' : 'border-black/10 bg-[#FAF7F2] hover:bg-white'
-                            }`}
-                          >
-                            <div className={`text-[12px] font-black ${templateIdx === idx ? 'text-[#8B5A2B]' : ''}`}>{t.label}</div>
-                            <div className="mt-1 text-[12px] font-medium opacity-70">{t.desc}</div>
-                            {templateIdx === idx && <div className="mt-2 h-1 w-8 rounded-full bg-[#8B5A2B]" />}
-                          </button>
-                        ))}
+                    <section className="sheet mt-7">
+                      <div className="eyebrow">템플릿</div>
+                      <div className="mt-3 grid grid-cols-1 gap-px bg-rule sm:grid-cols-3">
+                        {TEMPLATES.map((t, idx) => {
+                          const on = templateIdx === idx;
+                          return (
+                            <button
+                              key={t.id}
+                              type="button"
+                              onClick={() => {
+                                setTemplateIdx(idx);
+                                setScriptEdited(false);
+                                setScriptText(makeScript(liveTitle, livePrice, originalPrice, discount, idx));
+                                setVideoDone(false);
+                                setVideoProgress(0);
+                              }}
+                              className={`p-4 text-left transition ${on ? 'bg-ink text-plate' : 'bg-plate hover:bg-paper'}`}
+                            >
+                              <div className={`font-mono text-[10px] tabular-nums ${on ? 'text-plate/50' : 'text-muted'}`}>{t.id}</div>
+                              <div className="mt-1.5 text-[13px] font-bold">{t.name}</div>
+                              <div className={`mt-0.5 text-[12px] ${on ? 'text-plate/60' : 'text-muted'}`}>{t.desc}</div>
+                            </button>
+                          );
+                        })}
                       </div>
+                    </section>
 
-                      <div className="mt-6">
-                        <div className="flex items-center justify-between">
-                          <div className="text-[11px] font-bold tracking-[0.12em] opacity-50">
-                            SCRIPT (편집 가능){scriptEdited && <span className="ml-2 font-semibold tracking-normal text-[#8B5A2B]">직접 수정됨</span>}
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setScriptEdited(false);
-                              setScriptText(makeScript(liveTitle, livePrice, originalPrice, discount, templateIdx));
-                              showToast('스크립트를 현재 제품 정보로 다시 생성했습니다');
-                            }}
-                            className="rounded-full border border-black/10 px-3 py-1 text-[11px] hover:bg-[#FAF7F2]"
-                          >
-                            다시 생성
-                          </button>
-                        </div>
-                        <textarea
-                          value={scriptText}
-                          onChange={e => {
-                            setScriptText(e.target.value);
-                            setScriptEdited(true);
-                          }}
-                          className="mt-3 min-h-[240px] w-full resize-none rounded-2xl border border-black/10 bg-[#FAF7F2] p-4 text-[14px] leading-6 outline-none focus:border-[#8B5A2B] focus:bg-white"
-                        />
-                        <div className="mt-2 text-right text-[11px] tabular-nums opacity-40">{scriptText.length}자 · 9:16 최적화</div>
-                      </div>
-
-                      <div className="mt-6">
+                    <section className="sheet mt-8">
+                      <div className="flex items-baseline justify-between">
+                        <span className="eyebrow">
+                          스크립트{scriptEdited && <span className="ml-2 normal-case tracking-normal text-oak">직접 수정됨</span>}
+                        </span>
                         <button
                           type="button"
-                          onClick={handleGenerate}
-                          disabled={isGenerating}
-                          className={`flex w-full items-center justify-center gap-2 rounded-full px-6 py-3.5 text-[14px] font-bold text-white transition ${
-                            videoDone ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-[#121212] hover:bg-black disabled:opacity-40'
-                          }`}
+                          onClick={() => {
+                            setScriptEdited(false);
+                            setScriptText(makeScript(liveTitle, livePrice, originalPrice, discount, templateIdx));
+                            showToast('스크립트를 현재 제품 정보로 다시 생성했습니다');
+                          }}
+                          className="font-mono text-[11px] text-muted underline-offset-4 transition hover:text-ink hover:underline"
                         >
-                          {isGenerating ? (
-                            <>
-                              <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                              <span className="tabular-nums">생성 중 {videoProgress}%</span>
-                            </>
-                          ) : videoDone ? (
-                            '✓ 생성 완료 — 다시 생성'
-                          ) : (
-                            '▶ 영상 생성하기'
-                          )}
+                          다시 생성
                         </button>
-
-                        {(isGenerating || videoDone) && (
-                          <div className="mt-4">
-                            <div className="h-2 w-full overflow-hidden rounded-full bg-black/10">
-                              <div className="h-full rounded-full bg-[#8B5A2B] transition-all duration-300" style={{ width: `${videoProgress}%` }} />
-                            </div>
-                            <div className="mt-2 flex justify-between text-[11px] opacity-50">
-                              <span>{videoDone ? '렌더링 완료' : 'FFmpeg 렌더링 중...'}</span>
-                              <span className="tabular-nums">{videoProgress}%</span>
-                            </div>
-                          </div>
-                        )}
                       </div>
-                    </div>
+                      <textarea
+                        value={scriptText}
+                        onChange={e => {
+                          setScriptText(e.target.value);
+                          setScriptEdited(true);
+                        }}
+                        className="mt-3 min-h-[248px] w-full resize-none bg-plate p-5 text-[14px] leading-[1.75] outline-none ring-1 ring-inset ring-rule transition focus:ring-ink"
+                      />
+                      <div className="mt-2 text-right font-mono text-[11px] tabular-nums text-muted">
+                        {scriptText.length}자
+                      </div>
+                    </section>
+
+                    <section className="mt-8">
+                      <button type="button" onClick={handleGenerate} disabled={isGenerating} className={`${btnPrimary} w-full py-4`}>
+                        {isGenerating ? (
+                          <span className="tabular-nums">렌더링 {videoProgress}%</span>
+                        ) : videoDone ? (
+                          '다시 생성'
+                        ) : (
+                          '영상 생성'
+                        )}
+                      </button>
+
+                      {(isGenerating || videoDone) && (
+                        <div className="mt-3">
+                          <div className="h-px w-full bg-rule">
+                            <div
+                              className={`h-px transition-all duration-300 ${videoDone ? 'bg-go' : 'bg-ink'}`}
+                              style={{ width: `${videoProgress}%` }}
+                            />
+                          </div>
+                          <div className="mt-2 flex justify-between font-mono text-[11px] tabular-nums">
+                            <span className={videoDone ? 'text-go' : 'text-muted'}>{videoDone ? '렌더링 완료' : 'FFmpeg 렌더링 중'}</span>
+                            <span className="text-muted">{videoProgress}%</span>
+                          </div>
+                        </div>
+                      )}
+                    </section>
                   </div>
 
-                  {/* 9:16 preview */}
-                  <div className="lg:sticky lg:top-[88px] lg:h-fit">
-                    <div className="rounded-[20px] border border-black/10 bg-white p-4 shadow-sm">
-                      <div className="mb-3 flex items-center justify-between">
-                        <div className="text-[11px] font-bold tracking-[0.12em] opacity-50">PREVIEW — 9:16</div>
-                        <div className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${videoDone ? 'bg-emerald-50 text-emerald-700' : 'bg-black/5'}`}>
-                          {videoDone ? 'DONE' : 'DRAFT'}
-                        </div>
+                  {/* The one thing on the page that earns real elevation. */}
+                  <aside className="lg:sticky lg:top-[77px] lg:h-fit">
+                    <div className="flex items-baseline justify-between">
+                      <span className="eyebrow">미리보기 · 9:16</span>
+                      <span className={`font-mono text-[10px] tracking-label ${videoDone ? 'text-go' : 'text-muted'}`}>{videoDone ? 'DONE' : 'DRAFT'}</span>
+                    </div>
+
+                    <div
+                      className="relative mx-auto mt-3 w-full max-w-[286px] overflow-hidden rounded-[22px] bg-[#131210]"
+                      style={{ aspectRatio: '9/16', boxShadow: '0 26px 50px -18px rgba(25,23,19,0.5), 0 2px 8px rgba(25,23,19,0.18)' }}
+                    >
+                      <div className="absolute inset-x-0 top-0 z-10 bg-gradient-to-b from-black/75 to-transparent px-4 pb-8 pt-4">
+                        <div className="font-serif text-[13px] font-bold leading-tight text-white">{liveTitle}</div>
+                        <div className="mt-1 font-mono text-[9px] tracking-label text-white/50">{TEMPLATES[templateIdx].name}</div>
                       </div>
 
-                      <div className="relative mx-auto w-full max-w-[300px] overflow-hidden rounded-[20px] border border-black/10 shadow-lg" style={{ aspectRatio: '9/16', backgroundColor: '#1A1A1A' }}>
-                        <div className="absolute left-0 right-0 top-0 z-10 bg-gradient-to-b from-black/70 to-transparent p-3">
-                          <div className="line-clamp-2 text-[12px] font-bold leading-4 text-white">{liveTitle}</div>
-                          <div className="mt-1 flex items-center gap-1.5">
-                            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
-                            <span className="text-[10px] font-semibold tracking-wide text-white/70">ROOMCRAFT ENGINE</span>
-                          </div>
-                        </div>
-
-                        <div className="absolute inset-0 flex flex-col justify-center gap-3 p-3 pb-[132px] pt-16">
-                          <div className="overflow-hidden rounded-2xl">
-                            <div className="flex gap-3" style={{ animation: 'slideX 6s ease-in-out infinite' }}>
-                              {[...product.images, ...product.images].map((img, i) => (
-                                <div key={`slide-${i}`} className="relative h-[168px] w-[184px] shrink-0 overflow-hidden rounded-2xl border border-white/10" style={{ backgroundColor: img.swatch }}>
-                                  <img src={img.src} alt="" className="absolute inset-0 h-full w-full object-contain p-2" />
-                                  <div className="absolute bottom-2 left-2 rounded-full bg-black/60 px-2 py-1 text-[9px] text-white">원목 {img.grain}%</div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-
-                          <div className="mt-2 grid grid-cols-3 gap-2">
-                            {product.images.map(img => (
-                              <div key={`mini-${img.label}`} className="rounded-xl bg-white/10 p-2 backdrop-blur">
-                                <div className="flex h-8 items-center justify-center overflow-hidden rounded-lg" style={{ backgroundColor: img.swatch }}>
-                                  <img src={img.src} alt="" className="h-full w-auto object-contain" />
-                                </div>
-                                <div className="mt-2 h-2 w-3/4 rounded bg-white/20" />
+                      <div className="absolute inset-0 flex flex-col justify-center gap-2 px-3 pb-[128px] pt-20">
+                        <div className="overflow-hidden">
+                          <div className="flex gap-2" style={{ animation: 'slideX 7s ease-in-out infinite' }}>
+                            {[...product.images, ...product.images].map((img, i) => (
+                              <div key={`slide-${i}`} className="relative h-[164px] w-[178px] shrink-0 bg-white/[0.06]">
+                                <img src={img.src} alt="" className="absolute inset-0 h-full w-full object-contain p-3" />
                               </div>
                             ))}
                           </div>
                         </div>
+                        <div className="grid grid-cols-3 gap-2">
+                          {product.images.map(img => (
+                            <div key={`mini-${img.label}`} className="flex h-9 items-center justify-center bg-white/[0.06]">
+                              <img src={img.src} alt="" className="h-full w-auto object-contain p-1" />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
 
-                        <div className="absolute bottom-14 left-3 right-3 z-10">
-                          <div className="rounded-2xl bg-white p-3 shadow-xl">
-                            <div className="flex items-center justify-between gap-2">
-                              <div>
-                                <div className="text-[10px] font-bold tracking-wide opacity-50">TODAY ONLY</div>
-                                <div className="text-[15px] font-black tabular-nums">{won(livePrice)}</div>
-                              </div>
-                              <button
-                                type="button"
-                                onClick={openBuyLink}
-                                className="rounded-full bg-[#121212] px-3 py-1.5 text-[11px] font-bold text-white transition hover:bg-black"
-                              >
-                                구매하기
-                              </button>
-                            </div>
-                            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-black/10">
-                              <div className="h-full bg-[#8B5A2B] transition-all duration-300" style={{ width: `${Math.min(100, discount)}%` }} />
-                            </div>
+                      <div className="absolute inset-x-3 bottom-11 z-10 bg-plate p-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <div>
+                            <div className="font-mono text-[9px] uppercase tracking-label text-muted">Today only</div>
+                            <div className="text-[16px] font-bold tabular-nums">{won(livePrice)}</div>
                           </div>
+                          <button type="button" onClick={openBuyLink} className="bg-ink px-3 py-2 text-[11px] font-bold text-plate transition hover:bg-black">
+                            구매하기
+                          </button>
                         </div>
-
-                        <div className="absolute bottom-3 left-0 right-0 z-10 flex justify-center">
-                          <div className="rounded-full bg-black/60 px-3 py-1 text-[9px] font-bold tracking-[0.14em] text-white/80 backdrop-blur">ROOMCRAFT.WORLD</div>
+                        <div className="mt-2 h-px w-full bg-rule">
+                          <div className="h-px bg-oak" style={{ width: `${Math.min(100, discount)}%` }} />
                         </div>
-
-                        <div className="absolute left-3 top-[76px] z-10 rounded-full bg-white/90 px-2.5 py-1 text-[10px] font-bold shadow">{TEMPLATES[templateIdx].name}</div>
                       </div>
 
-                      <div className="mt-4 flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setActiveTab(2)}
-                          disabled={!videoDone}
-                          className="flex-1 rounded-full bg-[#8B5A2B] py-2.5 text-[12px] font-bold text-white transition hover:bg-[#6F4A24] disabled:opacity-30"
-                        >
-                          발행 단계로 →
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => showToast('초안을 저장했습니다')}
-                          className="rounded-full border border-black/10 px-4 py-2.5 text-[12px] font-semibold hover:bg-[#FAF7F2]"
-                        >
-                          저장
-                        </button>
+                      <div className="absolute inset-x-0 bottom-3 z-10 text-center font-mono text-[9px] tracking-label text-white/45">
+                        ROOMCRAFT.WORLD
                       </div>
-
-                      <div className="mt-3 text-center text-[11px] opacity-40">1080×1920 · H.264 · 12초 · 자막 포함</div>
                     </div>
-                  </div>
+
+                    <div className="mt-4 flex gap-2">
+                      <button type="button" onClick={() => setActiveTab(2)} disabled={!videoDone} className={`${btnPrimary} flex-1 py-2.5`}>
+                        발행 단계로 →
+                      </button>
+                      <button type="button" onClick={() => showToast('초안을 저장했습니다')} className={`${btnGhost} py-2.5`}>
+                        저장
+                      </button>
+                    </div>
+                    <div className="mt-3 text-center font-mono text-[10px] tabular-nums text-muted">{RENDER_SLATE}</div>
+                  </aside>
                 </div>
               )}
             </div>
@@ -820,129 +800,115 @@ export default function App() {
 
           {/* ── PUBLISH ── */}
           {activeTab === 2 && (
-            <div className="mx-auto max-w-[720px]">
-              <div className="mb-6">
-                <h2 className="text-[20px] font-bold tracking-[-0.01em]">SNS 발행</h2>
-                <p className="mt-2 text-[13px] opacity-60">생성된 영상을 선택한 채널에 동시 발행합니다. 해시태그는 자동 최적화됩니다.</p>
-              </div>
+            <div className="mx-auto max-w-[640px]">
+              <h2 className="font-serif text-[24px] font-bold tracking-tight">SNS 발행</h2>
+              <p className="mt-2 max-w-[52ch] text-[14px] text-muted">선택한 채널에 동시 발행합니다. 해시태그는 채널별로 자동 조정됩니다.</p>
 
               {!product ? (
-                <div className="rounded-[20px] border border-dashed border-black/15 bg-white p-10 text-center">
-                  <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-[#FAF7F2] text-[18px]">📤</div>
-                  <div className="mt-3 text-[14px] font-semibold">발행할 영상이 없습니다</div>
-                  <div className="mt-1 text-[12px] opacity-50">IMPORT → STUDIO를 완료하면 발행할 수 있습니다.</div>
+                <div className="mt-8 border-t border-rule py-16 text-center">
+                  <p className="text-[13px] text-muted">IMPORT → STUDIO를 마치면 발행할 수 있습니다.</p>
                 </div>
               ) : (
                 <>
-                  <div className="rounded-[20px] border border-black/10 bg-white p-5 shadow-sm">
-                    <div className="text-[11px] font-bold tracking-[0.12em] opacity-50">CHANNELS</div>
-                    <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
+                  <section className="sheet mt-8">
+                    <div className="eyebrow">채널</div>
+                    <div className="mt-2">
                       {CHANNELS.map(ch => (
                         <label
                           key={ch.key}
-                          className={`flex cursor-pointer items-center justify-between rounded-2xl border p-3 transition ${
-                            sns[ch.key] ? 'border-[#8B5A2B] bg-[#8B5A2B]/5' : 'border-black/10 bg-[#FAF7F2] hover:bg-white'
-                          }`}
+                          className="flex cursor-pointer items-center gap-4 border-b border-rule py-3.5 transition hover:bg-plate"
                         >
-                          <div className="flex items-center gap-3">
-                            <input
-                              type="checkbox"
-                              checked={sns[ch.key]}
-                              onChange={e => setSns(prev => ({ ...prev, [ch.key]: e.target.checked }))}
-                              className="h-4 w-4 accent-[#8B5A2B]"
-                            />
-                            <div>
-                              <div className="text-[13px] font-bold">{ch.name}</div>
-                              <div className="text-[11px] opacity-60">{ch.sub}</div>
-                            </div>
-                          </div>
-                          <div className="text-[11px] font-bold tabular-nums opacity-40">{ch.count}</div>
+                          <input
+                            type="checkbox"
+                            checked={sns[ch.key]}
+                            onChange={e => setSns(prev => ({ ...prev, [ch.key]: e.target.checked }))}
+                            className="h-3.5 w-3.5 shrink-0 accent-ink"
+                          />
+                          <span className="flex-1">
+                            <span className="block text-[13px] font-bold">{ch.name}</span>
+                            <span className="block text-[12px] text-muted">{ch.sub}</span>
+                          </span>
+                          <span className="font-mono text-[11px] tabular-nums text-muted">{ch.count}</span>
                         </label>
                       ))}
                     </div>
+                  </section>
 
-                    <div className="mt-6">
-                      <div className="flex items-center justify-between">
-                        <div className="text-[11px] font-bold tracking-[0.12em] opacity-50">
-                          CAPTION{captionEdited && <span className="ml-2 font-semibold tracking-normal text-[#8B5A2B]">직접 수정됨</span>}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setCaptionEdited(false);
-                            setCaption(makeCaption(liveTitle, livePrice, discount));
-                            showToast('캡션을 다시 생성했습니다');
-                          }}
-                          className="rounded-full border border-black/10 px-3 py-1 text-[11px] hover:bg-[#FAF7F2]"
-                        >
-                          다시 생성
-                        </button>
-                      </div>
-                      <textarea
-                        value={caption}
-                        onChange={e => {
-                          setCaption(e.target.value);
-                          setCaptionEdited(true);
+                  <section className="sheet mt-8">
+                    <div className="flex items-baseline justify-between">
+                      <span className="eyebrow">
+                        캡션{captionEdited && <span className="ml-2 normal-case tracking-normal text-oak">직접 수정됨</span>}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCaptionEdited(false);
+                          setCaption(makeCaption(liveTitle, livePrice, discount));
+                          showToast('캡션을 다시 생성했습니다');
                         }}
-                        className="mt-3 min-h-[140px] w-full resize-none rounded-2xl border border-black/10 bg-[#FAF7F2] p-4 text-[13px] leading-5 outline-none focus:border-[#8B5A2B] focus:bg-white"
+                        className="font-mono text-[11px] text-muted underline-offset-4 transition hover:text-ink hover:underline"
+                      >
+                        다시 생성
+                      </button>
+                    </div>
+                    <textarea
+                      value={caption}
+                      onChange={e => {
+                        setCaption(e.target.value);
+                        setCaptionEdited(true);
+                      }}
+                      className="mt-3 min-h-[168px] w-full resize-none bg-plate p-5 text-[13px] leading-[1.7] outline-none ring-1 ring-inset ring-rule transition focus:ring-ink"
+                    />
+                    <div className="mt-2 flex justify-between font-mono text-[11px] tabular-nums text-muted">
+                      <span>{selectedCount}개 채널</span>
+                      <span>{caption.length}자</span>
+                    </div>
+                  </section>
+
+                  <section className="sheet mt-8">
+                    <div className="flex items-baseline justify-between">
+                      <span className="eyebrow">발행 시점</span>
+                      <div className="flex gap-4 font-mono text-[11px]">
+                        {(['now', 'later'] as const).map(mode => (
+                          <button
+                            key={mode}
+                            type="button"
+                            onClick={() => setScheduleMode(mode)}
+                            className={`underline-offset-4 transition ${scheduleMode === mode ? 'text-ink underline' : 'text-muted hover:text-ink'}`}
+                          >
+                            {mode === 'now' ? '즉시' : '예약'}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    {scheduleMode === 'later' && (
+                      <input
+                        type="datetime-local"
+                        value={scheduleDate}
+                        onChange={e => setScheduleDate(e.target.value)}
+                        className={`${field} mt-2 font-mono text-[13px]`}
                       />
-                      <div className="mt-2 flex justify-between text-[11px] tabular-nums opacity-40">
-                        <span>{selectedCount}개 채널 선택됨</span>
-                        <span>{caption.length}자</span>
-                      </div>
-                    </div>
-
-                    <div className="mt-6 rounded-2xl bg-[#FAF7F2] p-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="text-[11px] font-bold tracking-[0.12em] opacity-50">SCHEDULE</div>
-                        <div className="flex rounded-full border border-black/10 bg-white p-1 text-[11px]">
-                          {(['now', 'later'] as const).map(mode => (
-                            <button
-                              key={mode}
-                              type="button"
-                              onClick={() => setScheduleMode(mode)}
-                              className={`rounded-full px-3 py-1 font-semibold transition ${scheduleMode === mode ? 'bg-[#121212] text-white' : 'opacity-60'}`}
-                            >
-                              {mode === 'now' ? '즉시 발행' : '예약 발행'}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                      {scheduleMode === 'later' && (
-                        <input
-                          type="datetime-local"
-                          value={scheduleDate}
-                          onChange={e => setScheduleDate(e.target.value)}
-                          className="mt-3 w-full rounded-xl border border-black/10 bg-white px-4 py-2.5 text-[13px] outline-none focus:border-[#8B5A2B]"
-                        />
-                      )}
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={handlePublish}
-                      disabled={selectedCount === 0}
-                      className="mt-6 flex w-full items-center justify-center gap-2 rounded-full bg-[#121212] py-3.5 text-[14px] font-bold text-white transition hover:bg-black disabled:opacity-30"
-                    >
-                      {scheduleMode === 'now' ? `🚀 ${selectedCount}개 채널에 발행하기` : `🗓️ ${selectedCount}개 채널 예약하기`}
+                    )}
+                    <button type="button" onClick={handlePublish} disabled={selectedCount === 0} className={`${btnPrimary} mt-6 w-full py-4`}>
+                      {scheduleMode === 'now' ? `${selectedCount}개 채널에 발행` : `${selectedCount}개 채널 예약`}
                     </button>
-                    {selectedCount === 0 && <div className="mt-2 text-center text-[11px] opacity-50">채널을 하나 이상 선택하세요.</div>}
-                  </div>
+                    {selectedCount === 0 && <p className="mt-2 text-center text-[12px] text-muted">채널을 하나 이상 선택하세요.</p>}
+                  </section>
 
-                  {/* Queue */}
-                  <div className="mt-8 rounded-[20px] border border-black/10 bg-white p-5 shadow-sm">
-                    <div className="flex items-center justify-between">
-                      <div className="text-[11px] font-bold tracking-[0.12em] opacity-50">QUEUE — 최근 처리 목록</div>
-                      <div className="text-[11px] tabular-nums opacity-40">{queue.length} items</div>
+                  {/* Queue ledger */}
+                  <section className="sheet mt-10">
+                    <div className="flex items-baseline justify-between">
+                      <span className="eyebrow">처리 목록</span>
+                      <span className="font-mono text-[11px] tabular-nums text-muted">{queue.length} items</span>
                     </div>
-                    <div className="mt-4 overflow-x-auto">
-                      <table className="w-full min-w-[420px] text-left">
+                    <div className="mt-3 overflow-x-auto">
+                      <table className="w-full min-w-[440px] border-collapse text-left">
                         <thead>
-                          <tr className="border-b border-black/5 text-[11px] opacity-40">
-                            <th className="pb-2 font-semibold">제품</th>
-                            <th className="pb-2 font-semibold">플랫폼</th>
-                            <th className="pb-2 font-semibold">상태</th>
-                            <th className="pb-2 font-semibold">일시</th>
+                          <tr className="border-b border-rule font-mono text-[10px] uppercase tracking-label text-muted">
+                            <th className="pb-2 font-normal">제품</th>
+                            <th className="pb-2 font-normal">플랫폼</th>
+                            <th className="pb-2 font-normal">상태</th>
+                            <th className="pb-2 text-right font-normal">일시</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -958,139 +924,124 @@ export default function App() {
                                   setQueueDetail(item);
                                 }
                               }}
-                              className="cursor-pointer border-b border-black/5 outline-none transition last:border-0 hover:bg-[#FAF7F2] focus-visible:bg-[#FAF7F2] focus-visible:ring-2 focus-visible:ring-[#8B5A2B]/40"
+                              className="cursor-pointer border-b border-rule outline-none transition hover:bg-plate focus-visible:bg-plate"
                             >
-                              <td className="py-3 text-[13px] font-medium">{item.title}</td>
-                              <td className="py-3 text-[12px] opacity-70">{item.platform}</td>
-                              <td className="py-3">
-                                <span
-                                  className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold ${
-                                    item.status === 'Posted'
-                                      ? 'bg-emerald-50 text-emerald-700'
-                                      : item.status === 'Video Done'
-                                      ? 'bg-amber-50 text-amber-700'
-                                      : 'bg-[#8B5A2B]/10 text-[#8B5A2B]'
-                                  }`}
-                                >
-                                  {STATUS_KO[item.status]}
-                                </span>
-                              </td>
-                              <td className="py-3 text-[12px] tabular-nums opacity-50">{item.date}</td>
+                              <td className="py-3 pr-3 text-[13px]">{item.title}</td>
+                              <td className="py-3 pr-3 font-mono text-[12px] text-muted">{item.platform}</td>
+                              <td className={`py-3 pr-3 font-mono text-[12px] ${STATUS_TONE[item.status]}`}>{STATUS_KO[item.status]}</td>
+                              <td className="py-3 text-right font-mono text-[12px] tabular-nums text-muted">{item.date}</td>
                             </tr>
                           ))}
-                          <tr className="bg-[#FAF7F2]/60">
-                            <td className="py-3 text-[13px] font-bold">{liveTitle}</td>
-                            <td className="py-3 text-[12px] opacity-70">{product.platform}</td>
-                            <td className="py-3">
-                              <span className="inline-flex rounded-full bg-[#121212] px-2.5 py-1 text-[11px] font-bold text-white">현재 작업</span>
-                            </td>
-                            <td className="py-3 text-[12px] opacity-50">방금 전</td>
+                          <tr className="border-b border-rule bg-plate">
+                            <td className="py-3 pr-3 text-[13px] font-bold">{liveTitle}</td>
+                            <td className="py-3 pr-3 font-mono text-[12px] text-muted">{product.platform}</td>
+                            <td className="py-3 pr-3 font-mono text-[12px] text-oak">현재 작업</td>
+                            <td className="py-3 text-right font-mono text-[12px] text-muted">방금 전</td>
                           </tr>
                         </tbody>
                       </table>
                     </div>
-                    <div className="mt-3 text-[11px] opacity-40">행을 클릭하면 상세 정보가 열립니다.</div>
-                  </div>
+                    <p className="mt-2.5 font-mono text-[11px] text-muted">행을 누르면 상세가 열립니다.</p>
+                  </section>
                 </>
               )}
             </div>
           )}
         </main>
 
-        {/* Right panel — desktop */}
-        <aside className="hidden border-l border-black/5 px-4 py-6 md:sticky md:top-[65px] md:block md:h-[calc(100vh-65px)] md:overflow-y-auto md:scrollbar-none">
-          <div className="rounded-2xl border border-black/10 bg-white p-4 shadow-sm">
-            <div className="text-[11px] font-bold tracking-[0.12em] opacity-50">FACTORY STATUS</div>
-            <div className="mt-4 space-y-3">
-              <div className="flex items-center justify-between rounded-xl bg-[#FAF7F2] p-3">
-                <span className="text-[12px] opacity-60">IMPORT</span>
-                <span className={`text-[11px] font-bold ${product ? 'text-emerald-600' : 'opacity-30'}`}>{product ? '✓ 완료' : '대기'}</span>
-              </div>
-              <div className="flex items-center justify-between rounded-xl bg-[#FAF7F2] p-3">
-                <span className="text-[12px] opacity-60">STUDIO</span>
-                <span className={`text-[11px] font-bold tabular-nums ${videoDone ? 'text-emerald-600' : isGenerating ? 'text-amber-600' : 'opacity-30'}`}>
-                  {videoDone ? '✓ 완료' : isGenerating ? `${videoProgress}%` : '대기'}
-                </span>
-              </div>
-              <div className="flex items-center justify-between rounded-xl bg-[#FAF7F2] p-3">
-                <span className="text-[12px] opacity-60">PUBLISH</span>
-                <span className="text-[11px] font-bold tabular-nums opacity-40">{selectedCount} 채널</span>
-              </div>
-            </div>
+        {/* Readings — a printed spec column, not a stack of cards. */}
+        <aside className="hidden lg:sticky lg:top-[53px] lg:block lg:h-[calc(100vh-53px)] lg:overflow-y-auto lg:px-6 lg:py-7 lg:scrollbar-none">
+          <div className="eyebrow">공정 상태</div>
+          <dl className="mt-3">
+            {STEPS.map(step => {
+              const v = stepState(step.k);
+              return (
+                <div key={`st-${step.k}`} className="flex items-baseline justify-between border-b border-rule py-2.5">
+                  <dt className="font-mono text-[11px] tracking-label text-muted">{step.label}</dt>
+                  <dd className={`font-mono text-[11px] tabular-nums ${v === '완료' ? 'text-go' : v.endsWith('%') ? 'text-wait' : 'text-muted'}`}>{v}</dd>
+                </div>
+              );
+            })}
+          </dl>
 
-            <div className="mt-6 rounded-xl bg-[#121212] p-4 text-white">
-              <div className="text-[11px] font-bold tracking-wide opacity-60">NEXT ACTION</div>
-              <div className="mt-2 text-[13px] font-medium leading-5">
-                {activeTab === 0 && !product && '링크를 붙여넣고 분석을 시작하세요.'}
-                {activeTab === 0 && product && '스튜디오로 이동해 영상을 생성하세요.'}
-                {activeTab === 1 && !videoDone && !isGenerating && '템플릿을 고르고 영상을 생성하세요.'}
-                {activeTab === 1 && isGenerating && '영상을 렌더링 중입니다...'}
-                {activeTab === 1 && videoDone && '발행 탭에서 SNS에 배포하세요.'}
-                {activeTab === 2 && '채널을 선택하고 발행하세요.'}
-              </div>
-            </div>
-
-            <div className="mt-6">
-              <div className="text-[11px] font-bold tracking-[0.12em] opacity-50">RECENT LOGS</div>
-              <div className="mt-3 space-y-2 font-mono text-[11px]">
-                {(aiLogs.length ? aiLogs : ['대기 중...', '링크 분석 대기', '엔진 아이들 상태']).slice(-4).map((l, i) => (
-                  <div key={`rlog-${i}`} className="truncate opacity-60">› {l}</div>
-                ))}
-              </div>
-            </div>
+          <div className="mt-8 border-l-2 border-oak pl-4">
+            <div className="eyebrow">다음 할 일</div>
+            <p className="mt-1.5 text-[13px] leading-relaxed">
+              {activeTab === 0 && !product && '링크를 붙여넣고 분석을 시작하세요.'}
+              {activeTab === 0 && product && '스튜디오로 이동해 영상을 생성하세요.'}
+              {activeTab === 1 && !videoDone && !isGenerating && '템플릿을 고르고 영상을 생성하세요.'}
+              {activeTab === 1 && isGenerating && '영상을 렌더링하고 있습니다.'}
+              {activeTab === 1 && videoDone && '발행 탭에서 채널을 고르세요.'}
+              {activeTab === 2 && '채널을 선택하고 발행하세요.'}
+            </p>
           </div>
 
-          <div className="mt-4 rounded-2xl border border-black/10 bg-[#8B5A2B]/5 p-4">
-            <div className="text-[11px] font-bold text-[#8B5A2B]">TIP</div>
-            <div className="mt-1 text-[12px] leading-5 opacity-70">가격비교 템플릿이 CTR이 가장 높습니다. 할인 배지를 꼭 유지하세요.</div>
+          <div className="mt-8">
+            <div className="eyebrow">최근 로그</div>
+            <ol className="mt-3 space-y-1.5 font-mono text-[11px] text-muted">
+              {(aiLogs.length ? aiLogs : ['엔진 대기 중']).slice(-4).map((l, i) => (
+                <li key={`rlog-${i}`} className="truncate">{l}</li>
+              ))}
+            </ol>
+          </div>
+
+          <div className="mt-8">
+            <div className="eyebrow">출력 규격</div>
+            <p className="mt-1.5 font-mono text-[11px] tabular-nums text-muted">{RENDER_SLATE}</p>
+            <p className="mt-1 font-mono text-[11px] text-muted">자막 포함 · 세이프에어리어 준수</p>
           </div>
         </aside>
       </div>
 
-      {/* Mobile nav */}
-      <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-black/10 bg-white/90 px-2 pb-[env(safe-area-inset-bottom)] pt-2 backdrop-blur-xl md:hidden">
-        <div className="grid grid-cols-3 gap-2">
-          {tabs.map(tab => (
-            <button
-              key={`mob-${tab.k}`}
-              type="button"
-              onClick={() => setActiveTab(tab.k)}
-              className={`flex flex-col items-center rounded-2xl px-2 py-2.5 transition ${
-                activeTab === tab.k ? 'bg-[#121212] text-white' : 'bg-[#FAF7F2] text-black/60'
-              }`}
-            >
-              <span className="text-[11px] font-black tracking-wide">{tab.label}</span>
-              <span className="text-[11px] opacity-70">{tab.ko}</span>
-            </button>
-          ))}
+      {/* Mobile step strip */}
+      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-rule bg-paper/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
+        <div className="grid grid-cols-3">
+          {STEPS.map(step => {
+            const on = activeTab === step.k;
+            return (
+              <button
+                key={`mob-${step.k}`}
+                type="button"
+                onClick={() => setActiveTab(step.k)}
+                className={`flex flex-col items-center gap-0.5 border-t-2 py-2.5 transition ${on ? 'border-oak' : 'border-transparent'}`}
+              >
+                <span className={`font-mono text-[9px] tabular-nums ${on ? 'text-oak' : 'text-muted'}`}>{step.no}</span>
+                <span className={`text-[11px] font-bold tracking-label ${on ? '' : 'text-muted'}`}>{step.label}</span>
+              </button>
+            );
+          })}
         </div>
       </nav>
 
-      {/* Room preview modal */}
+      {/* Room preview */}
       {showRoom && (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm" onClick={() => setShowRoom(false)}>
-          <div className="w-full max-w-[760px] rounded-[24px] border border-black/10 bg-white p-5 shadow-2xl" onClick={e => e.stopPropagation()}>
-            <div className="flex items-start justify-between gap-4">
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-ink/45 p-4 backdrop-blur-sm" onClick={() => setShowRoom(false)}>
+          <div
+            className="w-full max-w-[720px] bg-plate p-6"
+            style={{ boxShadow: '0 32px 64px -20px rgba(25,23,19,0.45)' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-baseline justify-between gap-4">
               <div>
-                <div className="text-[11px] font-bold tracking-[0.12em] opacity-50">ROOM PREVIEW</div>
-                <div className="mt-1 text-[17px] font-bold">원룸 미니멀 구성 — {ROOM_ITEMS.length} items placed</div>
+                <div className="eyebrow">룸 프리뷰</div>
+                <h3 className="mt-1 font-serif text-[19px] font-bold">원룸 미니멀 구성 · {ROOM_ITEMS.length}점</h3>
               </div>
-              <button type="button" onClick={() => setShowRoom(false)} aria-label="닫기" className="rounded-full border border-black/10 px-3 py-1.5 text-[13px] hover:bg-[#FAF7F2]">
-                닫기
+              <button type="button" onClick={() => setShowRoom(false)} aria-label="닫기" className="font-mono text-[11px] text-muted transition hover:text-ink">
+                닫기 ✕
               </button>
             </div>
-            <div className="mt-4">
+            <div className="mt-5 border border-rule">
               <RoomScene />
             </div>
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              {ROOM_ITEMS.map(item => (
-                <span key={`chip-${item.name}`} className="rounded-full bg-[#FAF7F2] px-2.5 py-1 text-[11px] font-semibold text-[#8B5A2B]">
-                  {item.name}
-                </span>
+            <ul className="mt-3 flex flex-wrap gap-x-5 gap-y-1 font-mono text-[11px] text-muted">
+              {ROOM_ITEMS.map((item, i) => (
+                <li key={`chip-${item.name}`}>
+                  <span className="tabular-nums text-oak">{String(i + 1).padStart(2, '0')}</span> {item.name}
+                </li>
               ))}
-            </div>
-            <div className="mt-4 flex flex-wrap justify-end gap-2">
-              <button type="button" onClick={openBuyLink} className="rounded-full border border-black/15 px-5 py-2.5 text-[13px] font-semibold hover:bg-[#FAF7F2]">
+            </ul>
+            <div className="mt-6 flex flex-wrap justify-end gap-3">
+              <button type="button" onClick={openBuyLink} className={btnGhost}>
                 구매 페이지 열기 ↗
               </button>
               <button
@@ -1099,7 +1050,7 @@ export default function App() {
                   setShowRoom(false);
                   setActiveTab(1);
                 }}
-                className="rounded-full bg-[#8B5A2B] px-5 py-2.5 text-[13px] font-bold text-white hover:bg-[#6F4A24]"
+                className={btnPrimary}
               >
                 이 구성으로 영상 만들기 →
               </button>
@@ -1108,72 +1059,70 @@ export default function App() {
         </div>
       )}
 
-      {/* Queue detail modal */}
+      {/* Queue detail */}
       {queueDetail && (
-        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm" onClick={() => setQueueDetail(null)}>
-          <div className="w-full max-w-[420px] rounded-[24px] border border-black/10 bg-white p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
-            <div className="text-[11px] font-bold tracking-[0.12em] opacity-50">QUEUE ITEM #{queueDetail.id}</div>
-            <div className="mt-2 text-[17px] font-bold leading-6">{queueDetail.title}</div>
-            <dl className="mt-5 space-y-2">
+        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-ink/40 p-4 backdrop-blur-sm" onClick={() => setQueueDetail(null)}>
+          <div
+            className="w-full max-w-[400px] bg-plate p-6"
+            style={{ boxShadow: '0 32px 64px -20px rgba(25,23,19,0.45)' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="eyebrow">큐 항목 {String(queueDetail.id).padStart(2, '0')}</div>
+            <h3 className="mt-1.5 font-serif text-[18px] font-bold leading-snug">{queueDetail.title}</h3>
+            <dl className="mt-5">
               {[
                 ['플랫폼', queueDetail.platform],
                 ['상태', STATUS_KO[queueDetail.status]],
                 ['처리 일시', queueDetail.date],
                 ['누적 조회', queueDetail.views],
               ].map(([k, v]) => (
-                <div key={k} className="flex items-center justify-between rounded-xl bg-[#FAF7F2] px-4 py-2.5">
-                  <dt className="text-[12px] opacity-60">{k}</dt>
-                  <dd className="text-[13px] font-semibold tabular-nums">{v}</dd>
+                <div key={k} className="flex items-baseline justify-between border-b border-rule py-2.5">
+                  <dt className="font-mono text-[11px] text-muted">{k}</dt>
+                  <dd className="font-mono text-[12px] tabular-nums">{v}</dd>
                 </div>
               ))}
             </dl>
-            <div className="mt-4">
-              <div className="text-[11px] font-bold tracking-wide opacity-50">발행 채널</div>
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {queueDetail.channels.length > 0 ? (
-                  queueDetail.channels.map(c => (
-                    <span key={c} className="rounded-full bg-[#8B5A2B]/10 px-2.5 py-1 text-[11px] font-semibold text-[#8B5A2B]">{c}</span>
-                  ))
-                ) : (
-                  <span className="text-[12px] opacity-50">아직 발행되지 않았습니다.</span>
-                )}
-              </div>
+            <div className="mt-5">
+              <div className="eyebrow">발행 채널</div>
+              {queueDetail.channels.length > 0 ? (
+                <ul className="mt-2 space-y-1 font-mono text-[12px]">
+                  {queueDetail.channels.map(c => (
+                    <li key={c}>
+                      <span className="text-go">✓</span> {c}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-2 font-mono text-[12px] text-muted">아직 발행되지 않았습니다.</p>
+              )}
             </div>
-            <button type="button" onClick={() => setQueueDetail(null)} className="mt-6 w-full rounded-full bg-[#121212] py-3 text-[13px] font-bold text-white">
+            <button type="button" onClick={() => setQueueDetail(null)} className={`${btnPrimary} mt-6 w-full`}>
               닫기
             </button>
           </div>
         </div>
       )}
 
-      {/* Publish success modal */}
+      {/* Publish result */}
       {showSuccess && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-[380px] rounded-[24px] border border-black/10 bg-white p-6 shadow-2xl">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50 text-[24px] text-emerald-600">✓</div>
-            <div className="mt-4 text-center">
-              <div className="text-[18px] font-bold">{scheduleMode === 'now' ? '발행 완료!' : '예약 완료!'}</div>
-              <div className="mt-1 text-[13px] opacity-60">
-                {scheduleMode === 'now'
-                  ? '선택한 채널에 즉시 발행되었습니다.'
-                  : `${scheduleDate ? scheduleDate.replace('T', ' ') : '예약 시간'}에 발행됩니다.`}
-              </div>
-            </div>
-
-            <div className="mt-6 space-y-2">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-ink/45 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-[380px] bg-plate p-6" style={{ boxShadow: '0 32px 64px -20px rgba(25,23,19,0.45)' }}>
+            <div className="eyebrow text-go">{scheduleMode === 'now' ? '발행 완료' : '예약 완료'}</div>
+            <h3 className="mt-1.5 font-serif text-[19px] font-bold leading-snug">
+              {scheduleMode === 'now'
+                ? `${selectedCount}개 채널에 올라갔습니다`
+                : `${scheduleDate ? scheduleDate.replace('T', ' ') : '예약 시간'}에 올라갑니다`}
+            </h3>
+            <ul className="mt-5">
               {selectedChannels.map(c => (
-                <div key={`succ-${c.key}`} className="flex items-center justify-between rounded-xl bg-[#FAF7F2] px-4 py-3">
-                  <span className="text-[13px] font-medium">{c.name}</span>
-                  <span className="flex items-center gap-1.5 text-[12px] font-bold text-emerald-600">
-                    <span className="flex h-4 w-4 items-center justify-center rounded-full bg-emerald-600 text-[10px] text-white">✓</span>
-                    {scheduleMode === 'now' ? '완료' : '예약'}
-                  </span>
-                </div>
+                <li key={`succ-${c.key}`} className="flex items-baseline justify-between border-b border-rule py-2.5">
+                  <span className="text-[13px]">{c.name}</span>
+                  <span className="font-mono text-[11px] text-go">{scheduleMode === 'now' ? '완료' : '예약'}</span>
+                </li>
               ))}
-            </div>
-
-            <div className="mt-6 flex gap-2">
-              <button type="button" onClick={() => setShowSuccess(false)} className="flex-1 rounded-full bg-[#121212] py-3 text-[13px] font-bold text-white">
+            </ul>
+            <div className="mt-6 flex gap-3">
+              <button type="button" onClick={() => setShowSuccess(false)} className={`${btnPrimary} flex-1`}>
                 확인
               </button>
               <button
@@ -1193,7 +1142,7 @@ export default function App() {
                   setVideoDone(false);
                   setVideoProgress(0);
                 }}
-                className="rounded-full border border-black/10 px-5 py-3 text-[13px] font-semibold hover:bg-[#FAF7F2]"
+                className={btnGhost}
               >
                 새 작업
               </button>
@@ -1204,7 +1153,11 @@ export default function App() {
 
       {/* Toast */}
       {toast && (
-        <div role="status" className="pointer-events-none fixed bottom-24 left-1/2 z-[110] -translate-x-1/2 rounded-full bg-[#121212] px-4 py-2 text-[12px] font-medium text-white shadow-lg md:bottom-8">
+        <div
+          role="status"
+          className="pointer-events-none fixed bottom-24 left-1/2 z-[110] -translate-x-1/2 bg-ink px-4 py-2.5 font-mono text-[11px] text-plate md:bottom-8"
+          style={{ animation: 'riseIn 200ms ease-out' }}
+        >
           {toast}
         </div>
       )}
