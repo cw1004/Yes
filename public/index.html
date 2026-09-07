@@ -16,15 +16,17 @@
   <section class="screen active" id="screen-home">
     <header class="hero">
       <div class="brand"><span class="dot"></span> SkinLab <b>AI</b></div>
-      <h1>카메라로 30초,<br><em>내 피부의 정확한 좌표</em></h1>
-      <p class="sub">얼굴 영상의 광학 정보를 Lab 색공간에서 계산해 9개 지표로 진단하고,
-      내 톤(ITA°)에 맞는 제품을 판매처 가격까지 비교해 보여드립니다.</p>
+      <h1>카메라로 30초,<br><em>닥터 세라의 1:1 상담</em></h1>
+      <p class="sub">문진 6문항과 얼굴 광학 분석을 함께 읽어, 무엇부터 손대야 하는지
+      순서를 잡아드립니다. 4주 뒤 전·후 사진으로 변화까지 확인합니다.</p>
+      <div class="hero-doctor" id="hero-doctor"></div>
       <ul class="hero-points">
-        <li>📷 사진은 <b>기기 밖으로 나가지 않습니다</b> — 분석은 브라우저 안에서 끝납니다</li>
-        <li>🎨 ITA° · 언더톤 · 퍼스널컬러까지 수치로</li>
-        <li>🛒 쿠팡 · 올리브영 · 네이버 최저가 동시 비교</li>
+        <li>🩺 문진 + 측정 <b>불일치까지 짚어주는</b> 상담형 리포트</li>
+        <li>📷 사진은 <b>기기 밖으로 나가지 않습니다</b> — 분석도 저장도 브라우저 안에서</li>
+        <li>📸 4주 뒤 <b>전 / 후 사진 슬라이더</b>로 변화 비교</li>
+        <li>🛒 내 톤(ITA°) 기준 제품을 판매처 최저가까지 비교</li>
       </ul>
-      <button class="cta" id="btn-start">무료로 진단 시작</button>
+      <button class="cta" id="btn-start">무료 상담 시작</button>
       <button class="ghost" id="btn-history-home">지난 기록 보기</button>
       <p class="fineprint" id="home-disclaimer"></p>
     </header>
@@ -59,6 +61,20 @@
     </div>
   </section>
 
+  <!-- ───────── 3.5 문진 ───────── -->
+  <section class="screen" id="screen-intake">
+    <div class="topbar"><button class="back" data-goto="home">‹</button><span>문진</span><span></span></div>
+    <div id="intake-body"></div>
+  </section>
+
+  <!-- ───────── 3.7 상담 ───────── -->
+  <section class="screen" id="screen-consult">
+    <div class="topbar"><button class="back" data-goto="home">‹</button><span>닥터 세라 상담</span>
+      <button class="ghost tiny" id="btn-skip-typing">전체 보기</button></div>
+    <div id="consult-body"></div>
+    <button class="cta secondary" style="margin-top:6px" data-goto="result">측정 리포트 자세히 보기 →</button>
+  </section>
+
   <!-- ───────── 4. 결과 ───────── -->
   <section class="screen" id="screen-result">
     <div class="topbar"><button class="back" data-goto="home">‹</button><span>진단 리포트</span><button class="ghost tiny" id="btn-retake">다시 촬영</button></div>
@@ -79,17 +95,26 @@
 
   <!-- ───────── 7. 기록 ───────── -->
   <section class="screen" id="screen-history">
-    <div class="topbar"><button class="back" data-goto="home">‹</button><span>변화 추적</span><span></span></div>
+    <div class="topbar"><button class="back" data-goto="home">‹</button><span>변화 추적</span>
+      <button class="ghost tiny" data-goto="compare">전/후 비교</button></div>
     <div id="history-body"></div>
+  </section>
+
+  <!-- ───────── 8. 전/후 비교 ───────── -->
+  <section class="screen" id="screen-compare">
+    <div class="topbar"><button class="back" data-goto="history">‹</button><span>전 / 후 비교</span>
+      <select id="compare-select" class="mini-select"></select></div>
+    <div id="compare-body"></div>
   </section>
 
 </div>
 
-<nav class="tabbar" id="tabbar">
+<nav class="tabbar tabs-5" id="tabbar">
   <button data-goto="home" class="active">홈</button>
-  <button data-goto="capture">진단</button>
+  <button data-goto="intake">진단</button>
+  <button data-goto="consult">상담</button>
   <button data-goto="shop">추천</button>
-  <button data-goto="history">기록</button>
+  <button data-goto="compare">전/후</button>
 </nav>
 
 <div class="toast" id="toast"></div>

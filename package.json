@@ -3,13 +3,18 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "SkinLab AI - 카메라 얼굴 분석 기반 피부 진단 / 톤 맞춤 화장품 추천 / 커머스 랭킹 수익화 앱",
-  "engines": { "node": ">=20" },
+  "description": "SkinLab AI - AI 닥터 상담형 피부 진단 / 전후 사진 비교 / 톤 맞춤 화장품 추천 / 커머스 랭킹 수익화 앱",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "start": "node server/index.js",
     "dev": "node --watch server/index.js",
     "test": "node --test tests/*.test.js"
   },
   "dependencies": {},
-  "devDependencies": {}
+  "devDependencies": {},
+  "optionalDependencies": {
+    "@anthropic-ai/sdk": "^0.124.0"
+  }
 }

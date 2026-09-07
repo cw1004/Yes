@@ -61,7 +61,11 @@ test('세션 발급 -> 분석 제출 -> 무료 리포트', async () => {
   token = s.json.token;
   assert.ok(token);
 
-  const r = await call('POST', '/api/analysis', { token, body: { analysis: fakeFace(), quality: { confidence: 88, issues: [] } } });
+  const r = await call('POST', '/api/analysis', { token, body: {
+    analysis: fakeFace(),
+    quality: { confidence: 88, issues: [] },
+    intake: { ageBand: '30s', selfType: 'dry', mainWorry: 'dryness', sleep: 'lt5', reaction: 'often', bogus: 'drop-me' },
+  } });
   assert.equal(r.status, 200);
   analysisId = r.json.analysisId;
   assert.equal(r.json.locked, true);
@@ -69,6 +73,14 @@ test('세션 발급 -> 분석 제출 -> 무료 리포트', async () => {
   assert.equal(r.json.analysis.metrics.length, 0, '잠긴 지표는 서버가 아예 내려보내지 않는다');
   assert.equal(r.json.free.preview.length, 3);
   assert.ok(r.json.free.tone.ita);
+
+  // AI 닥터 상담도 같은 경계로 잘려야 한다
+  assert.equal(r.json.consult.doctor.name, '닥터 세라');
+  assert.ok(r.json.consult.script.length >= 3);
+  assert.equal(r.json.consult.followUpAt, null, '재진 일정은 결제 후에만 준다');
+  assert.ok(!r.json.consult.script.some((t) => t.stage === 'plan'), '처방 대사는 결제 전에 내려보내지 않는다');
+  assert.equal(r.json.intake.bogus, undefined, '정의되지 않은 문진 값은 저장되지 않는다');
+  assert.equal(r.json.intake.selfType, 'dry');
 });
 
 test('다른 사용자는 남의 리포트를 볼 수 없다', async () => {
@@ -102,6 +114,13 @@ test('결제하면 전체 리포트가 열린다 (쿠폰 할인 포함)', async 
   assert.equal(done.json.report.pro.routine.am.length, 5);
   assert.equal(done.json.report.pro.plan.length, 4);
   assert.ok(done.json.report.pro.concerns[0].cause);
+
+  // 결제 후에는 상담 전체 대본과 재진 일정이 열린다
+  const consult = done.json.report.consult;
+  assert.ok(consult.script.some((t) => t.stage === 'plan'));
+  assert.ok(consult.script.some((t) => t.stage === 'followup'));
+  assert.ok(consult.followUpAt);
+  assert.ok(consult.script.length > consult.free.script.length);
 });
 
 test('1회 이용권은 결제한 리포트에만 적용된다', async () => {

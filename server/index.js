@@ -17,6 +17,8 @@ import { PLANS, provider, createOrder, startPayment, confirmPayment, hasProAcces
 import { trackClick, recordConversion, hasPartnerId } from './links.js';
 import { kpis } from './analytics.js';
 import { diagnose, DISCLAIMER } from '../public/js/engine/diagnose.js';
+import { sanitizeIntake } from '../public/js/engine/intake.js';
+import { narrate } from './doctor.js';
 import { rankProducts, buildBundle } from '../public/js/engine/ranking.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -102,16 +104,20 @@ const routes = {
   'POST /api/analysis': async (req) => {
     const user = userFromRequest(req);
     if (!user) throw Object.assign(new Error('세션이 필요합니다.'), { status: 401 });
-    const { analysis, quality } = await json(req);
+    const { analysis, quality, intake } = await json(req);
     if (!analysis?.metrics?.length || !analysis?.tone) throw Object.assign(new Error('분석 데이터가 올바르지 않습니다.'), { status: 400 });
 
     const id = `an_${crypto.randomBytes(6).toString('hex')}`;
     const diagnosis = diagnose(analysis);
-    const record = { id, userId: user.id, createdAt: new Date().toISOString(), analysis, quality: quality || null, diagnosis };
+    const record = {
+      id, userId: user.id, createdAt: new Date().toISOString(),
+      analysis, quality: quality || null, diagnosis,
+      intake: sanitizeIntake(intake),
+    };
     db.update((d) => { d.analyses[id] = record; });
-    logEvent('analysis_completed', { userId: user.id, analysisId: id, score: analysis.totalScore });
+    logEvent('analysis_completed', { userId: user.id, analysisId: id, score: analysis.totalScore, intake: Object.keys(record.intake).length });
 
-    return buildReport(record, user);
+    return await buildReport(record, user);
   },
 
   'GET /api/report': async (req, url) => {
@@ -119,7 +125,7 @@ const routes = {
     const record = db.read().analyses[url.searchParams.get('id')];
     if (!record) throw Object.assign(new Error('리포트를 찾을 수 없습니다.'), { status: 404 });
     if (!user || record.userId !== user.id) throw Object.assign(new Error('접근 권한이 없습니다.'), { status: 403 });
-    return buildReport(record, user);
+    return await buildReport(record, user);
   },
 
   'GET /api/history': async (req) => {
@@ -172,7 +178,7 @@ const routes = {
     if (!order || order.userId !== user.id) throw Object.assign(new Error('주문을 찾을 수 없습니다.'), { status: 404 });
     const result = await confirmPayment({ orderId, paymentKey, amount });
     const record = order.analysisId ? db.read().analyses[order.analysisId] : null;
-    return { ...result, report: record ? buildReport(record, db.read().users[user.id]) : null };
+    return { ...result, report: record ? await buildReport(record, db.read().users[user.id]) : null };
   },
 
   'POST /api/paywall-view': async (req) => {
@@ -237,11 +243,21 @@ const routes = {
 };
 
 /** 무료/유료 경계는 여기 한 곳에서만 정해진다 */
-function buildReport(record, user) {
+async function buildReport(record, user) {
   const pro = hasProAccess(user.id, record.id);
   const d = record.diagnosis;
   logEvent('report_view', { userId: user.id, analysisId: record.id, pro });
+
+  // AI 닥터 상담문 — 결제 전에는 무료 구간 대사만 생성/전송한다
+  const { consult, narrated } = await narrate(record.analysis, d, record.intake || {}, { tier: pro ? 'pro' : 'free' });
+  const consultOut = pro
+    ? { doctor: consult.doctor, script: consult.script, free: consult.free, discordance: consult.discordance, followUpAt: consult.followUpAt }
+    : { doctor: consult.doctor, script: consult.free.script, free: consult.free, discordance: consult.discordance.filter((x) => x.tier === 'free'), followUpAt: null };
+
   return {
+    consult: consultOut,
+    consultNarrated: narrated,
+    intake: record.intake || {},
     analysisId: record.id,
     createdAt: record.createdAt,
     quality: record.quality,

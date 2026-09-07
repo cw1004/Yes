@@ -7,9 +7,23 @@ import { Camera, imageDataFromFile } from './ui/camera.js';
 import { computeMetrics } from './engine/metrics.js';
 import { assessQuality, fallbackFaceBox } from './engine/quality.js';
 import { renderResult, renderPaywall, renderShop, renderHistory } from './ui/render.js';
+import { renderIntake, renderConsult, playConsult, doctorAvatar } from './ui/doctor.js';
+import { renderCompare, bindCompare } from './ui/compare.js';
+import { savePhoto, getPhoto, allPhotos } from './storage.js';
+import { INTAKE } from './engine/intake.js';
 
 const $ = (s) => document.querySelector(s);
-const state = { config: null, report: null, analysisId: null, plan: 'monthly', coupon: '', category: '', shop: null };
+const state = {
+  config: null, report: null, analysisId: null, plan: 'monthly', coupon: '', category: '', shop: null,
+  intake: loadIntake(), lastFrame: null, lastBox: null, stopTyping: null,
+  comparePair: null, showMarkers: true,
+};
+
+/** 문진 답변은 기기에 남겨 재측정 때 다시 묻지 않는다 */
+function loadIntake() {
+  try { return JSON.parse(localStorage.getItem('skinlab.intake') || '{}'); } catch { return {}; }
+}
+const saveIntake = () => localStorage.setItem('skinlab.intake', JSON.stringify(state.intake));
 
 /* ───────── 공통 UI ───────── */
 function toast(msg, ms = 2600) {
@@ -25,9 +39,13 @@ function go(name) {
   document.querySelectorAll('.tabbar button').forEach((b) => b.classList.toggle('active', b.dataset.goto === name));
   window.scrollTo({ top: 0 });
   if (name !== 'capture') camera?.stop();
+  if (name !== 'consult') state.stopTyping?.();
   if (name === 'capture') startCapture();
+  if (name === 'intake') $('#intake-body').innerHTML = renderIntake(state.intake);
+  if (name === 'consult') showConsult();
   if (name === 'shop') loadShop();
   if (name === 'history') loadHistory();
+  if (name === 'compare') loadCompare();
 }
 
 /* ───────── 카메라 ───────── */
@@ -70,20 +88,60 @@ async function runAnalysis(imageData, box) {
   }
 
   try {
-    const report = await api.submitAnalysis(analysis, quality);
-    showReport(report);
+    const report = await api.submitAnalysis(analysis, quality, state.intake);
+    // 사진은 서버로 보내지 않고 이 기기에만 남긴다 (전/후 비교용 기준선)
+    try {
+      await savePhoto({
+        analysisId: report.analysisId, imageData, box: faceBox,
+        totalScore: analysis.totalScore, tone: analysis.tone,
+      });
+    } catch (e) {
+      console.warn('사진 로컬 저장 실패:', e.message);
+      toast('사진을 기기에 저장하지 못해 전/후 비교가 제한될 수 있습니다.', 3200);
+    }
+    showReport(report, { toConsult: true });
   } catch (err) {
     toast(err.message);
     go('capture');
   }
 }
 
-function showReport(report) {
+/* ───────── 닥터 상담 ───────── */
+function showConsult() {
+  const report = state.report;
+  if (!report?.consult) {
+    $('#consult-body').innerHTML = `<div class="empty">먼저 진단을 받으면<br>닥터 세라가 결과를 짚어드립니다.</div>`;
+    return;
+  }
+  $('#consult-body').innerHTML = renderConsult(report.consult, {
+    locked: report.locked, narrated: report.consultNarrated,
+  });
+  const script = report.consult.script;
+  state.stopTyping = playConsult($('#chat-stream'), script);
+}
+
+function revealAllConsult() {
+  const report = state.report;
+  if (!report?.consult) return;
+  state.stopTyping?.();
+  const el = $('#chat-stream');
+  if (!el) return;
+  el.innerHTML = report.consult.script.map((t) => `
+    <div class="bubble in stage-${t.stage}${t.highlight ? ' highlight' : ''}${t.warn ? ' warn' : ''}">
+      ${t.highlight ? '<span class="bubble-tag">짚고 갈 점</span>' : ''}
+      ${t.warn ? '<span class="bubble-tag warn">주의</span>' : ''}
+      <p></p>${t.score !== undefined ? `<span class="bubble-score">${t.score}점</span>` : ''}
+    </div>`).join('');
+  // 텍스트는 innerHTML 이 아니라 textContent 로 넣는다
+  el.querySelectorAll('.bubble p').forEach((p, i) => { p.textContent = report.consult.script[i].text; });
+}
+
+function showReport(report, { toConsult = false } = {}) {
   state.report = report;
   state.analysisId = report.analysisId;
   $('#result-body').innerHTML = renderResult(report);
-  go('result');
-  if (report.locked) api.paywallView(report.analysisId, 'result_lock');
+  go(toConsult ? 'consult' : 'result');
+  if (report.locked) api.paywallView(report.analysisId, toConsult ? 'consult_lock' : 'result_lock');
 }
 
 /* ───────── 페이월 ───────── */
@@ -129,10 +187,53 @@ async function payWithToss(payment, order) {
 }
 
 function finishPurchase(res) {
-  toast('결제가 완료되었습니다. 전체 리포트가 열렸습니다 🎉');
-  if (res.report) showReport(res.report);
-  else if (state.analysisId) api.report(state.analysisId).then(showReport);
+  toast('결제가 완료되었습니다. 상담이 이어집니다 🎉');
+  if (res.report) showReport(res.report, { toConsult: true });
+  else if (state.analysisId) api.report(state.analysisId).then((r) => showReport(r, { toConsult: true }));
 }
+
+/* ───────── 전/후 비교 ───────── */
+async function loadCompare() {
+  const body = $('#compare-body');
+  body.innerHTML = `<div class="empty">기록을 불러오는 중…</div>`;
+  let items = [];
+  try { ({ items } = await api.history()); } catch (err) { body.innerHTML = `<div class="empty">${err.message}</div>`; return; }
+
+  const asc = [...items].reverse(); // 오래된 것부터
+  const sel = $('#compare-select');
+  sel.innerHTML = asc.map((it, i) =>
+    `<option value="${it.id}">${new Date(it.createdAt).toLocaleDateString('ko-KR')} · ${it.totalScore}점</option>`
+  ).join('');
+
+  if (asc.length < 2) {
+    body.innerHTML = renderCompare({ records: null });
+    return;
+  }
+  const before = state.comparePair?.before ?? asc[0];
+  const after = state.comparePair?.after ?? asc[asc.length - 1];
+  sel.value = before.id;
+  state.comparePair = { before, after };
+
+  const photos = {
+    before: await getPhoto(before.id),
+    after: await getPhoto(after.id),
+  };
+  body.innerHTML = renderCompare({ photos, records: { before, after }, showMarkers: state.showMarkers });
+  bindCompare(body);
+}
+
+$('#compare-select')?.addEventListener('change', async (e) => {
+  const { items } = await api.history();
+  const asc = [...items].reverse();
+  const before = asc.find((i) => i.id === e.target.value);
+  const after = state.comparePair?.after ?? asc[asc.length - 1];
+  if (before && after && before.id !== after.id) {
+    state.comparePair = { before, after };
+    loadCompare();
+  } else {
+    toast('기준 촬영과 비교 촬영이 같습니다. 다른 날짜를 선택해 주세요.');
+  }
+});
 
 /* ───────── 커머스 ───────── */
 async function loadShop() {
@@ -171,8 +272,17 @@ async function loadHistory() {
 
 /* ───────── 이벤트 바인딩 ───────── */
 document.addEventListener('click', async (e) => {
-  const el = e.target.closest('[data-goto],[data-action],[data-plan],[data-cat],[data-buy],[data-open]');
+  const el = e.target.closest('[data-goto],[data-action],[data-plan],[data-cat],[data-buy],[data-open],[data-intake]');
   if (!el) return;
+
+  if (el.dataset.intake) {
+    state.intake[el.dataset.intake] = el.dataset.value;
+    saveIntake();
+    $('#intake-body').innerHTML = renderIntake(state.intake);
+    const done = INTAKE.filter((q) => state.intake[q.key]).length;
+    if (done === INTAKE.length) toast('문진 완료 — 이제 촬영해 주세요.');
+    return;
+  }
 
   if (el.dataset.goto) return go(el.dataset.goto);
 
@@ -193,6 +303,11 @@ document.addEventListener('click', async (e) => {
   }
 
   switch (el.dataset.action) {
+    case 'intake-done': return go('capture');
+    case 'toggle-markers': {
+      state.showMarkers = !state.showMarkers;
+      return loadCompare();
+    }
     case 'paywall': return openPaywall();
     case 'pay': return pay();
     case 'shop': return go('shop');
@@ -214,7 +329,9 @@ document.addEventListener('click', async (e) => {
   }
 });
 
-$('#btn-start').addEventListener('click', () => go('capture'));
+$('#btn-start').addEventListener('click', () => go('intake'));
+$('#btn-skip-typing').addEventListener('click', revealAllConsult);
+$('#hero-doctor').innerHTML = doctorAvatar(104, 'happy');
 $('#btn-history-home').addEventListener('click', () => go('history'));
 $('#btn-retake').addEventListener('click', () => go('capture'));
 $('#btn-flip').addEventListener('click', () => camera?.flip());
