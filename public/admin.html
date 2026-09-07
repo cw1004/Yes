@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>SkinLab AI · 수익 대시보드</title>
+<link rel="stylesheet" href="/styles.css"/>
+<style>
+  #app{max-width:900px;padding:24px 18px 60px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:12px;margin-bottom:16px}
+  .kpi{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px}
+  .kpi span{display:block;font-size:11.5px;color:var(--muted);letter-spacing:.04em}
+  .kpi b{display:block;font-size:25px;font-weight:800;margin-top:6px;letter-spacing:-.02em}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:10px 8px;border-bottom:1px solid var(--line)}
+  th{color:var(--dim);font-weight:600;font-size:11.5px;letter-spacing:.04em}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+  .funnel-row{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+  .funnel-row .lbl{width:130px;font-size:12.5px;color:var(--muted);flex:none}
+  .funnel-row .b{height:26px;border-radius:7px;background:linear-gradient(90deg,var(--accent),var(--gold));min-width:3px}
+  .funnel-row .v{font-size:12.5px;color:var(--muted)}
+</style>
+</head>
+<body><div id="app">
+  <div class="brand" style="margin-bottom:22px"><span class="dot"></span> SkinLab <b>ADMIN</b></div>
+  <div class="coupon"><input id="tok" placeholder="ADMIN_TOKEN" /><button class="ghost small" id="load">불러오기</button></div>
+  <div id="out"><p class="fineprint">서버 실행 시 지정한 ADMIN_TOKEN 을 입력하세요.</p></div>
+</div>
+<script>
+const won = n => Number(n||0).toLocaleString('ko-KR')+'원';
+document.getElementById('load').onclick = load;
+document.getElementById('tok').value = localStorage.getItem('skinlab.admin') || '';
+async function load(){
+  const tok = document.getElementById('tok').value.trim();
+  localStorage.setItem('skinlab.admin', tok);
+  const out = document.getElementById('out');
+  try{
+    const res = await fetch('/api/admin/metrics', {headers:{'x-admin-token':tok}});
+    const d = await res.json();
+    if(!res.ok) throw new Error(d.error||'실패');
+    const f = d.funnel, r = d.revenue, a = d.affiliate;
+    const maxF = Math.max(f.analysisCompleted,1);
+    const step = (l,v)=>`<div class="funnel-row"><span class="lbl">${l}</span>
+      <div class="b" style="width:${Math.max(2,(v/maxF)*100)}%"></div><span class="v">${v}</span></div>`;
+    out.innerHTML = `
+      <div class="grid">
+        <div class="kpi"><span>총 매출</span><b>${won(r.total)}</b></div>
+        <div class="kpi"><span>구독·리포트</span><b>${won(r.subscription)}</b></div>
+        <div class="kpi"><span>제휴 확정</span><b>${won(r.affiliateConfirmed)}</b></div>
+        <div class="kpi"><span>제휴 예상(미확정)</span><b>${won(r.affiliatePending)}</b></div>
+        <div class="kpi"><span>ARPU</span><b>${won(r.arpu)}</b></div>
+        <div class="kpi"><span>결제 전환율</span><b>${f.overallCvr}%</b></div>
+        <div class="kpi"><span>제휴 EPC</span><b>${won(a.epc)}</b></div>
+        <div class="kpi"><span>사용자</span><b>${d.users}</b></div>
+      </div>
+      <div class="card"><h3>퍼널</h3>
+        ${step('진단 완료', f.analysisCompleted)}${step('페이월 노출', f.paywallViews)}
+        ${step('결제 시작', f.checkoutStarted)}${step('결제 완료', f.purchases)}
+        <p class="hint">진단→페이월 ${f.analysisToPaywall}% · 페이월→시작 ${f.paywallToCheckout}% · 시작→완료 ${f.checkoutToPurchase}%</p>
+      </div>
+      <div class="card"><h3>판매처별 제휴 성과</h3>
+        <table><tr><th>판매처</th><th class="num">클릭</th><th class="num">전환</th><th class="num">CVR</th><th class="num">EPC</th><th class="num">수익</th></tr>
+        ${Object.entries(a.byMerchant).map(([m,v])=>`<tr><td>${m}</td><td class="num">${v.clicks}</td>
+          <td class="num">${v.conversions}</td><td class="num">${v.cvr}%</td><td class="num">${won(v.epc)}</td><td class="num">${won(v.revenue)}</td></tr>`).join('')||'<tr><td colspan="6">데이터 없음</td></tr>'}
+        </table></div>
+      <div class="card"><h3>클릭 상위 상품</h3>
+        <table><tr><th>상품</th><th class="num">클릭</th><th class="num">수익</th></tr>
+        ${a.topProducts.map(p=>`<tr><td>${p.productId}</td><td class="num">${p.clicks}</td><td class="num">${won(p.revenue)}</td></tr>`).join('')||'<tr><td colspan="3">데이터 없음</td></tr>'}
+        </table></div>`;
+  }catch(e){ out.innerHTML = `<p class="fineprint">${e.message}</p>`; }
+}
+if(document.getElementById('tok').value) load();
+</script>
+</body></html>

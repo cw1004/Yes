@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>SkinLab AI · 카메라 피부 진단</title>
+<meta name="theme-color" content="#0e0b12" />
+<meta name="description" content="카메라로 얼굴을 분석해 피부 상태를 진단하고, 내 피부톤에 맞는 화장품을 판매처 가격까지 비교해 추천합니다." />
+<link rel="manifest" href="/manifest.webmanifest" />
+<link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+<div id="app">
+
+  <!-- ───────── 1. 홈 ───────── -->
+  <section class="screen active" id="screen-home">
+    <header class="hero">
+      <div class="brand"><span class="dot"></span> SkinLab <b>AI</b></div>
+      <h1>카메라로 30초,<br><em>내 피부의 정확한 좌표</em></h1>
+      <p class="sub">얼굴 영상의 광학 정보를 Lab 색공간에서 계산해 9개 지표로 진단하고,
+      내 톤(ITA°)에 맞는 제품을 판매처 가격까지 비교해 보여드립니다.</p>
+      <ul class="hero-points">
+        <li>📷 사진은 <b>기기 밖으로 나가지 않습니다</b> — 분석은 브라우저 안에서 끝납니다</li>
+        <li>🎨 ITA° · 언더톤 · 퍼스널컬러까지 수치로</li>
+        <li>🛒 쿠팡 · 올리브영 · 네이버 최저가 동시 비교</li>
+      </ul>
+      <button class="cta" id="btn-start">무료로 진단 시작</button>
+      <button class="ghost" id="btn-history-home">지난 기록 보기</button>
+      <p class="fineprint" id="home-disclaimer"></p>
+    </header>
+  </section>
+
+  <!-- ───────── 2. 촬영 ───────── -->
+  <section class="screen" id="screen-capture">
+    <div class="topbar"><button class="back" data-goto="home">‹</button><span>얼굴 촬영</span><span></span></div>
+    <div class="camera-wrap">
+      <video id="video" playsinline muted autoplay></video>
+      <canvas id="overlay"></canvas>
+      <div class="guide-oval"></div>
+      <div class="quality-hint" id="quality-hint">카메라를 준비하는 중…</div>
+    </div>
+    <div class="capture-controls">
+      <label class="upload">
+        <input type="file" id="file-input" accept="image/*" hidden />
+        사진 선택
+      </label>
+      <button class="shutter" id="btn-shutter" disabled></button>
+      <button class="ghost small" id="btn-flip">전/후면</button>
+    </div>
+    <p class="fineprint center">정면·무표정·화장을 지운 상태에서 가장 정확합니다. 밝은 자연광을 권장합니다.</p>
+  </section>
+
+  <!-- ───────── 3. 분석 중 ───────── -->
+  <section class="screen" id="screen-analyzing">
+    <div class="analyzing">
+      <div class="scanner"><canvas id="preview-canvas"></canvas><div class="scan-line"></div></div>
+      <h2 id="analyzing-step">피부 영역 검출 중…</h2>
+      <div class="progress"><div class="bar" id="analyze-bar"></div></div>
+    </div>
+  </section>
+
+  <!-- ───────── 4. 결과 ───────── -->
+  <section class="screen" id="screen-result">
+    <div class="topbar"><button class="back" data-goto="home">‹</button><span>진단 리포트</span><button class="ghost tiny" id="btn-retake">다시 촬영</button></div>
+    <div id="result-body"></div>
+  </section>
+
+  <!-- ───────── 5. 결제 ───────── -->
+  <section class="screen" id="screen-paywall">
+    <div class="topbar"><button class="back" data-goto="result">‹</button><span>전체 리포트 해제</span><span></span></div>
+    <div id="paywall-body"></div>
+  </section>
+
+  <!-- ───────── 6. 추천/커머스 ───────── -->
+  <section class="screen" id="screen-shop">
+    <div class="topbar"><button class="back" data-goto="result">‹</button><span>맞춤 추천</span><span></span></div>
+    <div id="shop-body"></div>
+  </section>
+
+  <!-- ───────── 7. 기록 ───────── -->
+  <section class="screen" id="screen-history">
+    <div class="topbar"><button class="back" data-goto="home">‹</button><span>변화 추적</span><span></span></div>
+    <div id="history-body"></div>
+  </section>
+
+</div>
+
+<nav class="tabbar" id="tabbar">
+  <button data-goto="home" class="active">홈</button>
+  <button data-goto="capture">진단</button>
+  <button data-goto="shop">추천</button>
+  <button data-goto="history">기록</button>
+</nav>
+
+<div class="toast" id="toast"></div>
+
+<script type="module" src="/js/app.js"></script>
+</body>
+</html>

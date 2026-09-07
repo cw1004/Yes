@@ -1,0 +1,13 @@
+{
+  "name": "SkinLab AI — 카메라 피부 진단",
+  "short_name": "SkinLab",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0e0b12",
+  "theme_color": "#0e0b12",
+  "lang": "ko",
+  "description": "카메라로 피부를 진단하고 내 톤에 맞는 화장품을 판매처 가격까지 비교해 추천합니다.",
+  "icons": [
+    { "src": "/assets/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

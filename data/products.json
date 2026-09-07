@@ -1,0 +1,250 @@
+{
+  "_meta": {
+    "note": "샘플 시드 카탈로그입니다. 가격·재고·평점은 예시값이며, 운영 시 server/feeds.js 의 어댑터로 쿠팡 파트너스 / 네이버 쇼핑 / 올리브영 제휴 API 실데이터로 교체해야 합니다.",
+    "currency": "KRW",
+    "updatedAt": "2026-09-01"
+  },
+  "merchants": {
+    "coupang":    { "name": "쿠팡",       "logo": "🅲", "trust": 0.93, "avgShipDays": 1, "affiliateParam": "subId" },
+    "naver":      { "name": "네이버쇼핑", "logo": "🅽", "trust": 0.9,  "avgShipDays": 2, "affiliateParam": "nt_source" },
+    "oliveyoung": { "name": "올리브영",   "logo": "🅾", "trust": 0.95, "avgShipDays": 2, "affiliateParam": "utm_content" },
+    "eleven":     { "name": "11번가",     "logo": "🅴", "trust": 0.86, "avgShipDays": 3, "affiliateParam": "trTypeCd" },
+    "amazon":     { "name": "Amazon",     "logo": "🅰", "trust": 0.91, "avgShipDays": 6, "affiliateParam": "tag" }
+  },
+  "products": [
+    {
+      "id": "cus-001", "brand": "클리오", "name": "킬커버 메쉬 글로우 쿠션", "category": "cushion",
+      "basePrice": 26000, "rating": 4.6, "reviews": 18420,
+      "match": { "skinType": ["dry", "normal", "combination"], "concerns": ["clarity", "evenness"], "undertone": ["warm", "neutral"], "finish": "glow" },
+      "shades": [
+        { "code": "01", "name": "라넨", "hex": "#f2d9c2", "ita": 58, "undertone": "neutral" },
+        { "code": "02", "name": "람브스킨", "hex": "#eccdb1", "ita": 48, "undertone": "warm" },
+        { "code": "03", "name": "리넨", "hex": "#e2bb9c", "ita": 36, "undertone": "warm" },
+        { "code": "04", "name": "진저", "hex": "#d3a685", "ita": 24, "undertone": "warm" }
+      ],
+      "offers": [
+        { "merchant": "coupang", "price": 21900, "shippingDays": 1, "coupon": 2000, "commissionRate": 0.035, "stock": true },
+        { "merchant": "oliveyoung", "price": 23400, "shippingDays": 2, "coupon": 0, "commissionRate": 0.06, "stock": true },
+        { "merchant": "naver", "price": 22800, "shippingDays": 2, "coupon": 1000, "commissionRate": 0.028, "stock": true }
+      ]
+    },
+    {
+      "id": "cus-002", "brand": "헤라", "name": "블랙 쿠션 SPF34", "category": "cushion",
+      "basePrice": 62000, "rating": 4.7, "reviews": 9310,
+      "match": { "skinType": ["combination", "oily"], "concerns": ["oiliness", "texture"], "undertone": ["cool", "neutral"], "finish": "satin" },
+      "shades": [
+        { "code": "13N1", "name": "아이보리", "hex": "#f5dcc7", "ita": 60, "undertone": "cool" },
+        { "code": "17N1", "name": "로지 바닐라", "hex": "#eed0b8", "ita": 50, "undertone": "cool" },
+        { "code": "21N1", "name": "바닐라", "hex": "#e6c1a4", "ita": 40, "undertone": "neutral" },
+        { "code": "23N1", "name": "베이지", "hex": "#d9ae8d", "ita": 28, "undertone": "neutral" }
+      ],
+      "offers": [
+        { "merchant": "oliveyoung", "price": 54000, "shippingDays": 2, "coupon": 3000, "commissionRate": 0.055, "stock": true },
+        { "merchant": "coupang", "price": 52900, "shippingDays": 1, "coupon": 0, "commissionRate": 0.032, "stock": true },
+        { "merchant": "eleven", "price": 51500, "shippingDays": 3, "coupon": 2000, "commissionRate": 0.04, "stock": false }
+      ]
+    },
+    {
+      "id": "fnd-001", "brand": "에스티로더", "name": "더블 웨어 파운데이션", "category": "foundation",
+      "basePrice": 78000, "rating": 4.8, "reviews": 41200,
+      "match": { "skinType": ["oily", "combination"], "concerns": ["oiliness", "pigmentation"], "undertone": ["warm", "cool", "neutral"], "finish": "matte" },
+      "shades": [
+        { "code": "1W1", "name": "본", "hex": "#f0d3b6", "ita": 55, "undertone": "warm" },
+        { "code": "2C0", "name": "쿨 바닐라", "hex": "#eacdb9", "ita": 49, "undertone": "cool" },
+        { "code": "2W1", "name": "다운", "hex": "#e0b995", "ita": 35, "undertone": "warm" },
+        { "code": "3W1", "name": "텐더 옐로우", "hex": "#cf9e79", "ita": 20, "undertone": "warm" },
+        { "code": "4N1", "name": "쉘 베이지", "hex": "#bd8a66", "ita": 8, "undertone": "neutral" }
+      ],
+      "offers": [
+        { "merchant": "amazon", "price": 49000, "shippingDays": 6, "coupon": 0, "commissionRate": 0.08, "stock": true },
+        { "merchant": "coupang", "price": 58900, "shippingDays": 1, "coupon": 3000, "commissionRate": 0.035, "stock": true },
+        { "merchant": "naver", "price": 56000, "shippingDays": 3, "coupon": 0, "commissionRate": 0.03, "stock": true }
+      ]
+    },
+    {
+      "id": "ser-001", "brand": "더오디너리", "name": "나이아신아마이드 10% + 아연 1%", "category": "serum",
+      "basePrice": 12000, "rating": 4.4, "reviews": 32800,
+      "match": { "skinType": ["oily", "combination"], "concerns": ["oiliness", "texture", "pigmentation"], "undertone": ["warm", "cool", "neutral"] },
+      "keyIngredients": ["나이아신아마이드 10%", "아연 PCA"],
+      "offers": [
+        { "merchant": "coupang", "price": 9900, "shippingDays": 1, "coupon": 0, "commissionRate": 0.035, "stock": true },
+        { "merchant": "amazon", "price": 8600, "shippingDays": 7, "coupon": 0, "commissionRate": 0.08, "stock": true },
+        { "merchant": "eleven", "price": 10500, "shippingDays": 3, "coupon": 500, "commissionRate": 0.045, "stock": true }
+      ]
+    },
+    {
+      "id": "ser-002", "brand": "닥터지", "name": "레드 블레미쉬 클리어 수딩 세럼", "category": "serum",
+      "basePrice": 32000, "rating": 4.5, "reviews": 15600,
+      "match": { "skinType": ["sensitive", "dry"], "concerns": ["redness", "hydration"], "undertone": ["warm", "cool", "neutral"] },
+      "keyIngredients": ["마데카소사이드", "판테놀", "세라마이드"],
+      "offers": [
+        { "merchant": "oliveyoung", "price": 25900, "shippingDays": 2, "coupon": 2000, "commissionRate": 0.065, "stock": true },
+        { "merchant": "coupang", "price": 24500, "shippingDays": 1, "coupon": 0, "commissionRate": 0.035, "stock": true },
+        { "merchant": "naver", "price": 26900, "shippingDays": 2, "coupon": 1500, "commissionRate": 0.028, "stock": true }
+      ]
+    },
+    {
+      "id": "ser-003", "brand": "멜라노CC", "name": "비타민C 집중 세럼", "category": "serum",
+      "basePrice": 15000, "rating": 4.5, "reviews": 27400,
+      "match": { "skinType": ["normal", "oily", "combination"], "concerns": ["pigmentation", "clarity", "evenness"], "undertone": ["warm", "cool", "neutral"] },
+      "keyIngredients": ["비타민C 유도체", "비타민E", "아이소프로필메틸페놀"],
+      "offers": [
+        { "merchant": "coupang", "price": 11900, "shippingDays": 1, "coupon": 1000, "commissionRate": 0.035, "stock": true },
+        { "merchant": "amazon", "price": 13200, "shippingDays": 5, "coupon": 0, "commissionRate": 0.08, "stock": true },
+        { "merchant": "eleven", "price": 12800, "shippingDays": 3, "coupon": 0, "commissionRate": 0.045, "stock": true }
+      ]
+    },
+    {
+      "id": "ser-004", "brand": "라로슈포제", "name": "레티놀 B3 세럼", "category": "serum",
+      "basePrice": 48000, "rating": 4.6, "reviews": 8900,
+      "match": { "skinType": ["normal", "dry", "combination"], "concerns": ["wrinkle", "texture", "evenness"], "undertone": ["warm", "cool", "neutral"] },
+      "keyIngredients": ["레티놀 0.3%", "나이아신아마이드", "글리세린"],
+      "offers": [
+        { "merchant": "oliveyoung", "price": 41000, "shippingDays": 2, "coupon": 3000, "commissionRate": 0.06, "stock": true },
+        { "merchant": "coupang", "price": 39900, "shippingDays": 1, "coupon": 0, "commissionRate": 0.035, "stock": true },
+        { "merchant": "amazon", "price": 36000, "shippingDays": 8, "coupon": 0, "commissionRate": 0.08, "stock": true }
+      ]
+    },
+    {
+      "id": "ton-001", "brand": "아누아", "name": "어성초 77% 수딩 토너", "category": "toner",
+      "basePrice": 24000, "rating": 4.7, "reviews": 36100,
+      "match": { "skinType": ["sensitive", "oily", "combination"], "concerns": ["redness", "texture"], "undertone": ["warm", "cool", "neutral"] },
+      "keyIngredients": ["어성초 추출물 77%", "판테놀"],
+      "offers": [
+        { "merchant": "coupang", "price": 17900, "shippingDays": 1, "coupon": 1000, "commissionRate": 0.035, "stock": true },
+        { "merchant": "oliveyoung", "price": 19900, "shippingDays": 2, "coupon": 2000, "commissionRate": 0.06, "stock": true },
+        { "merchant": "naver", "price": 18500, "shippingDays": 2, "coupon": 0, "commissionRate": 0.028, "stock": true }
+      ]
+    },
+    {
+      "id": "ton-002", "brand": "이즈앤트리", "name": "히아루로닉 애씨드 토너", "category": "toner",
+      "basePrice": 21000, "rating": 4.6, "reviews": 19800,
+      "match": { "skinType": ["dry", "normal"], "concerns": ["hydration", "clarity"], "undertone": ["warm", "cool", "neutral"] },
+      "keyIngredients": ["5중 히알루론산", "글리세린"],
+      "offers": [
+        { "merchant": "coupang", "price": 15900, "shippingDays": 1, "coupon": 0, "commissionRate": 0.035, "stock": true },
+        { "merchant": "oliveyoung", "price": 17500, "shippingDays": 2, "coupon": 1500, "commissionRate": 0.06, "stock": true }
+      ]
+    },
+    {
+      "id": "crm-001", "brand": "세라비", "name": "모이스처라이징 크림", "category": "cream",
+      "basePrice": 28000, "rating": 4.7, "reviews": 51200,
+      "match": { "skinType": ["dry", "sensitive"], "concerns": ["hydration", "redness"], "undertone": ["warm", "cool", "neutral"] },
+      "keyIngredients": ["세라마이드 NP/AP/EOP", "히알루론산"],
+      "offers": [
+        { "merchant": "coupang", "price": 19900, "shippingDays": 1, "coupon": 2000, "commissionRate": 0.035, "stock": true },
+        { "merchant": "amazon", "price": 17800, "shippingDays": 6, "coupon": 0, "commissionRate": 0.08, "stock": true },
+        { "merchant": "eleven", "price": 21000, "shippingDays": 3, "coupon": 0, "commissionRate": 0.045, "stock": true }
+      ]
+    },
+    {
+      "id": "crm-002", "brand": "라네즈", "name": "워터 슬리핑 마스크", "category": "mask",
+      "basePrice": 32000, "rating": 4.6, "reviews": 44300,
+      "match": { "skinType": ["dry", "normal", "combination"], "concerns": ["hydration", "clarity"], "undertone": ["warm", "cool", "neutral"] },
+      "keyIngredients": ["프로바이오틱 컴플렉스", "스쿠알란"],
+      "offers": [
+        { "merchant": "oliveyoung", "price": 24900, "shippingDays": 2, "coupon": 2000, "commissionRate": 0.06, "stock": true },
+        { "merchant": "coupang", "price": 23900, "shippingDays": 1, "coupon": 0, "commissionRate": 0.035, "stock": true },
+        { "merchant": "amazon", "price": 26000, "shippingDays": 6, "coupon": 0, "commissionRate": 0.08, "stock": true }
+      ]
+    },
+    {
+      "id": "sun-001", "brand": "라운드랩", "name": "자작나무 수분 선크림 SPF50+", "category": "suncare",
+      "basePrice": 25000, "rating": 4.7, "reviews": 38900,
+      "match": { "skinType": ["dry", "sensitive", "normal"], "concerns": ["pigmentation", "evenness", "redness"], "undertone": ["warm", "cool", "neutral"] },
+      "keyIngredients": ["자작나무 수액", "판테놀"],
+      "offers": [
+        { "merchant": "coupang", "price": 18900, "shippingDays": 1, "coupon": 1000, "commissionRate": 0.035, "stock": true },
+        { "merchant": "oliveyoung", "price": 20900, "shippingDays": 2, "coupon": 2000, "commissionRate": 0.06, "stock": true },
+        { "merchant": "naver", "price": 19500, "shippingDays": 2, "coupon": 0, "commissionRate": 0.028, "stock": true }
+      ]
+    },
+    {
+      "id": "sun-002", "brand": "닥터지", "name": "그린 마일드 업 선 SPF50+", "category": "suncare",
+      "basePrice": 26000, "rating": 4.6, "reviews": 29400,
+      "match": { "skinType": ["oily", "combination", "sensitive"], "concerns": ["oiliness", "pigmentation"], "undertone": ["warm", "cool", "neutral"] },
+      "keyIngredients": ["무기자차", "센텔라"],
+      "offers": [
+        { "merchant": "oliveyoung", "price": 19900, "shippingDays": 2, "coupon": 2000, "commissionRate": 0.065, "stock": true },
+        { "merchant": "coupang", "price": 18500, "shippingDays": 1, "coupon": 0, "commissionRate": 0.035, "stock": true }
+      ]
+    },
+    {
+      "id": "cln-001", "brand": "라운드랩", "name": "약산성 클렌징 폼", "category": "cleanser",
+      "basePrice": 16000, "rating": 4.5, "reviews": 21100,
+      "match": { "skinType": ["sensitive", "dry", "normal"], "concerns": ["redness", "hydration"], "undertone": ["warm", "cool", "neutral"] },
+      "keyIngredients": ["약산성 pH 5.5", "판테놀"],
+      "offers": [
+        { "merchant": "coupang", "price": 11900, "shippingDays": 1, "coupon": 0, "commissionRate": 0.035, "stock": true },
+        { "merchant": "oliveyoung", "price": 13500, "shippingDays": 2, "coupon": 1000, "commissionRate": 0.06, "stock": true }
+      ]
+    },
+    {
+      "id": "cln-002", "brand": "코스알엑스", "name": "BHA 블랙헤드 파워 리퀴드", "category": "exfoliant",
+      "basePrice": 23000, "rating": 4.5, "reviews": 25700,
+      "match": { "skinType": ["oily", "combination"], "concerns": ["texture", "oiliness"], "undertone": ["warm", "cool", "neutral"] },
+      "keyIngredients": ["베타인 살리실레이트 4%", "나이아신아마이드"],
+      "offers": [
+        { "merchant": "amazon", "price": 15900, "shippingDays": 6, "coupon": 0, "commissionRate": 0.08, "stock": true },
+        { "merchant": "coupang", "price": 17900, "shippingDays": 1, "coupon": 1000, "commissionRate": 0.035, "stock": true },
+        { "merchant": "eleven", "price": 18500, "shippingDays": 3, "coupon": 0, "commissionRate": 0.045, "stock": true }
+      ]
+    },
+    {
+      "id": "eye-001", "brand": "이니스프리", "name": "레티놀 시카 아이크림", "category": "eyecare",
+      "basePrice": 29000, "rating": 4.4, "reviews": 12300,
+      "match": { "skinType": ["normal", "dry", "sensitive"], "concerns": ["darkCircle", "wrinkle"], "undertone": ["warm", "cool", "neutral"] },
+      "keyIngredients": ["레티놀", "마데카소사이드", "펩타이드"],
+      "offers": [
+        { "merchant": "oliveyoung", "price": 22900, "shippingDays": 2, "coupon": 2000, "commissionRate": 0.06, "stock": true },
+        { "merchant": "coupang", "price": 21900, "shippingDays": 1, "coupon": 0, "commissionRate": 0.035, "stock": true }
+      ]
+    },
+    {
+      "id": "eye-002", "brand": "더마토리", "name": "카페인 아이 세럼", "category": "eyecare",
+      "basePrice": 24000, "rating": 4.3, "reviews": 6800,
+      "match": { "skinType": ["oily", "combination", "normal"], "concerns": ["darkCircle"], "undertone": ["warm", "cool", "neutral"] },
+      "keyIngredients": ["카페인 5%", "비타민K", "펩타이드"],
+      "offers": [
+        { "merchant": "coupang", "price": 17900, "shippingDays": 1, "coupon": 1000, "commissionRate": 0.035, "stock": true },
+        { "merchant": "naver", "price": 18900, "shippingDays": 2, "coupon": 0, "commissionRate": 0.028, "stock": true }
+      ]
+    },
+    {
+      "id": "spt-001", "brand": "메디큐브", "name": "제로 모공 패드 2.0", "category": "exfoliant",
+      "basePrice": 27000, "rating": 4.4, "reviews": 17900,
+      "match": { "skinType": ["oily", "combination"], "concerns": ["texture", "oiliness", "clarity"], "undertone": ["warm", "cool", "neutral"] },
+      "keyIngredients": ["AHA/BHA/PHA", "나이아신아마이드"],
+      "offers": [
+        { "merchant": "coupang", "price": 19900, "shippingDays": 1, "coupon": 2000, "commissionRate": 0.035, "stock": true },
+        { "merchant": "oliveyoung", "price": 22900, "shippingDays": 2, "coupon": 3000, "commissionRate": 0.065, "stock": true }
+      ]
+    },
+    {
+      "id": "spt-002", "brand": "구달", "name": "청귤 비타C 잡티 세럼", "category": "serum",
+      "basePrice": 29000, "rating": 4.6, "reviews": 33500,
+      "match": { "skinType": ["normal", "combination", "dry"], "concerns": ["pigmentation", "evenness", "clarity"], "undertone": ["warm", "cool", "neutral"] },
+      "keyIngredients": ["청귤 추출물", "비타민C 유도체", "나이아신아마이드"],
+      "offers": [
+        { "merchant": "oliveyoung", "price": 21900, "shippingDays": 2, "coupon": 2000, "commissionRate": 0.06, "stock": true },
+        { "merchant": "coupang", "price": 20900, "shippingDays": 1, "coupon": 0, "commissionRate": 0.035, "stock": true },
+        { "merchant": "eleven", "price": 22500, "shippingDays": 3, "coupon": 1000, "commissionRate": 0.045, "stock": true }
+      ]
+    },
+    {
+      "id": "lip-001", "brand": "롬앤", "name": "쥬시 래스팅 틴트", "category": "lip",
+      "basePrice": 12000, "rating": 4.7, "reviews": 62400,
+      "match": { "skinType": ["normal", "dry", "oily", "combination", "sensitive"], "concerns": [], "undertone": ["warm", "cool", "neutral"] },
+      "shades": [
+        { "code": "06", "name": "피그 핑크", "hex": "#c9566a", "ita": 40, "undertone": "cool" },
+        { "code": "09", "name": "리치 코랄", "hex": "#e2705a", "ita": 45, "undertone": "warm" },
+        { "code": "17", "name": "멜로우 플럼", "hex": "#a34459", "ita": 25, "undertone": "cool" },
+        { "code": "26", "name": "베리 밤", "hex": "#b04a4a", "ita": 30, "undertone": "warm" }
+      ],
+      "offers": [
+        { "merchant": "coupang", "price": 8900, "shippingDays": 1, "coupon": 0, "commissionRate": 0.035, "stock": true },
+        { "merchant": "oliveyoung", "price": 9900, "shippingDays": 2, "coupon": 1000, "commissionRate": 0.06, "stock": true }
+      ]
+    }
+  ]
+}
