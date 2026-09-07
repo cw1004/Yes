@@ -103,8 +103,7 @@ export function renderConsult(consult, { locked, narrated }) {
     </div>
     <button class="cta secondary" style="margin-top:12px" data-action="shop">닥터가 말한 성분으로 제품 보기 →</button>
   </div>`}
-
-  <script type="application/json" id="consult-data">${JSON.stringify(script).replace(/</g, '\\u003c')}</script>`;
+`;
 }
 
 /**

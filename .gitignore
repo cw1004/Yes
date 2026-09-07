@@ -3,3 +3,4 @@ data/db.json
 data/db.json.*.tmp
 .env
 .DS_Store
+dist/
