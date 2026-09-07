@@ -20,6 +20,7 @@
   var screenStart = $('screen-start');
   var screenResult = $('screen-result');
   var screenContinue = $('screen-continue');
+  var screenSettings = $('screen-settings');
   var bridge = window.SkyGoalNative || null;      // 안드로이드 앱이 주입하는 브리지
 
   /* ---------------------------------------------------------- 상태 변수 */
@@ -82,10 +83,37 @@
     gates = [];
     sparks = [];
     stage = E.stageFor(0, profile.difficulty);
-    arena = E.arenaParams(profile.difficulty, stage, profile.stats);
+    arena = E.arenaParams(profile.difficulty, stage, profile.stats, profile.settings);
     refreshStartScreen();
+    screenSettings.classList.add('hidden');
     screenResult.classList.add('hidden');
     screenStart.classList.remove('hidden');
+    panel.classList.remove('hidden');
+    hud.classList.add('hidden');
+  }
+
+  /* ---------------------------------------------------------- 조작 설정 */
+
+  function applySettings(save) {
+    var t = E.tuningFactors(profile.settings);
+    profile.settings.ballFine = t.ballFine;
+    profile.settings.speed = t.speed;
+    $('set-fine').value = t.ballFine;
+    $('set-speed').value = t.speed;
+    $('set-fine-val').textContent = t.ballFine;
+    $('set-speed-val').textContent = t.speed;
+    // 준비 상태에서 바꾸면 즉시 반영된다 (플레이 중에는 다음 판부터)
+    arena = E.arenaParams(run ? run.difficulty : profile.difficulty, stage,
+                          profile.stats, profile.settings);
+    if (save) storage.save(profile);
+  }
+
+  function showSettings() {
+    applySettings(false);
+    screenStart.classList.add('hidden');
+    screenResult.classList.add('hidden');
+    hideContinuePrompt();
+    screenSettings.classList.remove('hidden');
     panel.classList.remove('hidden');
     hud.classList.add('hidden');
   }
@@ -133,16 +161,18 @@
       baseMid: mid,
       mid: mid,
       gap: arena.gap,
-      amp: arena.movement * 12,
-      speed: 0.7 + Math.random() * 0.6,
+      amp: arena.bob,                                   // 난이도가 낮아도 8px 이상 흔들린다
+      speed: 0.55 + Math.random() * 0.5,                // 천천히 오르내리게
       phase: Math.random() * Math.PI * 2,
+      flagPhase: Math.random() * Math.PI * 2,           // 깃발이 각자 다르게 나부낀다
+      banner: Math.floor(Math.random() * 3),            // 상단 장식 종류
       passed: false
     };
   }
 
   function startRun() {
     stage = E.stageFor(0, profile.difficulty);
-    arena = E.arenaParams(profile.difficulty, stage, profile.stats);
+    arena = E.arenaParams(profile.difficulty, stage, profile.stats, profile.settings);
     run = {
       score: 0,
       combo: 0,
@@ -215,7 +245,7 @@
     var next = E.stageFor(run.passCount, run.difficulty);
     if (next.key !== stage.key) {
       stage = next;
-      arena = E.arenaParams(run.difficulty, stage, profile.stats);
+      arena = E.arenaParams(run.difficulty, stage, profile.stats, profile.settings);
       run.stage = stage.key;
       if (audio) { audio.stage(); audio.setIntensity(musicLevel()); }
     }
@@ -397,6 +427,7 @@
 
     refreshStatBox();
     hideContinuePrompt();
+    screenSettings.classList.add('hidden');
     screenStart.classList.add('hidden');
     screenResult.classList.remove('hidden');
     panel.classList.remove('hidden');
@@ -473,24 +504,123 @@
     ctx.fillRect(0, groundY, W, 2);
   }
 
+  // 인도 국기색 골대. 기둥 그라디언트 + 네트 + 상단 배너 + 나부끼는 깃발.
+  var GATE_TRIM = ['#ff9933', '#ffffff', '#138808'];
+
+  function drawPost(x, y, w, h) {
+    if (h <= 0) return;
+    var g = ctx.createLinearGradient(x, 0, x + w, 0);
+    g.addColorStop(0, 'rgba(226,236,247,0.98)');
+    g.addColorStop(0.35, 'rgba(255,255,255,0.98)');
+    g.addColorStop(1, 'rgba(186,201,219,0.98)');
+    ctx.fillStyle = g;
+    ctx.fillRect(x, y, w, h);
+
+    // 네트 (마름모 격자)
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x, y, w, h);
+    ctx.clip();
+    ctx.strokeStyle = 'rgba(40,60,85,0.13)';
+    ctx.lineWidth = 1;
+    for (var d = -h; d < w + h; d += 13) {
+      ctx.beginPath(); ctx.moveTo(x + d, y); ctx.lineTo(x + d + h, y + h); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x + d, y + h); ctx.lineTo(x + d + h, y); ctx.stroke();
+    }
+    ctx.restore();
+
+    // 좌우 프레임
+    ctx.fillStyle = 'rgba(255,255,255,0.95)';
+    ctx.fillRect(x, y, 3, h);
+    ctx.fillRect(x + w - 3, y, 3, h);
+  }
+
+  function drawFlag(x, y, dir, phase, color) {
+    var wave = Math.sin(clock * 3.4 + phase);
+    ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x, y + dir * 22);            // 깃대
+    ctx.stroke();
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(x, y + dir * 22);
+    ctx.lineTo(x + 20, y + dir * 22 + wave * 4 + dir * 5);
+    ctx.lineTo(x, y + dir * 22 + dir * 11);
+    ctx.closePath();
+    ctx.fill();
+  }
+
   function drawGate(g) {
     var top = g.mid - g.gap / 2;
     var bottom = g.mid + g.gap / 2;
-    ctx.fillStyle = 'rgba(255,255,255,0.95)';
-    ctx.fillRect(g.x, 0, GATE_W, top);
-    ctx.fillRect(g.x, bottom, GATE_W, groundY - bottom);
+
+    // 그림자
+    ctx.fillStyle = 'rgba(0,0,0,0.16)';
+    ctx.fillRect(g.x + 5, 0, GATE_W, top);
+    ctx.fillRect(g.x + 5, bottom, GATE_W, groundY - bottom);
+
+    drawPost(g.x, 0, GATE_W, top);
+    drawPost(g.x, bottom, GATE_W, groundY - bottom);
+
+    // 크로스바 (위: 주황 / 아래: 초록) + 삼색 트림
     ctx.fillStyle = '#ff9933';
-    ctx.fillRect(g.x - 4, top - 10, GATE_W + 8, 10);
+    ctx.fillRect(g.x - 5, top - 11, GATE_W + 10, 11);
     ctx.fillStyle = '#138808';
-    ctx.fillRect(g.x - 4, bottom, GATE_W + 8, 10);
-    // 골문 네트 느낌
-    ctx.strokeStyle = 'rgba(0,0,0,0.10)';
-    ctx.lineWidth = 1;
-    for (var y = 10; y < top; y += 14) {
-      ctx.beginPath(); ctx.moveTo(g.x, y); ctx.lineTo(g.x + GATE_W, y); ctx.stroke();
+    ctx.fillRect(g.x - 5, bottom, GATE_W + 10, 11);
+    for (var i = 0; i < 3; i++) {
+      ctx.fillStyle = GATE_TRIM[i];
+      ctx.fillRect(g.x - 5, top - 15 + i * 1.4, GATE_W + 10, 1.4);
+      ctx.fillRect(g.x - 5, bottom + 11 + i * 1.4, GATE_W + 10, 1.4);
     }
-    for (var y2 = bottom + 14; y2 < groundY; y2 += 14) {
-      ctx.beginPath(); ctx.moveTo(g.x, y2); ctx.lineTo(g.x + GATE_W, y2); ctx.stroke();
+
+    // 크로스바 끝 캡
+    ctx.fillStyle = 'rgba(255,255,255,0.92)';
+    ctx.fillRect(g.x - 7, top - 13, 4, 15);
+    ctx.fillRect(g.x + GATE_W + 3, top - 13, 4, 15);
+    ctx.fillRect(g.x - 7, bottom - 2, 4, 15);
+    ctx.fillRect(g.x + GATE_W + 3, bottom - 2, 4, 15);
+
+    // 상단 배너 장식 (골문마다 다른 무늬)
+    var by = top - 34;
+    if (by > 6) {
+      if (g.banner === 0) {                       // 삼색 리본
+        for (var b = 0; b < 3; b++) {
+          ctx.fillStyle = GATE_TRIM[b];
+          ctx.fillRect(g.x + 6, by + b * 5, GATE_W - 12, 4);
+        }
+      } else if (g.banner === 1) {                // 원형 엠블럼
+        ctx.strokeStyle = '#ff9933';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(g.x + GATE_W / 2, by + 7, 8, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(255,255,255,0.85)';
+        ctx.beginPath();
+        ctx.arc(g.x + GATE_W / 2, by + 7, 3.5, 0, Math.PI * 2);
+        ctx.fill();
+      } else {                                    // 작은 삼각 깃발 줄
+        for (var t = 0; t < 4; t++) {
+          ctx.fillStyle = GATE_TRIM[t % 3];
+          ctx.beginPath();
+          ctx.moveTo(g.x + 4 + t * 12, by);
+          ctx.lineTo(g.x + 14 + t * 12, by);
+          ctx.lineTo(g.x + 9 + t * 12, by + 10);
+          ctx.closePath();
+          ctx.fill();
+        }
+      }
+    }
+
+    // 기둥 끝 깃발 (위/아래에서 서로 반대로 나부낀다)
+    drawFlag(g.x + GATE_W / 2, top - 15, -1, g.flagPhase, '#ff9933');
+    drawFlag(g.x + GATE_W / 2, bottom + 15, 1, g.flagPhase + 2, '#138808');
+
+    // 바닥 받침
+    if (groundY - bottom > 6) {
+      ctx.fillStyle = 'rgba(20,30,45,0.35)';
+      ctx.fillRect(g.x - 6, groundY - 6, GATE_W + 12, 6);
     }
   }
 
@@ -604,6 +734,23 @@
   });
   if (!AudioLib) muteBtn.classList.add('hidden');
 
+  $('btn-settings').addEventListener('click', showSettings);
+  $('btn-settings-close').addEventListener('click', showStart);
+  $('btn-settings-reset').addEventListener('click', function () {
+    profile.settings.ballFine = 50;
+    profile.settings.speed = 50;
+    applySettings(true);
+  });
+  $('set-fine').addEventListener('input', function () {
+    profile.settings.ballFine = parseInt(this.value, 10);
+    applySettings(true);
+    if (audio) audio.tap();
+  });
+  $('set-speed').addEventListener('input', function () {
+    profile.settings.speed = parseInt(this.value, 10);
+    applySettings(true);
+  });
+
   $('btn-start').addEventListener('click', startRun);
   $('btn-retry').addEventListener('click', startRun);
   $('btn-home').addEventListener('click', showStart);
@@ -645,6 +792,7 @@
 
   resize();
   refreshMute();
+  applySettings(false);
   showStart();
   requestAnimationFrame(frame);
 
@@ -673,6 +821,8 @@
     flap: flap,
     forceEnd: function () { if (state === 'ready') state = 'playing'; endRun(); },
     home: showStart,
+    settings: showSettings,
+    getArena: function () { return arena; },
     // 보상형 광고 제공자 주입: fn(callback) → callback(성공 여부)
     setRewardProvider: function (fn) { rewardProvider = typeof fn === 'function' ? fn : null; },
     hasRewardProvider: function () { return !!rewardProvider; },
@@ -688,7 +838,7 @@
     debug: function () {
       return {
         ball: ball ? { x: ball.x, y: ball.y, vy: ball.vy } : null,
-        gates: gates.map(function (g) { return { x: g.x, mid: g.mid, gap: g.gap, passed: g.passed }; }),
+        gates: gates.map(function (g) { return { x: g.x, mid: g.mid, baseMid: g.baseMid, gap: g.gap, passed: g.passed }; }),
         arena: arena,
         stage: stage.key,
         gateWidth: GATE_W,
@@ -701,7 +851,7 @@
       for (var i = 0; i < E.STAGES.length; i++) {
         if (E.STAGES[i].key === key) stage = E.STAGES[i];
       }
-      arena = E.arenaParams(run ? run.difficulty : profile.difficulty, stage, profile.stats);
+      arena = E.arenaParams(run ? run.difficulty : profile.difficulty, stage, profile.stats, profile.settings);
       if (run) run.stage = stage.key;
       if (audio) audio.setIntensity(musicLevel());
       updateHud();

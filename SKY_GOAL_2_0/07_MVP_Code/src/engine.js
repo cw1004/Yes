@@ -11,8 +11,12 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
 
-  var VERSION = '1.0.0';
+  var VERSION = '1.1.0';
   var STORAGE_KEY = 'sky_goal_2_0_profile_v1';
+
+  // 플레이어가 직접 조절하는 값의 하한. 화면의 슬라이더도 이 값에서 시작한다.
+  var BALL_FINE_MIN = 20;    // 공 상하 미세 조정
+  var SPEED_MIN = 30;        // 스피드
 
   /* ---------------------------------------------------------------- utils */
 
@@ -63,7 +67,7 @@
       coins: 0,
       statPoints: 0,
       bestScore: 0,
-      settings: { muted: false },
+      settings: { muted: false, ballFine: 50, speed: 50 },
       stats: { control: 50, power: 50, speed: 50, luck: 50, stamina: 50 },
       metrics: {
         games: 0,
@@ -121,7 +125,11 @@
       coins: Math.max(0, Math.floor(num(raw.coins, 0, 0, 1e12))),
       statPoints: Math.max(0, Math.floor(num(raw.statPoints, 0, 0, 9999))),
       bestScore: Math.max(0, Math.floor(num(raw.bestScore, 0, 0, 1e9))),
-      settings: { muted: settings.muted === true },
+      settings: {
+        muted: settings.muted === true,
+        ballFine: num(settings.ballFine, 50, BALL_FINE_MIN, 100),
+        speed: num(settings.speed, 50, SPEED_MIN, 100)
+      },
       stats: {
         control: num(stats.control, 50, 0, 100),
         power: num(stats.power, 50, 0, 100),
@@ -249,11 +257,31 @@
 
   /* ------------------------------------------------------- arena / 물리값 */
 
+  /**
+   * 설정 슬라이더 → 물리 배율.
+   *   ballFine 20~100 → response 0.80~1.30
+   *     중력을 response^2, 탭 상승력을 response 배 하므로 **점프 높이는 그대로**이고
+   *     오르내리는 속도(반응성)만 바뀐다. 값이 클수록 민첩하고 촘촘하게 조작된다.
+   *   speed 30~100 → 스크롤 속도 0.70~1.30 배
+   */
+  function tuningFactors(settings) {
+    var t = settings || {};
+    var fine = clamp(num(t.ballFine, 50, BALL_FINE_MIN, 100), BALL_FINE_MIN, 100);
+    var spd = clamp(num(t.speed, 50, SPEED_MIN, 100), SPEED_MIN, 100);
+    return {
+      ballFine: fine,
+      speed: spd,
+      response: 0.80 + ((fine - BALL_FINE_MIN) / (100 - BALL_FINE_MIN)) * 0.50,
+      speedMul: 0.70 + ((spd - SPEED_MIN) / (100 - SPEED_MIN)) * 0.60
+    };
+  }
+
   // 문서 5장 + 성장 스탯 보정
-  function arenaParams(difficulty, stage, stats) {
+  function arenaParams(difficulty, stage, stats, settings) {
     var d = clamp(difficulty, 10, 95);
     var s = stats || { control: 50, power: 50, speed: 50, luck: 50, stamina: 50 };
     var st = stage || STAGES[0];
+    var tune = tuningFactors(settings);
 
     var gap = Math.max(145, 220 - 0.9 * d);
     var speed = 210 + 2.8 * d;
@@ -265,15 +293,26 @@
     speed = speed * (1 - (s.speed - 50) / 1000);          // SPEED  : 체감 속도
     movement = movement * (1 - (s.control - 50) / 500);   // CONTROL: 골문 흔들림 억제
 
+    // 플레이어 설정은 AI 가 정한 값 위에 곱해지는 개인 취향 보정이다.
+    // 느리게 맞춰 두면 성적이 올라가고, 그만큼 AI 가 난이도를 올려 균형이 맞는다.
+    speed = clamp(speed, 180, 560) * tune.speedMul;
+    var gravity = 950 * (1 - (s.stamina - 50) / 1200) * tune.response * tune.response;
+    var flap = -340 * (1 + (s.power - 50) / 800) * tune.response;
+
+    // 골문은 난이도가 낮아도 항상 살짝 오르내린다 (8~34px)
+    var bob = clamp(movement * 12, 8, 34);
+
     return {
       gap: clamp(gap, 130, 260),
-      speed: clamp(speed, 180, 560),
+      speed: clamp(speed, 140, 660),
       movement: Math.max(0, movement),
+      bob: bob,
       wind: clamp(wind, 0, 1.2),
       rain: st.rain,
-      gravity: 950 * (1 - (s.stamina - 50) / 1200),
-      flap: -340 * (1 + (s.power - 50) / 800),
-      perfectWindow: 0.12 + (s.control - 50) / 1000        // gap 대비 퍼펙트 판정 비율
+      gravity: gravity,
+      flap: flap,
+      perfectWindow: 0.12 + (s.control - 50) / 1000,       // gap 대비 퍼펙트 판정 비율
+      tuning: tune
     };
   }
 
@@ -484,6 +523,9 @@
     progressBand: progressBand,
     stageFor: stageFor,
     arenaParams: arenaParams,
+    tuningFactors: tuningFactors,
+    BALL_FINE_MIN: BALL_FINE_MIN,
+    SPEED_MIN: SPEED_MIN,
     perfectBonus: perfectBonus,
     passScore: passScore,
     coinReward: coinReward,

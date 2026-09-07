@@ -8,7 +8,7 @@ node 07_MVP_Code/tests/browser.smoke.mjs --screenshot ./shots
 ```
 브라우저 스모크 테스트는 Playwright 가 설치된 환경에서만 실행되고, 없으면 자동으로 건너뛴다.
 
-## 1. 엔진 단위 테스트 (`tests/engine.test.js`, 15개)
+## 1. 엔진 단위 테스트 (`tests/engine.test.js`, 19개)
 | 항목 | 확인 내용 |
 |---|---|
 | clamp / norm | 범위를 벗어난 값과 NaN 처리 |
@@ -24,6 +24,10 @@ node 07_MVP_Code/tests/browser.smoke.mjs --screenshot ./shots
 | commitRun | 지표·연속 기록·최근 10게임 갱신 |
 | 시뮬레이션 | 120게임 동안 난이도 수렴과 발산 없음 |
 | 저장소 | localStorage 차단·손상 시 폴백 |
+| 조작 설정 | 하한(공 20 / 스피드 30) 클램프, 잘못된 값 복구 |
+| 공 상하 조정 | 반응 속도만 바뀌고 **점프 높이는 불변** |
+| 스피드 조정 | 스크롤 속도만 바뀌고 중력·간격은 불변 |
+| 골문 흔들림 | 모든 난이도에서 8~34px 유지, 난이도 비례 |
 
 ## 1-2. 사운드 테스트 (`tests/audio.test.js`, 5개)
 | 항목 | 확인 내용 |
@@ -44,12 +48,15 @@ node 07_MVP_Code/tests/browser.smoke.mjs --screenshot ./shots
 | 7개 스테이지 | 팔레트 존재 + 렌더 호출 발생, 알 수 없는 키도 안전 |
 | 초기화 전 호출 | resize 전에 draw 해도 죽지 않음 |
 
-## 2. 브라우저 스모크 테스트 (`tests/browser.smoke.mjs`, 23개)
+## 2. 브라우저 스모크 테스트 (`tests/browser.smoke.mjs`, 39개)
 실제 Chromium 에서 빌드된 단일 HTML 을 띄워 확인한다.
 - 시작 화면 표시 / 엔진·사운드·배경 모듈 로드
 - 배경 레이어 순서(산 → 강 → 잔디)
 - 실제 클릭으로 AudioContext 가 열리고 BGM 이 재생됨
 - 음소거 버튼 토글과 새로고침 후 설정 유지
+- 조작 설정 슬라이더(하한 20/30) 즉시 반영·저장·기본값 복원
+- 보상형 광고 이어하기: 점수 유지·콤보 초기화·한 판 1회·광고 실패 시 결과로
+- PWA 매니페스트와 서비스 워커
 - 경기 시작 → `ready` 상태 → HUD 표시
 - 자동 조종 봇이 골문을 연속 통과해 점수를 낸다(최대 3판 시도)
 - 결과 화면과 보상 표시

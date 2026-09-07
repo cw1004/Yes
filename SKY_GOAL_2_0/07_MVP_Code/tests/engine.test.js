@@ -102,6 +102,69 @@ test('난이도가 높을수록 골문은 좁아지고 속도는 빨라진다', 
   }
 });
 
+test('조작 설정은 하한(공 20 / 스피드 30) 아래로 내려가지 않는다', () => {
+  assert.strictEqual(E.BALL_FINE_MIN, 20);
+  assert.strictEqual(E.SPEED_MIN, 30);
+  const low = E.tuningFactors({ ballFine: 0, speed: 0 });
+  assert.strictEqual(low.ballFine, 20);
+  assert.strictEqual(low.speed, 30);
+  const high = E.tuningFactors({ ballFine: 999, speed: 999 });
+  assert.strictEqual(high.ballFine, 100);
+  assert.strictEqual(high.speed, 100);
+  const bad = E.tuningFactors({ ballFine: 'x', speed: null });
+  assert.strictEqual(bad.ballFine, 50);
+  assert.strictEqual(bad.speed, 50);
+  assert.deepStrictEqual(E.tuningFactors(), E.tuningFactors({}));
+
+  const p = E.normalizeProfile({ settings: { ballFine: 5, speed: 1000 } });
+  assert.strictEqual(p.settings.ballFine, 20);
+  assert.strictEqual(p.settings.speed, 100);
+  assert.strictEqual(E.createProfile().settings.ballFine, 50);
+});
+
+test('공 상하 미세 조정은 반응 속도만 바꾸고 점프 높이는 유지한다', () => {
+  const stats = E.createProfile().stats;
+  const stage = E.stageFor(0, 50);
+  const height = (a) => (a.flap * a.flap) / (2 * a.gravity);
+  const slow = E.arenaParams(50, stage, stats, { ballFine: 20, speed: 50 });
+  const mid = E.arenaParams(50, stage, stats, { ballFine: 50, speed: 50 });
+  const fast = E.arenaParams(50, stage, stats, { ballFine: 100, speed: 50 });
+
+  assert.ok(Math.abs(height(slow) - height(fast)) < 0.001, '점프 높이가 같아야 한다');
+  assert.ok(Math.abs(height(mid) - height(fast)) < 0.001);
+  assert.ok(Math.abs(fast.flap) > Math.abs(slow.flap), '값이 클수록 상승·하강이 빠르다');
+  assert.ok(fast.gravity > mid.gravity && mid.gravity > slow.gravity);
+  assert.strictEqual(slow.speed, mid.speed, '공 설정은 스크롤 속도를 바꾸지 않는다');
+});
+
+test('스피드 설정은 스크롤 속도만 바꾼다', () => {
+  const stats = E.createProfile().stats;
+  const stage = E.stageFor(0, 50);
+  const slow = E.arenaParams(50, stage, stats, { ballFine: 50, speed: 30 });
+  const fast = E.arenaParams(50, stage, stats, { ballFine: 50, speed: 100 });
+  assert.ok(fast.speed > slow.speed * 1.5, slow.speed + ' → ' + fast.speed);
+  assert.strictEqual(slow.gravity, fast.gravity);
+  assert.strictEqual(slow.gap, fast.gap);
+  for (let d = 10; d <= 95; d += 5) {
+    for (const sp of [30, 65, 100]) {
+      const a = E.arenaParams(d, E.stageFor(0, d), stats, { speed: sp });
+      assert.ok(a.speed >= 140 && a.speed <= 660, 'speed 범위: ' + a.speed);
+    }
+  }
+});
+
+test('골문은 난이도가 낮아도 항상 살짝 오르내린다', () => {
+  const stats = E.createProfile().stats;
+  for (let d = 10; d <= 95; d += 5) {
+    const a = E.arenaParams(d, E.stageFor(0, d), stats);
+    assert.ok(a.bob >= 8, '최소 흔들림: ' + a.bob);
+    assert.ok(a.bob <= 34, '과도한 흔들림: ' + a.bob);
+  }
+  const easy = E.arenaParams(10, E.stageFor(0, 10), stats);
+  const hard = E.arenaParams(95, E.stageFor(0, 95), stats);
+  assert.ok(hard.bob > easy.bob, '난이도가 높을수록 더 흔들린다');
+});
+
 test('퍼펙트 보너스와 통과 점수', () => {
   assert.strictEqual(E.perfectBonus(0, 200), 10);
   assert.strictEqual(E.perfectBonus(100, 200), 0);

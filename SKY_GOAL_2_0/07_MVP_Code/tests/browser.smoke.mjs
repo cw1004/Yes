@@ -198,6 +198,53 @@ try {
   check('가로 스크롤이 생기지 않는다',
     await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
 
+  // 조작 설정 슬라이더
+  await page.evaluate(() => window.SkyGoal.home());
+  await page.click('#btn-settings');
+  check('조작 설정 화면이 열린다', await page.isVisible('#screen-settings'));
+  const bounds = await page.evaluate(() => ({
+    fineMin: document.getElementById('set-fine').min,
+    speedMin: document.getElementById('set-speed').min
+  }));
+  check('슬라이더 하한이 공 20 / 스피드 30 이다',
+    bounds.fineMin === '20' && bounds.speedMin === '30', JSON.stringify(bounds));
+
+  const before = await page.evaluate(() => window.SkyGoal.getArena().speed);
+  await page.evaluate(() => {
+    const el = document.getElementById('set-speed');
+    el.value = '100';
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  const after = await page.evaluate(() => ({
+    speed: window.SkyGoal.getArena().speed,
+    saved: window.SkyGoal.getProfile().settings.speed,
+    label: document.getElementById('set-speed-val').textContent
+  }));
+  check('스피드 슬라이더가 즉시 반영된다', after.speed > before,
+    before.toFixed(0) + ' → ' + after.speed.toFixed(0));
+  check('슬라이더 값이 화면에 표시된다', after.label === '100');
+
+  await page.evaluate(() => {
+    const el = document.getElementById('set-fine');
+    el.value = '20';
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await page.reload({ waitUntil: 'load' });
+  await page.waitForFunction(() => !!window.SkyGoal, null, { timeout: 5000 });
+  const persisted = await page.evaluate(() => window.SkyGoal.getProfile().settings);
+  check('조작 설정이 새로고침 후에도 유지된다',
+    persisted.speed === 100 && persisted.ballFine === 20, JSON.stringify(persisted));
+  await page.evaluate(() => {
+    window.SkyGoal.settings();
+    document.getElementById('btn-settings-reset').click();
+  });
+  check('기본값으로 되돌릴 수 있다',
+    await page.evaluate(() => {
+      const s = window.SkyGoal.getProfile().settings;
+      return s.speed === 50 && s.ballFine === 50;
+    }));
+  await page.evaluate(() => window.SkyGoal.home());
+
   // 보상형 광고 이어하기 흐름
   await page.evaluate(() => {
     window.SkyGoal.home();

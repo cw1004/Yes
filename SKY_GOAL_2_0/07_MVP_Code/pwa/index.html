@@ -81,6 +81,40 @@ p { margin: 8px 0; line-height: 1.55; color: #dbe7f7; font-size: 14px; }
 }
 .statpick button:disabled { opacity: 0.35; cursor: default; }
 .reasons { margin: 8px 0 0; padding-left: 18px; color: var(--sub); font-size: 12px; }
+.slider { margin: 16px 0 18px; }
+.slider label {
+  display: flex; justify-content: space-between; align-items: baseline;
+  font-size: 14px; font-weight: 700; margin-bottom: 8px;
+}
+.slider label b { font-size: 20px; color: var(--accent); }
+.slider input[type=range] {
+  width: 100%; height: 30px; margin: 0; cursor: pointer;
+  background: transparent; -webkit-appearance: none; appearance: none;
+}
+.slider input[type=range]::-webkit-slider-runnable-track {
+  height: 6px; border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent), var(--accent2));
+}
+.slider input[type=range]::-moz-range-track {
+  height: 6px; border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent), var(--accent2));
+}
+.slider input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none; margin-top: -9px;
+  width: 24px; height: 24px; border-radius: 50%;
+  background: #fff; border: 3px solid var(--accent);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+.slider input[type=range]::-moz-range-thumb {
+  width: 22px; height: 22px; border-radius: 50%;
+  background: #fff; border: 3px solid var(--accent);
+}
+.slider .hint {
+  display: flex; justify-content: space-between;
+  font-size: 11px; color: var(--sub); margin-top: 2px;
+}
+.slider .small { margin: 6px 0 0; }
+
 .iconbtn {
   position: fixed; right: 14px; bottom: 14px; z-index: 20;
   width: 46px; height: 46px; border-radius: 50%; cursor: pointer;
@@ -136,8 +170,33 @@ if ('serviceWorker' in navigator) {
       <div class="stat">누적 게임<b id="s-games">0</b></div>
     </div>
     <button class="btn" id="btn-start" type="button">경기 시작</button>
+    <button class="btn ghost" id="btn-settings" type="button">⚙ 조작 설정</button>
     <button class="btn ghost" id="btn-reset" type="button">플레이어 데이터 초기화</button>
     <p class="small" id="s-storage">진행 상황은 브라우저에 저장됩니다.</p>
+  </div>
+
+  <!-- 조작 설정 -->
+  <div class="card hidden" id="screen-settings">
+    <div class="tag">SETTINGS</div>
+    <h2>조작 설정</h2>
+    <p class="small">내 손에 맞게 조절하세요. 값을 낮춰 쉬워지면 AI 가 그만큼 난이도를 올려 균형을 맞춥니다.</p>
+
+    <div class="slider">
+      <label for="set-fine">공 상하 미세 조정 <b id="set-fine-val">50</b></label>
+      <input type="range" id="set-fine" min="20" max="100" step="1" value="50">
+      <div class="hint"><span>느긋하게 (20)</span><span>민첩하게 (100)</span></div>
+      <p class="small">탭에 반응하는 속도만 바뀝니다. 한 번 탭할 때 뜨는 높이는 그대로입니다.</p>
+    </div>
+
+    <div class="slider">
+      <label for="set-speed">스피드 <b id="set-speed-val">50</b></label>
+      <input type="range" id="set-speed" min="30" max="100" step="1" value="50">
+      <div class="hint"><span>천천히 (30)</span><span>빠르게 (100)</span></div>
+      <p class="small">골문이 다가오는 속도입니다.</p>
+    </div>
+
+    <button class="btn" id="btn-settings-close" type="button">확인</button>
+    <button class="btn ghost" id="btn-settings-reset" type="button">기본값으로</button>
   </div>
 
   <!-- 이어하기 화면 (보상형 광고) -->
@@ -196,8 +255,12 @@ if ('serviceWorker' in navigator) {
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
 
-  var VERSION = '1.0.0';
+  var VERSION = '1.1.0';
   var STORAGE_KEY = 'sky_goal_2_0_profile_v1';
+
+  // 플레이어가 직접 조절하는 값의 하한. 화면의 슬라이더도 이 값에서 시작한다.
+  var BALL_FINE_MIN = 20;    // 공 상하 미세 조정
+  var SPEED_MIN = 30;        // 스피드
 
   /* ---------------------------------------------------------------- utils */
 
@@ -248,7 +311,7 @@ if ('serviceWorker' in navigator) {
       coins: 0,
       statPoints: 0,
       bestScore: 0,
-      settings: { muted: false },
+      settings: { muted: false, ballFine: 50, speed: 50 },
       stats: { control: 50, power: 50, speed: 50, luck: 50, stamina: 50 },
       metrics: {
         games: 0,
@@ -306,7 +369,11 @@ if ('serviceWorker' in navigator) {
       coins: Math.max(0, Math.floor(num(raw.coins, 0, 0, 1e12))),
       statPoints: Math.max(0, Math.floor(num(raw.statPoints, 0, 0, 9999))),
       bestScore: Math.max(0, Math.floor(num(raw.bestScore, 0, 0, 1e9))),
-      settings: { muted: settings.muted === true },
+      settings: {
+        muted: settings.muted === true,
+        ballFine: num(settings.ballFine, 50, BALL_FINE_MIN, 100),
+        speed: num(settings.speed, 50, SPEED_MIN, 100)
+      },
       stats: {
         control: num(stats.control, 50, 0, 100),
         power: num(stats.power, 50, 0, 100),
@@ -434,11 +501,31 @@ if ('serviceWorker' in navigator) {
 
   /* ------------------------------------------------------- arena / 물리값 */
 
+  /**
+   * 설정 슬라이더 → 물리 배율.
+   *   ballFine 20~100 → response 0.80~1.30
+   *     중력을 response^2, 탭 상승력을 response 배 하므로 **점프 높이는 그대로**이고
+   *     오르내리는 속도(반응성)만 바뀐다. 값이 클수록 민첩하고 촘촘하게 조작된다.
+   *   speed 30~100 → 스크롤 속도 0.70~1.30 배
+   */
+  function tuningFactors(settings) {
+    var t = settings || {};
+    var fine = clamp(num(t.ballFine, 50, BALL_FINE_MIN, 100), BALL_FINE_MIN, 100);
+    var spd = clamp(num(t.speed, 50, SPEED_MIN, 100), SPEED_MIN, 100);
+    return {
+      ballFine: fine,
+      speed: spd,
+      response: 0.80 + ((fine - BALL_FINE_MIN) / (100 - BALL_FINE_MIN)) * 0.50,
+      speedMul: 0.70 + ((spd - SPEED_MIN) / (100 - SPEED_MIN)) * 0.60
+    };
+  }
+
   // 문서 5장 + 성장 스탯 보정
-  function arenaParams(difficulty, stage, stats) {
+  function arenaParams(difficulty, stage, stats, settings) {
     var d = clamp(difficulty, 10, 95);
     var s = stats || { control: 50, power: 50, speed: 50, luck: 50, stamina: 50 };
     var st = stage || STAGES[0];
+    var tune = tuningFactors(settings);
 
     var gap = Math.max(145, 220 - 0.9 * d);
     var speed = 210 + 2.8 * d;
@@ -450,15 +537,26 @@ if ('serviceWorker' in navigator) {
     speed = speed * (1 - (s.speed - 50) / 1000);          // SPEED  : 체감 속도
     movement = movement * (1 - (s.control - 50) / 500);   // CONTROL: 골문 흔들림 억제
 
+    // 플레이어 설정은 AI 가 정한 값 위에 곱해지는 개인 취향 보정이다.
+    // 느리게 맞춰 두면 성적이 올라가고, 그만큼 AI 가 난이도를 올려 균형이 맞는다.
+    speed = clamp(speed, 180, 560) * tune.speedMul;
+    var gravity = 950 * (1 - (s.stamina - 50) / 1200) * tune.response * tune.response;
+    var flap = -340 * (1 + (s.power - 50) / 800) * tune.response;
+
+    // 골문은 난이도가 낮아도 항상 살짝 오르내린다 (8~34px)
+    var bob = clamp(movement * 12, 8, 34);
+
     return {
       gap: clamp(gap, 130, 260),
-      speed: clamp(speed, 180, 560),
+      speed: clamp(speed, 140, 660),
       movement: Math.max(0, movement),
+      bob: bob,
       wind: clamp(wind, 0, 1.2),
       rain: st.rain,
-      gravity: 950 * (1 - (s.stamina - 50) / 1200),
-      flap: -340 * (1 + (s.power - 50) / 800),
-      perfectWindow: 0.12 + (s.control - 50) / 1000        // gap 대비 퍼펙트 판정 비율
+      gravity: gravity,
+      flap: flap,
+      perfectWindow: 0.12 + (s.control - 50) / 1000,       // gap 대비 퍼펙트 판정 비율
+      tuning: tune
     };
   }
 
@@ -669,6 +767,9 @@ if ('serviceWorker' in navigator) {
     progressBand: progressBand,
     stageFor: stageFor,
     arenaParams: arenaParams,
+    tuningFactors: tuningFactors,
+    BALL_FINE_MIN: BALL_FINE_MIN,
+    SPEED_MIN: SPEED_MIN,
     perfectBonus: perfectBonus,
     passScore: passScore,
     coinReward: coinReward,
@@ -1284,6 +1385,7 @@ if ('serviceWorker' in navigator) {
   var screenStart = $('screen-start');
   var screenResult = $('screen-result');
   var screenContinue = $('screen-continue');
+  var screenSettings = $('screen-settings');
   var bridge = window.SkyGoalNative || null;      // 안드로이드 앱이 주입하는 브리지
 
   /* ---------------------------------------------------------- 상태 변수 */
@@ -1346,10 +1448,37 @@ if ('serviceWorker' in navigator) {
     gates = [];
     sparks = [];
     stage = E.stageFor(0, profile.difficulty);
-    arena = E.arenaParams(profile.difficulty, stage, profile.stats);
+    arena = E.arenaParams(profile.difficulty, stage, profile.stats, profile.settings);
     refreshStartScreen();
+    screenSettings.classList.add('hidden');
     screenResult.classList.add('hidden');
     screenStart.classList.remove('hidden');
+    panel.classList.remove('hidden');
+    hud.classList.add('hidden');
+  }
+
+  /* ---------------------------------------------------------- 조작 설정 */
+
+  function applySettings(save) {
+    var t = E.tuningFactors(profile.settings);
+    profile.settings.ballFine = t.ballFine;
+    profile.settings.speed = t.speed;
+    $('set-fine').value = t.ballFine;
+    $('set-speed').value = t.speed;
+    $('set-fine-val').textContent = t.ballFine;
+    $('set-speed-val').textContent = t.speed;
+    // 준비 상태에서 바꾸면 즉시 반영된다 (플레이 중에는 다음 판부터)
+    arena = E.arenaParams(run ? run.difficulty : profile.difficulty, stage,
+                          profile.stats, profile.settings);
+    if (save) storage.save(profile);
+  }
+
+  function showSettings() {
+    applySettings(false);
+    screenStart.classList.add('hidden');
+    screenResult.classList.add('hidden');
+    hideContinuePrompt();
+    screenSettings.classList.remove('hidden');
     panel.classList.remove('hidden');
     hud.classList.add('hidden');
   }
@@ -1397,16 +1526,18 @@ if ('serviceWorker' in navigator) {
       baseMid: mid,
       mid: mid,
       gap: arena.gap,
-      amp: arena.movement * 12,
-      speed: 0.7 + Math.random() * 0.6,
+      amp: arena.bob,                                   // 난이도가 낮아도 8px 이상 흔들린다
+      speed: 0.55 + Math.random() * 0.5,                // 천천히 오르내리게
       phase: Math.random() * Math.PI * 2,
+      flagPhase: Math.random() * Math.PI * 2,           // 깃발이 각자 다르게 나부낀다
+      banner: Math.floor(Math.random() * 3),            // 상단 장식 종류
       passed: false
     };
   }
 
   function startRun() {
     stage = E.stageFor(0, profile.difficulty);
-    arena = E.arenaParams(profile.difficulty, stage, profile.stats);
+    arena = E.arenaParams(profile.difficulty, stage, profile.stats, profile.settings);
     run = {
       score: 0,
       combo: 0,
@@ -1479,7 +1610,7 @@ if ('serviceWorker' in navigator) {
     var next = E.stageFor(run.passCount, run.difficulty);
     if (next.key !== stage.key) {
       stage = next;
-      arena = E.arenaParams(run.difficulty, stage, profile.stats);
+      arena = E.arenaParams(run.difficulty, stage, profile.stats, profile.settings);
       run.stage = stage.key;
       if (audio) { audio.stage(); audio.setIntensity(musicLevel()); }
     }
@@ -1661,6 +1792,7 @@ if ('serviceWorker' in navigator) {
 
     refreshStatBox();
     hideContinuePrompt();
+    screenSettings.classList.add('hidden');
     screenStart.classList.add('hidden');
     screenResult.classList.remove('hidden');
     panel.classList.remove('hidden');
@@ -1737,24 +1869,123 @@ if ('serviceWorker' in navigator) {
     ctx.fillRect(0, groundY, W, 2);
   }
 
+  // 인도 국기색 골대. 기둥 그라디언트 + 네트 + 상단 배너 + 나부끼는 깃발.
+  var GATE_TRIM = ['#ff9933', '#ffffff', '#138808'];
+
+  function drawPost(x, y, w, h) {
+    if (h <= 0) return;
+    var g = ctx.createLinearGradient(x, 0, x + w, 0);
+    g.addColorStop(0, 'rgba(226,236,247,0.98)');
+    g.addColorStop(0.35, 'rgba(255,255,255,0.98)');
+    g.addColorStop(1, 'rgba(186,201,219,0.98)');
+    ctx.fillStyle = g;
+    ctx.fillRect(x, y, w, h);
+
+    // 네트 (마름모 격자)
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x, y, w, h);
+    ctx.clip();
+    ctx.strokeStyle = 'rgba(40,60,85,0.13)';
+    ctx.lineWidth = 1;
+    for (var d = -h; d < w + h; d += 13) {
+      ctx.beginPath(); ctx.moveTo(x + d, y); ctx.lineTo(x + d + h, y + h); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x + d, y + h); ctx.lineTo(x + d + h, y); ctx.stroke();
+    }
+    ctx.restore();
+
+    // 좌우 프레임
+    ctx.fillStyle = 'rgba(255,255,255,0.95)';
+    ctx.fillRect(x, y, 3, h);
+    ctx.fillRect(x + w - 3, y, 3, h);
+  }
+
+  function drawFlag(x, y, dir, phase, color) {
+    var wave = Math.sin(clock * 3.4 + phase);
+    ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x, y + dir * 22);            // 깃대
+    ctx.stroke();
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(x, y + dir * 22);
+    ctx.lineTo(x + 20, y + dir * 22 + wave * 4 + dir * 5);
+    ctx.lineTo(x, y + dir * 22 + dir * 11);
+    ctx.closePath();
+    ctx.fill();
+  }
+
   function drawGate(g) {
     var top = g.mid - g.gap / 2;
     var bottom = g.mid + g.gap / 2;
-    ctx.fillStyle = 'rgba(255,255,255,0.95)';
-    ctx.fillRect(g.x, 0, GATE_W, top);
-    ctx.fillRect(g.x, bottom, GATE_W, groundY - bottom);
+
+    // 그림자
+    ctx.fillStyle = 'rgba(0,0,0,0.16)';
+    ctx.fillRect(g.x + 5, 0, GATE_W, top);
+    ctx.fillRect(g.x + 5, bottom, GATE_W, groundY - bottom);
+
+    drawPost(g.x, 0, GATE_W, top);
+    drawPost(g.x, bottom, GATE_W, groundY - bottom);
+
+    // 크로스바 (위: 주황 / 아래: 초록) + 삼색 트림
     ctx.fillStyle = '#ff9933';
-    ctx.fillRect(g.x - 4, top - 10, GATE_W + 8, 10);
+    ctx.fillRect(g.x - 5, top - 11, GATE_W + 10, 11);
     ctx.fillStyle = '#138808';
-    ctx.fillRect(g.x - 4, bottom, GATE_W + 8, 10);
-    // 골문 네트 느낌
-    ctx.strokeStyle = 'rgba(0,0,0,0.10)';
-    ctx.lineWidth = 1;
-    for (var y = 10; y < top; y += 14) {
-      ctx.beginPath(); ctx.moveTo(g.x, y); ctx.lineTo(g.x + GATE_W, y); ctx.stroke();
+    ctx.fillRect(g.x - 5, bottom, GATE_W + 10, 11);
+    for (var i = 0; i < 3; i++) {
+      ctx.fillStyle = GATE_TRIM[i];
+      ctx.fillRect(g.x - 5, top - 15 + i * 1.4, GATE_W + 10, 1.4);
+      ctx.fillRect(g.x - 5, bottom + 11 + i * 1.4, GATE_W + 10, 1.4);
     }
-    for (var y2 = bottom + 14; y2 < groundY; y2 += 14) {
-      ctx.beginPath(); ctx.moveTo(g.x, y2); ctx.lineTo(g.x + GATE_W, y2); ctx.stroke();
+
+    // 크로스바 끝 캡
+    ctx.fillStyle = 'rgba(255,255,255,0.92)';
+    ctx.fillRect(g.x - 7, top - 13, 4, 15);
+    ctx.fillRect(g.x + GATE_W + 3, top - 13, 4, 15);
+    ctx.fillRect(g.x - 7, bottom - 2, 4, 15);
+    ctx.fillRect(g.x + GATE_W + 3, bottom - 2, 4, 15);
+
+    // 상단 배너 장식 (골문마다 다른 무늬)
+    var by = top - 34;
+    if (by > 6) {
+      if (g.banner === 0) {                       // 삼색 리본
+        for (var b = 0; b < 3; b++) {
+          ctx.fillStyle = GATE_TRIM[b];
+          ctx.fillRect(g.x + 6, by + b * 5, GATE_W - 12, 4);
+        }
+      } else if (g.banner === 1) {                // 원형 엠블럼
+        ctx.strokeStyle = '#ff9933';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(g.x + GATE_W / 2, by + 7, 8, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(255,255,255,0.85)';
+        ctx.beginPath();
+        ctx.arc(g.x + GATE_W / 2, by + 7, 3.5, 0, Math.PI * 2);
+        ctx.fill();
+      } else {                                    // 작은 삼각 깃발 줄
+        for (var t = 0; t < 4; t++) {
+          ctx.fillStyle = GATE_TRIM[t % 3];
+          ctx.beginPath();
+          ctx.moveTo(g.x + 4 + t * 12, by);
+          ctx.lineTo(g.x + 14 + t * 12, by);
+          ctx.lineTo(g.x + 9 + t * 12, by + 10);
+          ctx.closePath();
+          ctx.fill();
+        }
+      }
+    }
+
+    // 기둥 끝 깃발 (위/아래에서 서로 반대로 나부낀다)
+    drawFlag(g.x + GATE_W / 2, top - 15, -1, g.flagPhase, '#ff9933');
+    drawFlag(g.x + GATE_W / 2, bottom + 15, 1, g.flagPhase + 2, '#138808');
+
+    // 바닥 받침
+    if (groundY - bottom > 6) {
+      ctx.fillStyle = 'rgba(20,30,45,0.35)';
+      ctx.fillRect(g.x - 6, groundY - 6, GATE_W + 12, 6);
     }
   }
 
@@ -1868,6 +2099,23 @@ if ('serviceWorker' in navigator) {
   });
   if (!AudioLib) muteBtn.classList.add('hidden');
 
+  $('btn-settings').addEventListener('click', showSettings);
+  $('btn-settings-close').addEventListener('click', showStart);
+  $('btn-settings-reset').addEventListener('click', function () {
+    profile.settings.ballFine = 50;
+    profile.settings.speed = 50;
+    applySettings(true);
+  });
+  $('set-fine').addEventListener('input', function () {
+    profile.settings.ballFine = parseInt(this.value, 10);
+    applySettings(true);
+    if (audio) audio.tap();
+  });
+  $('set-speed').addEventListener('input', function () {
+    profile.settings.speed = parseInt(this.value, 10);
+    applySettings(true);
+  });
+
   $('btn-start').addEventListener('click', startRun);
   $('btn-retry').addEventListener('click', startRun);
   $('btn-home').addEventListener('click', showStart);
@@ -1909,6 +2157,7 @@ if ('serviceWorker' in navigator) {
 
   resize();
   refreshMute();
+  applySettings(false);
   showStart();
   requestAnimationFrame(frame);
 
@@ -1937,6 +2186,8 @@ if ('serviceWorker' in navigator) {
     flap: flap,
     forceEnd: function () { if (state === 'ready') state = 'playing'; endRun(); },
     home: showStart,
+    settings: showSettings,
+    getArena: function () { return arena; },
     // 보상형 광고 제공자 주입: fn(callback) → callback(성공 여부)
     setRewardProvider: function (fn) { rewardProvider = typeof fn === 'function' ? fn : null; },
     hasRewardProvider: function () { return !!rewardProvider; },
@@ -1952,7 +2203,7 @@ if ('serviceWorker' in navigator) {
     debug: function () {
       return {
         ball: ball ? { x: ball.x, y: ball.y, vy: ball.vy } : null,
-        gates: gates.map(function (g) { return { x: g.x, mid: g.mid, gap: g.gap, passed: g.passed }; }),
+        gates: gates.map(function (g) { return { x: g.x, mid: g.mid, baseMid: g.baseMid, gap: g.gap, passed: g.passed }; }),
         arena: arena,
         stage: stage.key,
         gateWidth: GATE_W,
@@ -1965,7 +2216,7 @@ if ('serviceWorker' in navigator) {
       for (var i = 0; i < E.STAGES.length; i++) {
         if (E.STAGES[i].key === key) stage = E.STAGES[i];
       }
-      arena = E.arenaParams(run ? run.difficulty : profile.difficulty, stage, profile.stats);
+      arena = E.arenaParams(run ? run.difficulty : profile.difficulty, stage, profile.stats, profile.settings);
       if (run) run.stage = stage.key;
       if (audio) audio.setIntensity(musicLevel());
       updateHud();
