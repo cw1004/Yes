@@ -19,21 +19,51 @@ export class Camera {
 
   async start() {
     await this.stop();
-    try {
-      this.stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: this.facingMode, width: { ideal: 1280 }, height: { ideal: 1706 } },
-        audio: false,
-      });
-    } catch (err) {
-      this.hint(`카메라를 열 수 없습니다 (${err.name}). '사진 선택'으로도 진단할 수 있습니다.`, false);
-      throw err;
+    if (!navigator.mediaDevices?.getUserMedia) {
+      this.hint(location.protocol === 'https:' || location.hostname === 'localhost'
+        ? '이 브라우저는 카메라를 지원하지 않습니다. 아래 ‘사진 · 앨범’에서 선택해 주세요.'
+        : '카메라는 보안 연결(HTTPS)에서만 열립니다. 아래 ‘사진 · 앨범’에서 선택해 주세요.', false);
+      throw new Error('getUserMedia 미지원');
     }
+    try {
+      this.stream = await this.openStream({ width: { ideal: 1280 }, height: { ideal: 1706 } });
+    } catch (err) {
+      // 요청한 해상도를 못 맞추는 기기가 많다. 제약을 풀고 한 번 더 시도한다.
+      if (err.name === 'OverconstrainedError') {
+        try { this.stream = await this.openStream({}); } catch (retry) { this.failWith(retry); }
+      } else {
+        this.failWith(err);
+      }
+    }
+    if (!this.stream) throw new Error('카메라 스트림 없음');
     this.video.srcObject = this.stream;
     await this.video.play().catch(() => {});
     if ('FaceDetector' in window) {
       try { this.detector = new window.FaceDetector({ fastMode: true, maxDetectedFaces: 1 }); } catch { /* 미지원 */ }
     }
     this.loop();
+  }
+
+  openStream(extra) {
+    return navigator.mediaDevices.getUserMedia({
+      video: { facingMode: this.facingMode, ...extra },
+      audio: false,
+    });
+  }
+
+  /** 오류 코드를 그대로 보여주면 사용자는 무엇을 해야 할지 알 수 없다 */
+  failWith(err) {
+    const MESSAGES = {
+      NotAllowedError: '카메라 권한이 꺼져 있습니다. 브라우저 주소창의 자물쇠 아이콘에서 카메라를 허용한 뒤 다시 시도해 주세요.',
+      PermissionDeniedError: '카메라 권한이 꺼져 있습니다. 설정에서 허용한 뒤 다시 시도해 주세요.',
+      NotFoundError: '이 기기에서 카메라를 찾지 못했습니다. 아래 ‘사진 · 앨범’에서 사진을 선택해 주세요.',
+      NotReadableError: '다른 앱이 카메라를 쓰고 있습니다. 그 앱을 닫고 다시 시도해 주세요.',
+      AbortError: '카메라를 여는 중 중단됐습니다. 다시 시도해 주세요.',
+      SecurityError: '카메라는 보안 연결(HTTPS)에서만 열립니다. 아래 ‘사진 · 앨범’에서 선택해 주세요.',
+    };
+    console.warn('[camera]', err.name, err.message);
+    this.hint(MESSAGES[err.name] || '카메라를 열 수 없습니다. 아래 ‘사진 · 앨범’에서 사진을 선택해 주세요.', false);
+    throw err;
   }
 
   async stop() {

@@ -59,7 +59,15 @@ async function startCapture() {
       onReady: (ok) => { $('#btn-shutter').disabled = false; $('#btn-shutter').dataset.ok = ok ? '1' : '0'; },
     });
   }
-  try { await camera.start(); } catch { $('#btn-shutter').disabled = true; }
+  const controls = document.querySelector('.capture-controls');
+  try {
+    await camera.start();
+    controls.classList.remove('no-camera');
+  } catch {
+    // 카메라를 못 열면 셔터가 아니라 '사진 · 앨범'이 주 동작이 된다
+    $('#btn-shutter').disabled = true;
+    controls.classList.add('no-camera');
+  }
 }
 
 /* ───────── 분석 파이프라인 ───────── */
@@ -347,6 +355,9 @@ $('#btn-shutter').addEventListener('click', async () => {
 
 $('#file-input').addEventListener('change', async (e) => {
   const file = e.target.files?.[0];
+  // 같은 사진을 다시 고르면 change 가 안 뜬다. 값을 비워 재선택이 항상 먹히게 한다
+  // (재측정 때 같은 파일을 다시 여는 건 흔한 동작이고, 안 비우면 앱이 멈춘 것처럼 보인다)
+  e.target.value = '';
   if (!file) return;
   try {
     const img = await imageDataFromFile(file, 640);
