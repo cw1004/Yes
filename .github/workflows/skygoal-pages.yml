@@ -1,0 +1,33 @@
+name: SKY GOAL — 웹앱 배포 (GitHub Pages)
+
+# 자동 실행하지 않는다. 저장소 Settings → Pages → Source 를 "GitHub Actions" 로
+# 바꾼 뒤, Actions 탭에서 이 워크플로를 "Run workflow" 로 직접 실행한다.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: 설치형 웹앱(PWA) 빌드
+        run: python3 build.py --pwa
+        working-directory: SKY_GOAL_2_0
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: SKY_GOAL_2_0/07_MVP_Code/pwa
+      - id: deployment
+        uses: actions/deploy-pages@v4
