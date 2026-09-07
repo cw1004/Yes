@@ -1,0 +1,36 @@
+{
+  "name": "SKY GOAL 2.0",
+  "short_name": "SKY GOAL",
+  "description": "탭 한 번으로 즐기는 원버튼 축구 아케이드. 플레이할수록 AI가 난이도를 맞춰줍니다.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "portrait",
+  "background_color": "#07111f",
+  "theme_color": "#07111f",
+  "categories": [
+    "games",
+    "sports"
+  ],
+  "lang": "ko",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/adaptive-foreground-432.png",
+      "sizes": "432x432",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

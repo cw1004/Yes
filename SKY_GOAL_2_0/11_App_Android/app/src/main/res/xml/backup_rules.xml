@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <!-- WebView localStorage(플레이어 프로필)만 백업한다 -->
+    <include domain="database" path="." />
+    <include domain="file" path="app_webview" />
+</full-backup-content>

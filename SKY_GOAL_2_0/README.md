@@ -4,6 +4,17 @@
 히말라야 능선과 강이 흐르는 배경, WebAudio 로 합성한 BGM·효과음까지 파일 하나에 들어있다.
 설치 없이 브라우저에서 바로 실행된다.
 
+## 어디서 돌아가나
+
+| 형태 | 파일 | 설명 |
+|---|---|---|
+| 웹 | `07_MVP_Code/sky_goal_2_0.html` | 파일 하나. 열면 바로 플레이 |
+| 설치형 웹앱(PWA) | `07_MVP_Code/pwa/` | 홈 화면에 추가 → 오프라인 실행, 스토어 불필요 |
+| 안드로이드 앱 | `11_App_Android/` | WebView 셸 + AdMob(배너·전면·보상형 이어하기) |
+
+같은 HTML 이 세 곳에서 그대로 돌아갑니다. 앱에서만 `window.SkyGoalNative` 가 주입되어
+광고와 이어하기가 활성화되고, 브라우저에서는 그 기능이 조용히 빠집니다.
+
 ## 바로 실행
 
 ```bash
@@ -23,7 +34,10 @@ start 07_MVP_Code\sky_goal_2_0.html         # Windows
 
 ```bash
 python3 build.py            # src/ → 07_MVP_Code/sky_goal_2_0.html 생성
+python3 build.py --pwa      # 설치형 웹앱(PWA)까지 생성
 python3 build.py --zip      # 배포용 zip 까지 생성
+
+cd 11_App_Android && ./sync_assets.sh && gradle bundleRelease   # 스토어 업로드용 AAB
 ./test.sh                   # 빌드 + 엔진 테스트 15개 + 브라우저 스모크 테스트 15개
 ```
 
@@ -53,7 +67,12 @@ SKY_GOAL_2_0/
 │   └── tests/                  엔진 단위 테스트 + 브라우저 스모크 테스트
 ├── 08_Patent/                  기술 정리 노트
 ├── 09_Test_Balance/            테스트·밸런스 기준
-└── 10_Release/                 릴리즈 체크리스트
+├── 10_Release/                 릴리즈 · 스토어 출시 · 수익화 문서
+│   ├── PLAY_STORE_GUIDE.md     구글 플레이 등록 절차 (★ 표시가 직접 하실 부분)
+│   ├── MONETIZATION.md         광고 배치와 수익 계산
+│   ├── PRIVACY_POLICY.md       개인정보처리방침 초안
+│   └── store/                  아이콘 · 피처그래픽 · 스크린샷 · 등록정보 문구
+└── 11_App_Android/             안드로이드 앱 프로젝트
 ```
 
 `engine.js` 는 DOM 에 의존하지 않는다. 그래서 브라우저에서 게임이 쓰는 로직과

@@ -1,0 +1,58 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.skygoal.arcade'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId "com.skygoal.arcade"
+        minSdk 24
+        targetSdk 35
+        versionCode 1
+        versionName "1.0.0"
+        resConfigs "ko", "en", "hi"
+    }
+
+    // 릴리즈 서명: 환경변수 또는 keystore.properties 로 주입한다.
+    // (키스토어 파일과 비밀번호는 절대 저장소에 커밋하지 않는다)
+    signingConfigs {
+        release {
+            def storePath = System.getenv("SKYGOAL_KEYSTORE") ?: ""
+            if (storePath) {
+                storeFile file(storePath)
+                storePassword System.getenv("SKYGOAL_KEYSTORE_PASSWORD")
+                keyAlias System.getenv("SKYGOAL_KEY_ALIAS")
+                keyPassword System.getenv("SKYGOAL_KEY_PASSWORD")
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            if (System.getenv("SKYGOAL_KEYSTORE")) {
+                signingConfig signingConfigs.release
+            }
+        }
+        debug {
+            applicationIdSuffix ".debug"
+            versionNameSuffix "-debug"
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation 'androidx.appcompat:appcompat:1.7.0'
+    implementation 'androidx.webkit:webkit:1.12.1'          // WebViewAssetLoader
+    implementation 'com.google.android.gms:play-services-ads:23.6.0'
+    implementation 'com.google.android.ump:user-messaging-platform:3.1.0'  // GDPR 동의
+}

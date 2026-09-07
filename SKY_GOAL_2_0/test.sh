@@ -4,7 +4,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 echo "== 1/3 빌드 =="
-python3 build.py --check
+python3 build.py --check --pwa
 
 echo
 echo "== 2/3 단위 테스트 (엔진 · 사운드 · 배경) =="

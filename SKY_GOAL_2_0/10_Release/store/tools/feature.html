@@ -1,0 +1,32 @@
+<!doctype html><meta charset="utf-8">
+<style>
+ html,body{margin:0;width:1024px;height:500px;overflow:hidden;
+   font-family:system-ui,-apple-system,"Noto Sans KR",sans-serif;color:#fff}
+ .bg{position:absolute;inset:0;background:linear-gradient(120deg,#0d1b33 0%,#1a2f52 45%,#20402f 100%)}
+ .glow{position:absolute;right:-120px;top:-160px;width:620px;height:620px;border-radius:50%;
+   background:radial-gradient(circle,rgba(255,153,51,.45),rgba(255,153,51,0) 62%)}
+ .ridge{position:absolute;left:0;right:0;bottom:0;height:220px}
+ .txt{position:absolute;left:64px;top:132px}
+ h1{margin:0;font-size:74px;letter-spacing:-1px;line-height:1}
+ h1 span{color:#ff9933}
+ p{margin:16px 0 0;font-size:26px;color:#cfe0f5;line-height:1.4}
+ .pill{display:inline-block;margin-top:26px;padding:10px 20px;border-radius:999px;
+   background:rgba(255,153,51,.16);border:1px solid #ff9933;color:#ffc078;font-size:19px;font-weight:700}
+ .ball{position:absolute;right:120px;top:150px;width:210px;height:210px;border-radius:50%;
+   background:#fff;box-shadow:0 24px 60px rgba(0,0,0,.5)}
+ .ball:after{content:"";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+   width:0;height:0;border-left:44px solid transparent;border-right:44px solid transparent;
+   border-bottom:74px solid #16202c}
+</style>
+<div class="bg"></div><div class="glow"></div>
+<svg class="ridge" viewBox="0 0 1024 220" preserveAspectRatio="none">
+  <path d="M0 150 L120 70 L210 128 L330 40 L450 132 L560 78 L700 140 L820 60 L940 130 L1024 96 L1024 220 L0 220Z" fill="#16273f"/>
+  <rect x="0" y="176" width="1024" height="20" fill="#2c5382"/>
+  <rect x="0" y="196" width="1024" height="24" fill="#138808"/>
+</svg>
+<div class="ball"></div>
+<div class="txt">
+  <h1>SKY <span>GOAL</span> 2.0</h1>
+  <p>탭 한 번으로 즐기는 원버튼 축구 아케이드<br>플레이할수록 나에게 맞춰지는 AI 난이도</p>
+  <div class="pill">ADAPTIVE AI ARCADE</div>
+</div>

@@ -198,7 +198,90 @@ try {
   check('가로 스크롤이 생기지 않는다',
     await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
 
+  // 보상형 광고 이어하기 흐름
+  await page.evaluate(() => {
+    window.SkyGoal.home();
+    window.SkyGoal.setRewardProvider((cb) => cb(true));
+    window.SkyGoal.start();
+    const r = window.SkyGoal.getRun();
+    r.score = 50; r.passCount = 4; r.combo = 4;      // 이어하기 조건(30점) 충족
+    window.SkyGoal.forceEnd();
+  });
+  check('사망 시 이어하기 화면이 뜬다', await page.isVisible('#screen-continue'));
+  const gamesBefore = await page.evaluate(() => window.SkyGoal.getProfile().metrics.games);
+  await page.click('#btn-continue');
+  const resumed = await page.evaluate(() => ({
+    state: window.SkyGoal.getState(),
+    score: window.SkyGoal.getRun().score,
+    combo: window.SkyGoal.getRun().combo,
+    games: window.SkyGoal.getProfile().metrics.games
+  }));
+  check('광고 시청 후 같은 점수로 이어진다',
+    resumed.state === 'ready' && resumed.score === 50 && resumed.games === gamesBefore,
+    JSON.stringify(resumed));
+  check('이어하기 시 콤보는 초기화된다', resumed.combo === 0);
+  await page.evaluate(() => window.SkyGoal.forceEnd());
+  check('이어하기는 한 판에 한 번뿐 — 두 번째 사망은 바로 결과 화면',
+    await page.isVisible('#screen-result'));
+  check('이어한 판이 한 판으로 집계된다',
+    (await page.evaluate(() => window.SkyGoal.getProfile().metrics.games)) === gamesBefore + 1);
+
+  // 광고를 거부하면 그대로 결과로 넘어간다
+  await page.evaluate(() => {
+    window.SkyGoal.home();
+    window.SkyGoal.setRewardProvider((cb) => cb(false));
+    window.SkyGoal.start();
+    const r = window.SkyGoal.getRun();
+    r.score = 40; r.passCount = 3;
+    window.SkyGoal.forceEnd();
+  });
+  await page.click('#btn-continue');
+  check('광고 실패 시 결과 화면으로 넘어간다', await page.isVisible('#screen-result'));
+
   check('콘솔 에러가 없다', errors.length === 0, errors.join(' | ').slice(0, 300));
+
+  // ── 설치형 웹앱(PWA) 검증 ─────────────────────────────────────────
+  const pwaDir = path.join(HERE, '..', 'pwa');
+  if (fs.existsSync(path.join(pwaDir, 'index.html'))) {
+    const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript',
+                    '.webmanifest': 'application/manifest+json', '.png': 'image/png' };
+    const pwaServer = http.createServer((req, res) => {
+      const rel = decodeURIComponent(req.url.split('?')[0]).replace(/^\/+/, '') || 'index.html';
+      const file = path.join(pwaDir, rel);
+      if (!file.startsWith(pwaDir) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) {
+        res.writeHead(404); res.end('not found'); return;
+      }
+      res.writeHead(200, { 'Content-Type': types[path.extname(file)] || 'application/octet-stream' });
+      res.end(fs.readFileSync(file));
+    });
+    await new Promise((r) => pwaServer.listen(0, '127.0.0.1', r));
+    const pwaUrl = `http://127.0.0.1:${pwaServer.address().port}/`;
+    const pwaPage = await context.newPage();
+    const pwaErrors = [];
+    pwaPage.on('pageerror', (e) => pwaErrors.push(String(e)));
+    pwaPage.on('console', (m) => { if (m.type() === 'error') pwaErrors.push(m.text()); });
+    try {
+      await pwaPage.goto(pwaUrl, { waitUntil: 'load' });
+      await pwaPage.waitForFunction(() => !!window.SkyGoal, null, { timeout: 5000 });
+      const manifest = await pwaPage.evaluate(async () => {
+        const link = document.querySelector('link[rel=manifest]');
+        if (!link) return null;
+        const res = await fetch(link.href);
+        return res.ok ? await res.json() : null;
+      });
+      check('PWA 매니페스트가 로드된다',
+        !!manifest && manifest.display === 'fullscreen' && manifest.icons.length >= 2,
+        manifest ? manifest.name : 'none');
+      const swReady = await pwaPage.evaluate(() =>
+        navigator.serviceWorker.ready.then(() => true).catch(() => false));
+      check('서비스 워커가 등록된다 (오프라인 실행)', swReady === true);
+      check('PWA 에서도 게임이 뜬다', await pwaPage.isVisible('#screen-start'));
+      check('PWA 콘솔 에러가 없다', pwaErrors.length === 0, pwaErrors.join(' | ').slice(0, 200));
+    } finally {
+      await pwaPage.close();
+      pwaServer.close();
+    }
+  }
 } finally {
   await browser.close();
   server.close();

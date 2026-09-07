@@ -1,0 +1,14 @@
+<resources>
+    <string name="app_name">SKY GOAL</string>
+
+    <!--
+      아래는 구글이 제공하는 공식 "테스트" 광고 ID 다.
+      실제 배포 전에 AdMob 콘솔에서 발급받은 값으로 교체해야 한다.
+      테스트 ID 그대로 배포하면 수익이 발생하지 않는다.
+      반대로, 개발 중에 실제 ID 로 테스트하면 계정이 정지될 수 있다.
+    -->
+    <string name="admob_app_id" translatable="false">ca-app-pub-3940256099942544~3347511713</string>
+    <string name="admob_banner_id" translatable="false">ca-app-pub-3940256099942544/6300978111</string>
+    <string name="admob_interstitial_id" translatable="false">ca-app-pub-3940256099942544/1033173712</string>
+    <string name="admob_rewarded_id" translatable="false">ca-app-pub-3940256099942544/5224354917</string>
+</resources>

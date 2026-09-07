@@ -1,2 +1,8 @@
 10_Release/*.zip
 shots/
+11_App_Android/app/build/
+11_App_Android/build/
+11_App_Android/.gradle/
+11_App_Android/local.properties
+11_App_Android/*.jks
+11_App_Android/*.keystore

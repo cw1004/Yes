@@ -19,6 +19,8 @@
   var hud = $('hud');
   var screenStart = $('screen-start');
   var screenResult = $('screen-result');
+  var screenContinue = $('screen-continue');
+  var bridge = window.SkyGoalNative || null;      // 안드로이드 앱이 주입하는 브리지
 
   /* ---------------------------------------------------------- 상태 변수 */
 
@@ -46,6 +48,10 @@
   var scenery = Scenery ? Scenery.create(20300101) : null;
   var audio = AudioLib ? AudioLib.create({ muted: profile.settings.muted }) : null;
 
+  var usedContinue = false;          // 한 판에 이어하기는 1회
+  var rewardProvider = null;         // 보상형 광고 제공자 (네이티브 앱에서 주입)
+  var pendingReward = null;          // 광고 결과를 기다리는 콜백
+
   var GATE_W = 54;
   var GATE_SPACING = 260;
 
@@ -69,6 +75,7 @@
 
   function showStart() {
     if (audio) audio.stopMusic();
+    hideContinuePrompt();
     state = 'idle';
     run = null;
     ball = null;
@@ -151,6 +158,7 @@
     gates = [];
     sparks = [];
     for (var i = 0; i < 4; i++) gates.push(makeGate(W + 220 + i * GATE_SPACING));
+    usedContinue = false;
     elapsed = 0;
     scroll = 0;
     flash = 0;
@@ -304,10 +312,63 @@
     lastEndReason = reason || 'manual';
     addSparks(ball.x, ball.y, 22, '255,120,60');
     if (audio) { audio.stopMusic(); audio.die(); }
+    if (canContinue()) { showContinuePrompt(); return; }
+    finalizeRun();
+  }
+
+  // 보상형 광고로 살아날 수 있는 상황인지
+  function canContinue() {
+    return !usedContinue && run && run.score >= 30 && !!rewardProvider;
+  }
+
+  // 이어하기: 점수와 통과 수는 유지하고 콤보만 초기화한다.
+  function continueRun() {
+    if (state !== 'over' || usedContinue) return false;
+    usedContinue = true;
+    hideContinuePrompt();
+    ball.y = groundY * 0.5;
+    ball.vy = 0;
+    ball.vx = 0;
+    run.combo = 0;
+    lastMid = ball.y;
+    for (var i = gates.length - 1; i >= 0; i--) {          // 눈앞의 골문은 치운다
+      if (gates[i].x < ball.x + W * 0.75) gates.splice(i, 1);
+    }
+    var rightMost = ball.x + W * 0.75;
+    for (var k = 0; k < gates.length; k++) rightMost = Math.max(rightMost, gates[k].x);
+    while (gates.length < 4) {
+      gates.push(makeGate(rightMost + GATE_SPACING * (gates.length + 1)));
+    }
+    state = 'ready';
+    panel.classList.add('hidden');
+    hud.classList.remove('hidden');
+    updateHud();
+    return true;
+  }
+
+  // 한 판을 확정한다 (프로필 반영 + 결과 화면)
+  function finalizeRun() {
+    hideContinuePrompt();
     var summary = E.commitRun(profile, run);
     storage.save(profile);
     if (audio && summary.levelsGained > 0) setTimeout(function () { audio.levelUp(); }, 420);
+    if (bridge && bridge.gameOver) {
+      try { bridge.gameOver(summary.score, profile.metrics.games); } catch (e) { /* 무시 */ }
+    }
     showResult(summary);
+  }
+
+  function showContinuePrompt() {
+    $('c-score').textContent = run.score;
+    screenStart.classList.add('hidden');
+    screenResult.classList.add('hidden');
+    screenContinue.classList.remove('hidden');
+    panel.classList.remove('hidden');
+    hud.classList.add('hidden');
+  }
+
+  function hideContinuePrompt() {
+    screenContinue.classList.add('hidden');
   }
 
   /* ---------------------------------------------------------- 결과 화면 */
@@ -335,6 +396,7 @@
     }
 
     refreshStatBox();
+    hideContinuePrompt();
     screenStart.classList.add('hidden');
     screenResult.classList.remove('hidden');
     panel.classList.remove('hidden');
@@ -545,6 +607,23 @@
   $('btn-start').addEventListener('click', startRun);
   $('btn-retry').addEventListener('click', startRun);
   $('btn-home').addEventListener('click', showStart);
+  $('btn-giveup').addEventListener('click', finalizeRun);
+  $('btn-continue').addEventListener('click', function () {
+    if (!rewardProvider) { finalizeRun(); return; }
+    var btn = this;
+    btn.disabled = true;
+    btn.textContent = '광고 불러오는 중...';
+    rewardProvider(function (granted) {
+      btn.disabled = false;
+      btn.textContent = '광고 보고 이어하기';
+      if (granted) {
+        if (audio) { audio.unlock(); audio.startMusic(musicLevel()); }
+        continueRun();
+      } else {
+        finalizeRun();
+      }
+    });
+  });
   $('btn-reset').addEventListener('click', function () {
     if (!window.confirm('플레이어 데이터를 초기화할까요?')) return;
     profile = storage.reset();
@@ -569,6 +648,19 @@
   showStart();
   requestAnimationFrame(frame);
 
+  // 네이티브 앱(안드로이드 WebView)이 있으면 보상형 광고를 이어하기에 연결한다.
+  if (bridge && typeof bridge.showRewarded === 'function') {
+    rewardProvider = function (cb) {
+      pendingReward = cb;
+      try {
+        bridge.showRewarded();
+      } catch (e) {
+        pendingReward = null;
+        cb(false);
+      }
+    };
+  }
+
   // 자동화 테스트/디버깅용 훅
   window.SkyGoal = {
     engine: E,
@@ -581,6 +673,18 @@
     flap: flap,
     forceEnd: function () { if (state === 'ready') state = 'playing'; endRun(); },
     home: showStart,
+    // 보상형 광고 제공자 주입: fn(callback) → callback(성공 여부)
+    setRewardProvider: function (fn) { rewardProvider = typeof fn === 'function' ? fn : null; },
+    hasRewardProvider: function () { return !!rewardProvider; },
+    // 안드로이드가 광고 시청 결과를 이 함수로 돌려준다
+    onRewardResult: function (granted) {
+      var cb = pendingReward;
+      pendingReward = null;
+      if (cb) cb(!!granted);
+    },
+    canContinue: canContinue,
+    continueRun: continueRun,
+    finalizeRun: finalizeRun,
     debug: function () {
       return {
         ball: ball ? { x: ball.x, y: ball.y, vy: ball.vy } : null,
