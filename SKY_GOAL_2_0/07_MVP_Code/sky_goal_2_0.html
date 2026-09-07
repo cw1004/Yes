@@ -81,6 +81,14 @@ p { margin: 8px 0; line-height: 1.55; color: #dbe7f7; font-size: 14px; }
 }
 .statpick button:disabled { opacity: 0.35; cursor: default; }
 .reasons { margin: 8px 0 0; padding-left: 18px; color: var(--sub); font-size: 12px; }
+.iconbtn {
+  position: fixed; right: 14px; bottom: 14px; z-index: 20;
+  width: 46px; height: 46px; border-radius: 50%; cursor: pointer;
+  font-size: 20px; line-height: 1; color: var(--ink);
+  background: rgba(7, 17, 31, 0.78); border: 1px solid var(--line);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+}
+.iconbtn.off { opacity: 0.55; }
 .hidden { display: none !important; }
 
 </style>
@@ -149,6 +157,8 @@ p { margin: 8px 0; line-height: 1.55; color: #dbe7f7; font-size: 14px; }
   </div>
 </div>
 
+<button id="btn-mute" class="iconbtn" type="button" aria-label="소리 켜기/끄기">🔊</button>
+
 <script>
 /*
  * SKY GOAL 2.0 — Adaptive Difficulty / Economy Engine
@@ -215,6 +225,7 @@ p { margin: 8px 0; line-height: 1.55; color: #dbe7f7; font-size: 14px; }
       coins: 0,
       statPoints: 0,
       bestScore: 0,
+      settings: { muted: false },
       stats: { control: 50, power: 50, speed: 50, luck: 50, stamina: 50 },
       metrics: {
         games: 0,
@@ -250,6 +261,7 @@ p { margin: 8px 0; line-height: 1.55; color: #dbe7f7; font-size: 14px; }
     var m = raw.metrics && typeof raw.metrics === 'object' ? raw.metrics : {};
     var inv = raw.inventory && typeof raw.inventory === 'object' ? raw.inventory : {};
     var lr = raw.lastRun && typeof raw.lastRun === 'object' ? raw.lastRun : {};
+    var settings = raw.settings && typeof raw.settings === 'object' ? raw.settings : {};
 
     function numList(v, cap) {
       if (!Array.isArray(v)) return [];
@@ -271,6 +283,7 @@ p { margin: 8px 0; line-height: 1.55; color: #dbe7f7; font-size: 14px; }
       coins: Math.max(0, Math.floor(num(raw.coins, 0, 0, 1e12))),
       statPoints: Math.max(0, Math.floor(num(raw.statPoints, 0, 0, 9999))),
       bestScore: Math.max(0, Math.floor(num(raw.bestScore, 0, 0, 1e9))),
+      settings: { muted: settings.muted === true },
       stats: {
         control: num(stats.control, 50, 0, 100),
         power: num(stats.power, 50, 0, 100),
@@ -650,6 +663,583 @@ p { margin: 8px 0; line-height: 1.55; color: #dbe7f7; font-size: 14px; }
 </script>
 <script>
 /*
+ * SKY GOAL 2.0 — 사운드 엔진
+ * WebAudio 로 전부 합성한다. 외부 음원 파일이 없으므로 단일 HTML 배포가 유지된다.
+ * AudioContext 가 없거나 차단된 환경에서도 게임이 멈추지 않도록 모든 호출이 안전하다.
+ */
+(function (root, factory) {
+  var api = factory();
+  if (typeof module === 'object' && module.exports) module.exports = api;
+  root.SkyGoalAudio = api;
+})(typeof globalThis !== 'undefined' ? globalThis : this, function () {
+  'use strict';
+
+  // D 마이너 펜타토닉 — 신나면서 인도풍 선율과도 잘 맞는 음계
+  var SCALE = [146.83, 174.61, 196.00, 220.00, 261.63, 293.66, 349.23, 392.00];
+  var BASS = [73.42, 73.42, 98.00, 87.31];         // 마디별 베이스 루트
+  var TEMPO = 132;                                  // BPM
+  var STEPS_PER_BAR = 16;                           // 16분음표
+
+  function create(options) {
+    options = options || {};
+    var Ctor = options.AudioContextCtor;
+    if (Ctor === undefined && typeof window !== 'undefined') {
+      Ctor = window.AudioContext || window.webkitAudioContext;
+    }
+
+    var ctx = null;
+    var master = null, musicBus = null, sfxBus = null;
+    var noise = null;
+    var muted = !!options.muted;
+    var timer = null;
+    var step = 0;
+    var nextTime = 0;
+    var intensity = 0;
+    var failed = false;
+
+    function ensure() {
+      if (failed) return null;
+      if (ctx) return ctx;
+      if (!Ctor) { failed = true; return null; }
+      try {
+        ctx = new Ctor();
+        master = ctx.createGain();
+        master.gain.value = muted ? 0 : 0.9;
+        master.connect(ctx.destination);
+        musicBus = ctx.createGain();
+        musicBus.gain.value = 0.42;
+        musicBus.connect(master);
+        sfxBus = ctx.createGain();
+        sfxBus.gain.value = 0.85;
+        sfxBus.connect(master);
+
+        var len = Math.floor(ctx.sampleRate * 0.5);
+        noise = ctx.createBuffer(1, len, ctx.sampleRate);
+        var data = noise.getChannelData(0);
+        for (var i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+      } catch (e) {
+        failed = true;
+        ctx = null;
+      }
+      return ctx;
+    }
+
+    // 브라우저 정책상 사용자 입력이 있어야 소리가 난다.
+    function unlock() {
+      var c = ensure();
+      if (!c) return false;
+      if (c.state === 'suspended' && c.resume) { try { c.resume(); } catch (e) { /* 무시 */ } }
+      return c.state !== 'suspended';
+    }
+
+    function now() {
+      var c = ensure();
+      return c ? c.currentTime : 0;
+    }
+
+    /* ------------------------------------------------------------ 음색 */
+
+    function tone(opts) {
+      var c = ensure();
+      if (!c) return;
+      var t = opts.at || c.currentTime;
+      var osc = c.createOscillator();
+      var gain = c.createGain();
+      osc.type = opts.type || 'sine';
+      osc.frequency.setValueAtTime(opts.from, t);
+      if (opts.to && opts.to !== opts.from) {
+        osc.frequency.exponentialRampToValueAtTime(Math.max(1, opts.to), t + opts.dur);
+      }
+      gain.gain.setValueAtTime(0.0001, t);
+      gain.gain.exponentialRampToValueAtTime(Math.max(0.0002, opts.gain), t + (opts.attack || 0.005));
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + opts.dur);
+      var out = gain;
+      if (opts.filter) {
+        var f = c.createBiquadFilter();
+        f.type = opts.filter;
+        f.frequency.value = opts.cutoff || 900;
+        gain.connect(f);
+        out = f;
+      }
+      osc.connect(gain);
+      out.connect(opts.bus || sfxBus);
+      osc.start(t);
+      osc.stop(t + opts.dur + 0.02);
+    }
+
+    function hit(opts) {
+      var c = ensure();
+      if (!c || !noise) return;
+      var t = opts.at || c.currentTime;
+      var src = c.createBufferSource();
+      src.buffer = noise;
+      var f = c.createBiquadFilter();
+      f.type = opts.filter || 'highpass';
+      f.frequency.setValueAtTime(opts.cutoff || 6000, t);
+      if (opts.sweepTo) f.frequency.exponentialRampToValueAtTime(opts.sweepTo, t + opts.dur);
+      var gain = c.createGain();
+      gain.gain.setValueAtTime(opts.gain, t);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + opts.dur);
+      src.connect(f); f.connect(gain); gain.connect(opts.bus || sfxBus);
+      src.start(t);
+      src.stop(t + opts.dur + 0.02);
+    }
+
+    /* -------------------------------------------------------- 리듬 파트 */
+
+    function kick(t) {
+      tone({ at: t, type: 'sine', from: 165, to: 45, dur: 0.20, gain: 0.95, bus: musicBus });
+      hit({ at: t, filter: 'lowpass', cutoff: 220, dur: 0.05, gain: 0.35, bus: musicBus });
+    }
+    function snare(t) {
+      hit({ at: t, filter: 'bandpass', cutoff: 1900, dur: 0.16, gain: 0.34, bus: musicBus });
+      tone({ at: t, type: 'triangle', from: 220, to: 160, dur: 0.10, gain: 0.18, bus: musicBus });
+    }
+    function hat(t, accent) {
+      hit({ at: t, filter: 'highpass', cutoff: 8200, dur: accent ? 0.05 : 0.03,
+            gain: accent ? 0.16 : 0.09, bus: musicBus });
+    }
+    function tabla(t, high) {
+      tone({ at: t, type: 'sine', from: high ? 420 : 300, to: high ? 240 : 150,
+             dur: 0.09, gain: 0.30, bus: musicBus });
+    }
+    function bass(t, freq) {
+      tone({ at: t, type: 'sawtooth', from: freq, to: freq, dur: 0.20, gain: 0.42,
+             filter: 'lowpass', cutoff: 420, bus: musicBus });
+    }
+    function lead(t, freq, dur) {
+      tone({ at: t, type: 'triangle', from: freq, to: freq, dur: dur || 0.16, gain: 0.24, bus: musicBus });
+    }
+
+    // intensity 0~3 에 따라 파트가 쌓인다 (스테이지가 올라갈수록 신나게)
+    function scheduleStep(index, t) {
+      var inBar = index % STEPS_PER_BAR;
+      var bar = Math.floor(index / STEPS_PER_BAR) % 4;
+
+      if (inBar % 4 === 0) kick(t);
+      if (intensity >= 1 && (inBar === 6 || inBar === 14)) kick(t);
+      if (inBar === 4 || inBar === 12) snare(t);
+      if (inBar % 2 === 0) hat(t, inBar % 8 === 0);
+      if (intensity >= 1 && (inBar === 3 || inBar === 7 || inBar === 11 || inBar === 15)) {
+        tabla(t, inBar === 7 || inBar === 15);
+      }
+      if (inBar % 8 === 0) bass(t, BASS[bar]);
+      if (intensity >= 2 && inBar % 4 === 2) bass(t, BASS[bar] * 1.5);
+      if (intensity >= 2 && inBar % 2 === 1) {
+        lead(t, SCALE[(index + bar) % SCALE.length], 0.12);
+      }
+      if (intensity >= 3 && inBar % 4 === 0) {
+        lead(t, SCALE[(index * 3 + 2) % SCALE.length] * 2, 0.10);
+      }
+    }
+
+    function pump() {
+      var c = ensure();
+      if (!c) return;
+      var spb = 60 / TEMPO / 4;                       // 16분음표 길이(초)
+      while (nextTime < c.currentTime + 0.12) {       // 0.12초 앞을 미리 예약
+        scheduleStep(step, nextTime);
+        step += 1;
+        nextTime += spb;
+      }
+    }
+
+    function startMusic(level) {
+      intensity = Math.max(0, Math.min(3, level || 0));
+      var c = ensure();
+      if (!c || timer) return;
+      unlock();
+      step = 0;
+      nextTime = c.currentTime + 0.06;
+      pump();
+      timer = setInterval(pump, 25);
+    }
+
+    function stopMusic() {
+      if (timer) { clearInterval(timer); timer = null; }
+    }
+
+    /* --------------------------------------------------------- 효과음 */
+
+    var api = {
+      unlock: unlock,
+      available: function () { return !!ensure(); },
+      isMuted: function () { return muted; },
+      setMuted: function (v) {
+        muted = !!v;
+        if (master) {
+          try {
+            master.gain.setTargetAtTime(muted ? 0 : 0.9, now(), 0.02);
+          } catch (e) { master.gain.value = muted ? 0 : 0.9; }
+        }
+        return muted;
+      },
+      toggleMute: function () { return api.setMuted(!muted); },
+
+      tap: function () {
+        tone({ type: 'triangle', from: 680, to: 340, dur: 0.09, gain: 0.30 });
+        hit({ filter: 'highpass', cutoff: 3200, dur: 0.04, gain: 0.10 });
+      },
+      pass: function (combo) {
+        var n = Math.min(6, Math.max(0, combo || 0));
+        tone({ type: 'square', from: 900 + n * 60, to: 1350 + n * 90, dur: 0.07, gain: 0.16 });
+      },
+      perfect: function () {
+        var t = now();
+        [0, 2, 4].forEach(function (i, k) {
+          tone({ at: t + k * 0.055, type: 'triangle', from: SCALE[i] * 4, to: SCALE[i] * 4,
+                 dur: 0.16, gain: 0.24 });
+        });
+      },
+      stage: function () {
+        var t = now();
+        tone({ at: t, type: 'sawtooth', from: 220, to: 880, dur: 0.45, gain: 0.20,
+               filter: 'lowpass', cutoff: 1800 });
+        hit({ at: t, filter: 'bandpass', cutoff: 900, sweepTo: 2600, dur: 0.9, gain: 0.22 }); // 관중 함성
+      },
+      die: function () {
+        var t = now();
+        tone({ at: t, type: 'sawtooth', from: 320, to: 60, dur: 0.55, gain: 0.42,
+               filter: 'lowpass', cutoff: 700 });
+        hit({ at: t, filter: 'lowpass', cutoff: 1200, sweepTo: 200, dur: 0.4, gain: 0.25 });
+      },
+      levelUp: function () {
+        var t = now();
+        [0, 2, 4, 7].forEach(function (i, k) {
+          tone({ at: t + k * 0.08, type: 'triangle', from: SCALE[i] * 2, to: SCALE[i] * 2,
+                 dur: 0.22, gain: 0.26 });
+        });
+      },
+
+      startMusic: startMusic,
+      stopMusic: stopMusic,
+      isPlaying: function () { return !!timer; },
+      setIntensity: function (level) { intensity = Math.max(0, Math.min(3, level || 0)); },
+      getIntensity: function () { return intensity; }
+    };
+
+    // 어떤 호출도 게임 루프를 죽이지 않도록 전부 try/catch 로 감싼다.
+    Object.keys(api).forEach(function (k) {
+      var fn = api[k];
+      api[k] = function () {
+        try { return fn.apply(null, arguments); } catch (e) { return undefined; }
+      };
+    });
+    return api;
+  }
+
+  return { create: create, SCALE: SCALE, TEMPO: TEMPO };
+});
+
+</script>
+<script>
+/*
+ * SKY GOAL 2.0 — 배경(경치) 렌더러
+ * 히말라야 능선 + 강 + 들판을 패럴랙스로 그린다. 스테이지마다 색과 하늘이 바뀐다.
+ * 지형은 시드 기반으로 한 번만 생성하므로 매 프레임 모양이 흔들리지 않는다.
+ */
+(function (root, factory) {
+  var api = factory();
+  if (typeof module === 'object' && module.exports) module.exports = api;
+  root.SkyGoalScenery = api;
+})(typeof globalThis !== 'undefined' ? globalThis : this, function () {
+  'use strict';
+
+  // 스테이지별 팔레트: 하늘 위/아래, 먼 산, 가까운 산, 강, 숲, 천체
+  var PALETTE = {
+    DAY:         { sky: ['#3aa5f0', '#cdeeff'], far: '#8aa6c2', near: '#5c7f9f', river: '#63bfe6',
+                   forest: '#2f6b46', bank: '#3d7a4e', body: '#fff6d0', bodyGlow: 'rgba(255,246,208,0.35)',
+                   haze: 'rgba(255,255,255,0.30)', stars: 0 },
+    SUNSET:      { sky: ['#ff6a2a', '#ffd9a0'], far: '#8a5f72', near: '#5a3b52', river: '#ffab5e',
+                   forest: '#3c2b3c', bank: '#4b3145', body: '#fff0b8', bodyGlow: 'rgba(255,170,80,0.45)',
+                   haze: 'rgba(255,180,120,0.28)', stars: 0.2 },
+    NIGHT:       { sky: ['#050d22', '#1b4470'], far: '#1b2c47', near: '#101f36', river: '#2c5382',
+                   forest: '#0f2420', bank: '#14301f', body: '#eaf2ff', bodyGlow: 'rgba(220,235,255,0.30)',
+                   haze: 'rgba(140,180,230,0.16)', stars: 1 },
+    RAIN:        { sky: ['#2a3b4b', '#8296a6'], far: '#4d6070', near: '#394a5b', river: '#5a7381',
+                   forest: '#24402f', bank: '#2c4a36', body: null, bodyGlow: null,
+                   haze: 'rgba(200,215,225,0.35)', stars: 0 },
+    WIND:        { sky: ['#2f6d92', '#d5e9f4'], far: '#71889b', near: '#51677a', river: '#7fb6cc',
+                   forest: '#2c5b3f', bank: '#3a6b48', body: '#fdf6df', bodyGlow: 'rgba(253,246,223,0.25)',
+                   haze: 'rgba(255,255,255,0.22)', stars: 0 },
+    STORM:       { sky: ['#070f19', '#33445a'], far: '#1c2836', near: '#111b26', river: '#233444',
+                   forest: '#13221b', bank: '#182c1f', body: null, bodyGlow: null,
+                   haze: 'rgba(150,170,190,0.22)', stars: 0.15 },
+    WORLD_FINAL: { sky: ['#1a0b2e', '#ff9933'], far: '#4a2a56', near: '#2d1838', river: '#c07a35',
+                   forest: '#241640', bank: '#33204a', body: '#fff2c4', bodyGlow: 'rgba(255,200,110,0.45)',
+                   haze: 'rgba(255,190,120,0.25)', stars: 0.5 }
+  };
+
+  function mulberry32(seed) {
+    var a = seed >>> 0;
+    return function () {
+      a = (a + 0x6D2B79F5) >>> 0;
+      var t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  // 능선: 좌우로 이어 붙여도 끊기지 않도록 첫 점과 끝 점의 높이를 맞춘다.
+  function ridge(rand, width, points, baseY, height, roughness) {
+    var pts = [];
+    var first = baseY - height * (0.45 + rand() * 0.4);
+    for (var i = 0; i <= points; i++) {
+      var y;
+      if (i === 0 || i === points) {
+        y = first;
+      } else {
+        var peak = rand() < roughness ? 0.55 + rand() * 0.45 : 0.2 + rand() * 0.3;
+        y = baseY - height * peak;
+      }
+      pts.push({ x: (width * i) / points, y: y });
+    }
+    return pts;
+  }
+
+  function create(seed) {
+    var rand = mulberry32(seed || 20300101);
+    var W = 0, H = 0, groundY = 0;
+    var layers = null;
+    var stars = [];
+    var clouds = [];
+    var birds = [];
+
+    function resize(width, height, ground) {
+      W = width; H = height; groundY = ground;
+      var span = Math.max(640, W * 1.6);          // 반복 단위 폭
+      var horizon = groundY - Math.max(120, H * 0.19);
+      var r = mulberry32(seed || 20300101);       // 리사이즈해도 같은 지형
+
+      layers = {
+        span: span,
+        horizon: horizon,
+        riverTop: groundY - Math.max(76, H * 0.115),
+        riverBottom: groundY - Math.max(30, H * 0.05),
+        far: ridge(r, span, 11, horizon, Math.max(150, H * 0.30), 0.55),
+        near: ridge(r, span, 9, horizon + 26, Math.max(90, H * 0.17), 0.35),
+        forest: ridge(r, span, 26, horizon + 58, Math.max(34, H * 0.055), 0.8)
+      };
+
+      stars = [];
+      for (var i = 0; i < 70; i++) {
+        stars.push({ x: r() * span, y: r() * horizon * 0.8, s: 0.6 + r() * 1.4, tw: r() * 6.28 });
+      }
+      clouds = [];
+      for (var c = 0; c < 6; c++) {
+        clouds.push({ x: r() * span, y: horizon * (0.12 + r() * 0.5), w: 90 + r() * 150, h: 16 + r() * 20 });
+      }
+      birds = [];
+      for (var b = 0; b < 4; b++) {
+        birds.push({ x: r() * span, y: horizon * (0.25 + r() * 0.35), s: 5 + r() * 4, ph: r() * 6.28 });
+      }
+    }
+
+    function paletteFor(key) {
+      return PALETTE[key] || PALETTE.DAY;
+    }
+
+    // 한 레이어를 화면 폭만큼 반복해서 그린다.
+    function fillRidge(ctx, pts, offset, bottom, color) {
+      var span = layers.span;
+      var shift = -(offset % span);
+      ctx.fillStyle = color;
+      for (var pass = 0; pass < Math.ceil(W / span) + 2; pass++) {
+        var base = shift + pass * span;
+        ctx.beginPath();
+        ctx.moveTo(base + pts[0].x, pts[0].y);
+        for (var i = 1; i < pts.length; i++) ctx.lineTo(base + pts[i].x, pts[i].y);
+        ctx.lineTo(base + span, bottom);
+        ctx.lineTo(base, bottom);
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
+
+    function snowCaps(ctx, pts, offset, color) {
+      var span = layers.span;
+      var shift = -(offset % span);
+      ctx.fillStyle = color;
+      for (var pass = 0; pass < Math.ceil(W / span) + 2; pass++) {
+        var base = shift + pass * span;
+        for (var i = 1; i < pts.length - 1; i++) {
+          var p = pts[i], a = pts[i - 1], b = pts[i + 1];
+          if (p.y < a.y && p.y < b.y) {                   // 봉우리에만 만년설
+            var drop = Math.min(28, (Math.min(a.y, b.y) - p.y) * 0.55);
+            if (drop < 6) continue;
+            ctx.beginPath();
+            ctx.moveTo(base + p.x, p.y);
+            ctx.lineTo(base + p.x + drop * 0.9, p.y + drop);
+            ctx.lineTo(base + p.x - drop * 0.9, p.y + drop);
+            ctx.closePath();
+            ctx.fill();
+          }
+        }
+      }
+    }
+
+    /**
+     * opts = { stage: 'NIGHT', scroll: number, time: seconds, flash: 0~1 }
+     */
+    function draw(ctx, opts) {
+      if (!layers) return;
+      var p = paletteFor(opts.stage);
+      var scroll = opts.scroll || 0;
+      var t = opts.time || 0;
+      var L = layers;
+
+      // 하늘
+      var g = ctx.createLinearGradient(0, 0, 0, groundY);
+      g.addColorStop(0, p.sky[0]);
+      g.addColorStop(1, p.sky[1]);
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, W, H);
+
+      // 별
+      if (p.stars > 0) {
+        for (var s = 0; s < stars.length; s++) {
+          var st = stars[s];
+          var x = (st.x - scroll * 0.02) % L.span;
+          if (x < 0) x += L.span;
+          if (x > W) continue;
+          var tw = 0.55 + 0.45 * Math.sin(t * 2 + st.tw);
+          ctx.fillStyle = 'rgba(255,255,255,' + (p.stars * tw * 0.9).toFixed(3) + ')';
+          ctx.fillRect(x, st.y, st.s, st.s);
+        }
+      }
+
+      // 해 / 달
+      if (p.body) {
+        var bx = W * 0.74, by = L.horizon * 0.42;
+        var glow = ctx.createRadialGradient(bx, by, 4, bx, by, 96);
+        glow.addColorStop(0, p.bodyGlow);
+        glow.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = glow;
+        ctx.fillRect(bx - 100, by - 100, 200, 200);
+        ctx.fillStyle = p.body;
+        ctx.beginPath();
+        ctx.arc(bx, by, opts.stage === 'SUNSET' ? 34 : 24, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // 구름
+      ctx.fillStyle = p.haze;
+      for (var c = 0; c < clouds.length; c++) {
+        var cl = clouds[c];
+        var cx = (cl.x - scroll * 0.03) % L.span;
+        if (cx < 0) cx += L.span;
+        if (cx > W + cl.w) continue;
+        ctx.beginPath();
+        ctx.ellipse(cx, cl.y, cl.w * 0.5, cl.h, 0, 0, Math.PI * 2);
+        ctx.ellipse(cx + cl.w * 0.28, cl.y + cl.h * 0.25, cl.w * 0.32, cl.h * 0.75, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // 새 (맑은 스테이지에만)
+      if (p.stars === 0 && opts.stage !== 'RAIN') {
+        ctx.strokeStyle = 'rgba(30,40,55,0.35)';
+        ctx.lineWidth = 1.5;
+        for (var b = 0; b < birds.length; b++) {
+          var bd = birds[b];
+          var bxx = (bd.x - scroll * 0.05 - t * 14) % L.span;
+          if (bxx < 0) bxx += L.span;
+          if (bxx > W) continue;
+          var flap = Math.sin(t * 6 + bd.ph) * bd.s * 0.5;
+          ctx.beginPath();
+          ctx.moveTo(bxx - bd.s, bd.y + flap);
+          ctx.lineTo(bxx, bd.y);
+          ctx.lineTo(bxx + bd.s, bd.y + flap);
+          ctx.stroke();
+        }
+      }
+
+      // 산줄기 (먼 산 → 가까운 산)
+      fillRidge(ctx, L.far, scroll * 0.06, L.riverTop, p.far);
+      snowCaps(ctx, L.far, scroll * 0.06, 'rgba(255,255,255,0.55)');
+      fillRidge(ctx, L.near, scroll * 0.12, L.riverTop, p.near);
+
+      // 대기 원근감
+      var hz = ctx.createLinearGradient(0, L.horizon - 40, 0, L.riverTop);
+      hz.addColorStop(0, 'rgba(255,255,255,0)');
+      hz.addColorStop(1, p.haze);
+      ctx.fillStyle = hz;
+      ctx.fillRect(0, L.horizon - 40, W, L.riverTop - L.horizon + 40);
+
+      // 숲 / 강둑
+      fillRidge(ctx, L.forest, scroll * 0.22, L.riverTop, p.forest);
+
+      // 강
+      var rg = ctx.createLinearGradient(0, L.riverTop, 0, L.riverBottom);
+      rg.addColorStop(0, p.river);
+      rg.addColorStop(0.55, p.sky[1]);
+      rg.addColorStop(1, p.river);
+      ctx.globalAlpha = 0.95;
+      ctx.fillStyle = rg;
+      ctx.fillRect(0, L.riverTop, W, L.riverBottom - L.riverTop);
+      ctx.globalAlpha = 1;
+
+      // 해/달의 물 반사 — 가장자리를 부드럽게 흘린다
+      if (p.body) {
+        var refX = W * 0.74;
+        var refW = 74;
+        var ref = ctx.createLinearGradient(refX - refW / 2, 0, refX + refW / 2, 0);
+        ref.addColorStop(0, 'rgba(0,0,0,0)');
+        ref.addColorStop(0.5, p.bodyGlow);
+        ref.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = ref;
+        for (var rr = 0; rr < 6; rr++) {
+          var ry0 = L.riverTop + (rr / 6) * (L.riverBottom - L.riverTop);
+          var wob = Math.sin(t * 1.6 + rr * 1.1) * (3 + rr * 1.6);
+          ctx.globalAlpha = 0.85 - rr * 0.1;
+          ctx.fillRect(refX - refW / 2 + wob, ry0, refW, (L.riverBottom - L.riverTop) / 6 - 1);
+        }
+        ctx.globalAlpha = 1;
+      }
+
+      // 물비늘
+      ctx.strokeStyle = 'rgba(255,255,255,0.30)';
+      ctx.lineWidth = 1;
+      var rows = 5;
+      for (var r2 = 0; r2 < rows; r2++) {
+        var ry = L.riverTop + ((r2 + 0.5) / rows) * (L.riverBottom - L.riverTop);
+        var speed = 12 + r2 * 9;
+        for (var k = 0; k < 7; k++) {
+          var sx = ((k * 160 + t * speed + r2 * 45 - scroll * 0.35) % (W + 180)) - 90;
+          var len = 26 + (r2 % 3) * 12;
+          ctx.beginPath();
+          ctx.moveTo(sx, ry + Math.sin(t * 2 + k + r2) * 1.6);
+          ctx.lineTo(sx + len, ry + Math.sin(t * 2 + k + r2 + 1) * 1.6);
+          ctx.stroke();
+        }
+      }
+
+      // 앞쪽 강둑
+      ctx.fillStyle = p.bank;
+      ctx.fillRect(0, L.riverBottom, W, groundY - L.riverBottom);
+      ctx.fillStyle = 'rgba(0,0,0,0.18)';
+      ctx.fillRect(0, L.riverBottom, W, 4);
+
+      // 번개 (STORM)
+      if (opts.flash > 0) {
+        ctx.fillStyle = 'rgba(210,230,255,' + (opts.flash * 0.55).toFixed(3) + ')';
+        ctx.fillRect(0, 0, W, H);
+      }
+    }
+
+    return {
+      resize: resize,
+      draw: draw,
+      paletteFor: paletteFor,
+      layout: function () { return layers; }
+    };
+  }
+
+  return { create: create, PALETTE: PALETTE, mulberry32: mulberry32 };
+});
+
+</script>
+<script>
+/*
  * SKY GOAL 2.0 — 게임 셸 (렌더링 / 입력 / 화면 전환)
  * 로직은 전부 SkyGoalEngine 에 있고, 이 파일은 그것을 화면에 연결한다.
  */
@@ -658,6 +1248,8 @@ p { margin: 8px 0; line-height: 1.55; color: #dbe7f7; font-size: 14px; }
 
   var E = window.SkyGoalEngine;
   if (!E) { console.error('SkyGoalEngine 을 찾을 수 없습니다.'); return; }
+  var Scenery = window.SkyGoalScenery;
+  var AudioLib = window.SkyGoalAudio;
 
   /* ------------------------------------------------------------ DOM 참조 */
 
@@ -687,6 +1279,13 @@ p { margin: 8px 0; line-height: 1.55; color: #dbe7f7; font-size: 14px; }
   var elapsed = 0;
   var lastEndReason = null;
   var lastMid = null;
+  var scroll = 0;                    // 배경 패럴랙스용 누적 이동 거리
+  var clock = 0;                     // 배경 애니메이션 시간(초)
+  var flash = 0;                     // 번개 섬광 세기
+  var flashAt = 3;                   // 다음 번개까지 남은 시간
+
+  var scenery = Scenery ? Scenery.create(20300101) : null;
+  var audio = AudioLib ? AudioLib.create({ muted: profile.settings.muted }) : null;
 
   var GATE_W = 54;
   var GATE_SPACING = 260;
@@ -701,6 +1300,7 @@ p { margin: 8px 0; line-height: 1.55; color: #dbe7f7; font-size: 14px; }
     canvas.height = Math.max(1, Math.round(H * dpr));
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     groundY = H * 0.9;
+    if (scenery) scenery.resize(W, H, groundY);
     if (ball) ball.x = Math.min(ball.x, W * 0.45);
   }
   window.addEventListener('resize', resize);
@@ -709,6 +1309,7 @@ p { margin: 8px 0; line-height: 1.55; color: #dbe7f7; font-size: 14px; }
   /* ---------------------------------------------------------- 화면 전환 */
 
   function showStart() {
+    if (audio) audio.stopMusic();
     state = 'idle';
     run = null;
     ball = null;
@@ -792,6 +1393,9 @@ p { margin: 8px 0; line-height: 1.55; color: #dbe7f7; font-size: 14px; }
     sparks = [];
     for (var i = 0; i < 4; i++) gates.push(makeGate(W + 220 + i * GATE_SPACING));
     elapsed = 0;
+    scroll = 0;
+    flash = 0;
+    flashAt = 3;
     lastTapAt = 0;
     state = 'ready';                  // 첫 입력 전까지 공이 떠 있는 준비 상태
     panel.classList.add('hidden');
@@ -804,6 +1408,11 @@ p { margin: 8px 0; line-height: 1.55; color: #dbe7f7; font-size: 14px; }
       state = 'playing';
       lastTapAt = performance.now();
       ball.vy = arena.flap;
+      if (audio) {
+        audio.unlock();
+        audio.tap();
+        audio.startMusic(musicLevel());
+      }
       return;
     }
     if (state !== 'playing') return;
@@ -812,6 +1421,14 @@ p { margin: 8px 0; line-height: 1.55; color: #dbe7f7; font-size: 14px; }
     lastTapAt = now;
     ball.vy = arena.flap;
     ball.spin = -0.5;
+    if (audio) audio.tap();
+  }
+
+  // 스테이지가 올라갈수록 음악 파트를 쌓는다 (0~3)
+  function musicLevel() {
+    var idx = 0;
+    for (var i = 0; i < E.STAGES.length; i++) if (E.STAGES[i].key === stage.key) idx = i;
+    return Math.min(3, Math.floor(idx / 2));
   }
 
   function addSparks(x, y, n, color) {
@@ -833,6 +1450,7 @@ p { margin: 8px 0; line-height: 1.55; color: #dbe7f7; font-size: 14px; }
       stage = next;
       arena = E.arenaParams(run.difficulty, stage, profile.stats);
       run.stage = stage.key;
+      if (audio) { audio.stage(); audio.setIntensity(musicLevel()); }
     }
   }
 
@@ -846,6 +1464,7 @@ p { margin: 8px 0; line-height: 1.55; color: #dbe7f7; font-size: 14px; }
 
     elapsed += dt;
     run.duration = elapsed;
+    scroll += arena.speed * dt;
 
     // 공 물리
     ball.vy += arena.gravity * dt;
@@ -882,8 +1501,10 @@ p { margin: 8px 0; line-height: 1.55; color: #dbe7f7; font-size: 14px; }
         if (error <= g.gap * arena.perfectWindow) {
           run.perfectCount += 1;
           addSparks(ball.x, ball.y, 14, '255,215,0');
+          if (audio) audio.perfect();
         } else {
           addSparks(g.x + GATE_W, g.mid, 6, '255,255,255');
+          if (audio) audio.pass(run.combo);
         }
         refreshStage();
         updateHud();
@@ -923,8 +1544,10 @@ p { margin: 8px 0; line-height: 1.55; color: #dbe7f7; font-size: 14px; }
     state = 'over';
     lastEndReason = reason || 'manual';
     addSparks(ball.x, ball.y, 22, '255,120,60');
+    if (audio) { audio.stopMusic(); audio.die(); }
     var summary = E.commitRun(profile, run);
     storage.save(profile);
+    if (audio && summary.levelsGained > 0) setTimeout(function () { audio.levelUp(); }, 420);
     showResult(summary);
   }
 
@@ -973,59 +1596,58 @@ p { margin: 8px 0; line-height: 1.55; color: #dbe7f7; font-size: 14px; }
 
   /* -------------------------------------------------------------- 렌더 */
 
-  var SKY = {
-    DAY: ['#53b9ff', '#d8f3ff'],
-    SUNSET: ['#ff7e3f', '#ffd9a0'],
-    NIGHT: ['#08152f', '#274b73'],
-    RAIN: ['#2e4457', '#7d94a5'],
-    WIND: ['#3d6f8e', '#cfe6f2'],
-    STORM: ['#0b1622', '#3a4b5c'],
-    WORLD_FINAL: ['#1a0b2e', '#ff9933']
-  };
-
   function drawBackground() {
-    var pair = SKY[stage.key] || SKY.DAY;
-    var g = ctx.createLinearGradient(0, 0, 0, H);
-    g.addColorStop(0, pair[0]);
-    g.addColorStop(1, pair[1]);
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, W, H);
+    if (scenery) {
+      scenery.draw(ctx, { stage: stage.key, scroll: scroll, time: clock, flash: flash });
+    } else {                                   // scenery.js 가 없을 때의 최소 폴백
+      var g0 = ctx.createLinearGradient(0, 0, 0, H);
+      g0.addColorStop(0, '#3aa5f0');
+      g0.addColorStop(1, '#cdeeff');
+      ctx.fillStyle = g0;
+      ctx.fillRect(0, 0, W, H);
+    }
+    drawWeather();
+    drawField();
+  }
 
-    // 원경 관중석
-    ctx.fillStyle = 'rgba(0,0,0,0.18)';
-    ctx.fillRect(0, groundY - 60, W, 60);
-
+  function drawWeather() {
     if (stage.rain > 0) {
-      ctx.strokeStyle = 'rgba(255,255,255,' + (0.18 + 0.22 * stage.rain) + ')';
+      ctx.strokeStyle = 'rgba(255,255,255,' + (0.16 + 0.24 * stage.rain) + ')';
       ctx.lineWidth = 1;
-      var t = performance.now() / 5;
+      var t = clock * 190;
       for (var i = 0; i < 90; i++) {
         var x = (i * 97 + t) % (W + 40) - 20;
-        var y = (i * 53 + t * 1.6) % H;
+        var y = (i * 53 + t * 1.7) % H;
         ctx.beginPath();
         ctx.moveTo(x, y);
         ctx.lineTo(x - 7, y + 20);
         ctx.stroke();
       }
     }
-
     if (stage.wind > 0.5) {
-      ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+      ctx.strokeStyle = 'rgba(255,255,255,0.20)';
       ctx.lineWidth = 2;
       for (var w = 0; w < 5; w++) {
-        var wy = (w * 137 + (performance.now() / 6) % H) % H;
+        var wy = (w * 137 + clock * 26) % H;
+        var wx = (clock * 240 + w * 200) % (W + 300) - 150;
         ctx.beginPath();
-        ctx.moveTo((performance.now() / 3 + w * 200) % (W + 300) - 150, wy);
-        ctx.lineTo((performance.now() / 3 + w * 200) % (W + 300) - 60, wy);
+        ctx.moveTo(wx, wy);
+        ctx.lineTo(wx + 90, wy);
         ctx.stroke();
       }
     }
+  }
 
-    // 잔디
+  // 잔디 경기장 — 줄무늬가 스크롤과 함께 흐른다
+  function drawField() {
     ctx.fillStyle = '#1d6b39';
     ctx.fillRect(0, groundY, W, H - groundY);
-    ctx.fillStyle = 'rgba(255,255,255,0.08)';
-    for (var s = 0; s < W; s += 60) ctx.fillRect(s, groundY, 30, H - groundY);
+    ctx.fillStyle = 'rgba(255,255,255,0.07)';
+    var stripe = 60;
+    var off = -(scroll % (stripe * 2));
+    for (var x = off - stripe * 2; x < W + stripe * 2; x += stripe * 2) {
+      ctx.fillRect(x, groundY, stripe, H - groundY);
+    }
     ctx.fillStyle = 'rgba(255,255,255,0.55)';
     ctx.fillRect(0, groundY, W, 2);
   }
@@ -1101,10 +1723,23 @@ p { margin: 8px 0; line-height: 1.55; color: #dbe7f7; font-size: 14px; }
 
   /* ------------------------------------------------------------ 루프 */
 
+  // STORM / WORLD FINAL 에서 간헐적으로 번개가 친다
+  function tickLightning(dt) {
+    if (flash > 0) flash = Math.max(0, flash - dt * 3.5);
+    if (stage.key !== 'STORM' && stage.key !== 'WORLD_FINAL') return;
+    flashAt -= dt;
+    if (flashAt <= 0) {
+      flash = 1;
+      flashAt = 2.5 + Math.random() * 4.5;
+    }
+  }
+
   function frame(now) {
     var dt = lastFrame ? (now - lastFrame) / 1000 : 0;
     lastFrame = now;
     dt = Math.min(dt, 1 / 30);             // 탭 전환 후 큰 점프 방지
+    clock += dt;
+    tickLightning(dt);
     if (state === 'ready' || state === 'playing') update(dt);
     if (state !== 'idle') render();
     else drawBackground();
@@ -1133,6 +1768,21 @@ p { margin: 8px 0; line-height: 1.55; color: #dbe7f7; font-size: 14px; }
     }
   });
 
+  var muteBtn = $('btn-mute');
+  function refreshMute() {
+    var muted = profile.settings.muted;
+    muteBtn.textContent = muted ? '🔇' : '🔊';
+    muteBtn.classList.toggle('off', muted);
+    if (audio) audio.setMuted(muted);
+  }
+  muteBtn.addEventListener('click', function () {
+    profile.settings.muted = !profile.settings.muted;
+    storage.save(profile);
+    refreshMute();
+    if (audio && !profile.settings.muted) { audio.unlock(); audio.tap(); }
+  });
+  if (!AudioLib) muteBtn.classList.add('hidden');
+
   $('btn-start').addEventListener('click', startRun);
   $('btn-retry').addEventListener('click', startRun);
   $('btn-home').addEventListener('click', showStart);
@@ -1140,6 +1790,7 @@ p { margin: 8px 0; line-height: 1.55; color: #dbe7f7; font-size: 14px; }
     if (!window.confirm('플레이어 데이터를 초기화할까요?')) return;
     profile = storage.reset();
     storage.save(profile);
+    refreshMute();
     showStart();
   });
   var statButtons = screenResult.querySelectorAll('button[data-stat]');
@@ -1155,12 +1806,15 @@ p { margin: 8px 0; line-height: 1.55; color: #dbe7f7; font-size: 14px; }
   /* ------------------------------------------------------------ 시작 */
 
   resize();
+  refreshMute();
   showStart();
   requestAnimationFrame(frame);
 
   // 자동화 테스트/디버깅용 훅
   window.SkyGoal = {
     engine: E,
+    audio: function () { return audio; },
+    scenery: function () { return scenery; },
     getProfile: function () { return profile; },
     getState: function () { return state; },
     getRun: function () { return run; },
@@ -1178,6 +1832,17 @@ p { margin: 8px 0; line-height: 1.55; color: #dbe7f7; font-size: 14px; }
         endReason: lastEndReason,
         size: { w: W, h: H, groundY: groundY }
       };
+    },
+    // 아트 확인용: 특정 스테이지 연출을 즉시 적용한다
+    previewStage: function (key) {
+      for (var i = 0; i < E.STAGES.length; i++) {
+        if (E.STAGES[i].key === key) stage = E.STAGES[i];
+      }
+      arena = E.arenaParams(run ? run.difficulty : profile.difficulty, stage, profile.stats);
+      if (run) run.stage = stage.key;
+      if (audio) audio.setIntensity(musicLevel());
+      updateHud();
+      return stage.key;
     }
   };
 })();

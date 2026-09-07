@@ -3,7 +3,7 @@
 ## 실행 방법
 ```bash
 ./test.sh                    # 빌드 + 엔진 테스트 + 브라우저 스모크 테스트
-node --test 07_MVP_Code/tests/engine.test.js
+node --test 07_MVP_Code/tests/*.test.js
 node 07_MVP_Code/tests/browser.smoke.mjs --screenshot ./shots
 ```
 브라우저 스모크 테스트는 Playwright 가 설치된 환경에서만 실행되고, 없으면 자동으로 건너뛴다.
@@ -25,9 +25,31 @@ node 07_MVP_Code/tests/browser.smoke.mjs --screenshot ./shots
 | 시뮬레이션 | 120게임 동안 난이도 수렴과 발산 없음 |
 | 저장소 | localStorage 차단·손상 시 폴백 |
 
-## 2. 브라우저 스모크 테스트 (`tests/browser.smoke.mjs`, 15개)
+## 1-2. 사운드 테스트 (`tests/audio.test.js`, 5개)
+| 항목 | 확인 내용 |
+|---|---|
+| 효과음 | 오실레이터가 실제로 예약된다 (WebAudio 스텁으로 호출 수 검증) |
+| BGM | 시작·정지, 강도 0~3 클램프 |
+| 음소거 | 토글과 초기 muted 옵션 |
+| 미지원 환경 | AudioContext 가 없으면 모든 호출이 무시된다 |
+| 생성 실패 | 생성자가 예외를 던져도 게임이 계속된다 |
+
+## 1-3. 배경 테스트 (`tests/scenery.test.js`, 6개)
+| 항목 | 확인 내용 |
+|---|---|
+| 레이어 순서 | 능선 → 강 → 잔디 순으로 배치 |
+| 이음매 | 능선 첫/끝 높이가 같아 무한 반복 시 끊기지 않음 |
+| 결정성 | 같은 시드 = 같은 지형, 다른 시드 = 다른 지형 |
+| 리사이즈 | 크기가 바뀌어도 같은 산 |
+| 7개 스테이지 | 팔레트 존재 + 렌더 호출 발생, 알 수 없는 키도 안전 |
+| 초기화 전 호출 | resize 전에 draw 해도 죽지 않음 |
+
+## 2. 브라우저 스모크 테스트 (`tests/browser.smoke.mjs`, 23개)
 실제 Chromium 에서 빌드된 단일 HTML 을 띄워 확인한다.
-- 시작 화면 표시 / 엔진 로드
+- 시작 화면 표시 / 엔진·사운드·배경 모듈 로드
+- 배경 레이어 순서(산 → 강 → 잔디)
+- 실제 클릭으로 AudioContext 가 열리고 BGM 이 재생됨
+- 음소거 버튼 토글과 새로고침 후 설정 유지
 - 경기 시작 → `ready` 상태 → HUD 표시
 - 자동 조종 봇이 골문을 연속 통과해 점수를 낸다(최대 3판 시도)
 - 결과 화면과 보상 표시
@@ -43,6 +65,7 @@ node 07_MVP_Code/tests/browser.smoke.mjs --screenshot ./shots
 4. 최근 10게임 성공률이 65~80% 근처를 유지하는가
 5. 모바일 터치 / PC 스페이스 / 클릭 모두 동작하는가
 6. 탭 전환 후 돌아왔을 때 공이 갑자기 죽지 않는가 (자동 일시정지)
+6-1. 스테이지가 바뀔 때 배경과 BGM 강도가 함께 바뀌는가
 7. 장시간 플레이 시 골문 배열이 끊기지 않는가
 
 ## 4. 목표 KPI

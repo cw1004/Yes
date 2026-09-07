@@ -69,6 +69,12 @@ try {
 
   check('시작 화면이 보인다', await page.isVisible('#screen-start'));
   check('엔진이 로드되었다', await page.evaluate(() => !!window.SkyGoalEngine));
+  check('사운드·배경 모듈이 로드되었다',
+    await page.evaluate(() => !!window.SkyGoalAudio && !!window.SkyGoalScenery));
+  check('배경 레이어가 산 → 강 → 잔디 순으로 구성된다', await page.evaluate(() => {
+    const L = window.SkyGoal.scenery().layout();
+    return !!L && L.horizon < L.riverTop && L.riverTop < L.riverBottom;
+  }));
   if (shotDir) {
     fs.mkdirSync(shotDir, { recursive: true });
     await page.screenshot({ path: path.join(shotDir, '01-start.png') });
@@ -77,6 +83,15 @@ try {
   await page.click('#btn-start');
   check('경기 시작 → ready 상태', (await page.evaluate(() => window.SkyGoal.getState())) === 'ready');
   check('HUD 가 표시된다', await page.isVisible('#hud'));
+
+  // 실제 클릭(사용자 제스처)으로 오디오가 열리고 BGM 이 도는지
+  await page.mouse.click(210, 500);
+  const sound = await page.evaluate(() => {
+    const a = window.SkyGoal.audio();
+    return { available: !!a && a.available(), playing: !!a && a.isPlaying(), muted: !!a && a.isMuted() };
+  });
+  check('오디오 컨텍스트가 열린다', sound.available, JSON.stringify(sound));
+  check('BGM 이 재생된다', sound.playing);
 
   // 자동 조종: 매 프레임 다음 골문을 겨냥해 탭하는 간단한 봇.
   // 봇이 완벽하지는 않으므로 최대 3판까지 시도해 "사람이 칠 수 있는 게임인지"만 확인한다.
@@ -162,7 +177,24 @@ try {
   // 회전/리사이즈
   await page.setViewportSize({ width: 900, height: 500 });
   await page.waitForTimeout(300);
+  // 음소거 설정
+  await page.click('#btn-mute');
+  const mutedNow = await page.evaluate(() => ({
+    flag: window.SkyGoal.getProfile().settings.muted,
+    icon: document.getElementById('btn-mute').textContent
+  }));
+  check('음소거 버튼이 상태를 바꾼다', mutedNow.flag === true, 'icon=' + mutedNow.icon);
+  await page.reload({ waitUntil: 'load' });
+  await page.waitForFunction(() => !!window.SkyGoal, null, { timeout: 5000 });
+  check('음소거 설정이 새로고침 후에도 유지된다',
+    await page.evaluate(() => window.SkyGoal.getProfile().settings.muted === true));
+  await page.click('#btn-mute');
+  check('음소거를 다시 해제할 수 있다',
+    await page.evaluate(() => window.SkyGoal.getProfile().settings.muted === false));
+
   check('리사이즈 후에도 렌더가 살아있다', (await page.evaluate(() => window.SkyGoal.debug().size.w)) > 800);
+  check('리사이즈 후 배경도 다시 계산된다',
+    await page.evaluate(() => window.SkyGoal.scenery().layout().span >= 640));
   check('가로 스크롤이 생기지 않는다',
     await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
 

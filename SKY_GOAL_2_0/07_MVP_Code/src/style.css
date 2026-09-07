@@ -73,4 +73,12 @@ p { margin: 8px 0; line-height: 1.55; color: #dbe7f7; font-size: 14px; }
 }
 .statpick button:disabled { opacity: 0.35; cursor: default; }
 .reasons { margin: 8px 0 0; padding-left: 18px; color: var(--sub); font-size: 12px; }
+.iconbtn {
+  position: fixed; right: 14px; bottom: 14px; z-index: 20;
+  width: 46px; height: 46px; border-radius: 50%; cursor: pointer;
+  font-size: 20px; line-height: 1; color: var(--ink);
+  background: rgba(7, 17, 31, 0.78); border: 1px solid var(--line);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+}
+.iconbtn.off { opacity: 0.55; }
 .hidden { display: none !important; }

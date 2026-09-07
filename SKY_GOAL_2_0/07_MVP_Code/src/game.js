@@ -7,6 +7,8 @@
 
   var E = window.SkyGoalEngine;
   if (!E) { console.error('SkyGoalEngine 을 찾을 수 없습니다.'); return; }
+  var Scenery = window.SkyGoalScenery;
+  var AudioLib = window.SkyGoalAudio;
 
   /* ------------------------------------------------------------ DOM 참조 */
 
@@ -36,6 +38,13 @@
   var elapsed = 0;
   var lastEndReason = null;
   var lastMid = null;
+  var scroll = 0;                    // 배경 패럴랙스용 누적 이동 거리
+  var clock = 0;                     // 배경 애니메이션 시간(초)
+  var flash = 0;                     // 번개 섬광 세기
+  var flashAt = 3;                   // 다음 번개까지 남은 시간
+
+  var scenery = Scenery ? Scenery.create(20300101) : null;
+  var audio = AudioLib ? AudioLib.create({ muted: profile.settings.muted }) : null;
 
   var GATE_W = 54;
   var GATE_SPACING = 260;
@@ -50,6 +59,7 @@
     canvas.height = Math.max(1, Math.round(H * dpr));
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     groundY = H * 0.9;
+    if (scenery) scenery.resize(W, H, groundY);
     if (ball) ball.x = Math.min(ball.x, W * 0.45);
   }
   window.addEventListener('resize', resize);
@@ -58,6 +68,7 @@
   /* ---------------------------------------------------------- 화면 전환 */
 
   function showStart() {
+    if (audio) audio.stopMusic();
     state = 'idle';
     run = null;
     ball = null;
@@ -141,6 +152,9 @@
     sparks = [];
     for (var i = 0; i < 4; i++) gates.push(makeGate(W + 220 + i * GATE_SPACING));
     elapsed = 0;
+    scroll = 0;
+    flash = 0;
+    flashAt = 3;
     lastTapAt = 0;
     state = 'ready';                  // 첫 입력 전까지 공이 떠 있는 준비 상태
     panel.classList.add('hidden');
@@ -153,6 +167,11 @@
       state = 'playing';
       lastTapAt = performance.now();
       ball.vy = arena.flap;
+      if (audio) {
+        audio.unlock();
+        audio.tap();
+        audio.startMusic(musicLevel());
+      }
       return;
     }
     if (state !== 'playing') return;
@@ -161,6 +180,14 @@
     lastTapAt = now;
     ball.vy = arena.flap;
     ball.spin = -0.5;
+    if (audio) audio.tap();
+  }
+
+  // 스테이지가 올라갈수록 음악 파트를 쌓는다 (0~3)
+  function musicLevel() {
+    var idx = 0;
+    for (var i = 0; i < E.STAGES.length; i++) if (E.STAGES[i].key === stage.key) idx = i;
+    return Math.min(3, Math.floor(idx / 2));
   }
 
   function addSparks(x, y, n, color) {
@@ -182,6 +209,7 @@
       stage = next;
       arena = E.arenaParams(run.difficulty, stage, profile.stats);
       run.stage = stage.key;
+      if (audio) { audio.stage(); audio.setIntensity(musicLevel()); }
     }
   }
 
@@ -195,6 +223,7 @@
 
     elapsed += dt;
     run.duration = elapsed;
+    scroll += arena.speed * dt;
 
     // 공 물리
     ball.vy += arena.gravity * dt;
@@ -231,8 +260,10 @@
         if (error <= g.gap * arena.perfectWindow) {
           run.perfectCount += 1;
           addSparks(ball.x, ball.y, 14, '255,215,0');
+          if (audio) audio.perfect();
         } else {
           addSparks(g.x + GATE_W, g.mid, 6, '255,255,255');
+          if (audio) audio.pass(run.combo);
         }
         refreshStage();
         updateHud();
@@ -272,8 +303,10 @@
     state = 'over';
     lastEndReason = reason || 'manual';
     addSparks(ball.x, ball.y, 22, '255,120,60');
+    if (audio) { audio.stopMusic(); audio.die(); }
     var summary = E.commitRun(profile, run);
     storage.save(profile);
+    if (audio && summary.levelsGained > 0) setTimeout(function () { audio.levelUp(); }, 420);
     showResult(summary);
   }
 
@@ -322,59 +355,58 @@
 
   /* -------------------------------------------------------------- 렌더 */
 
-  var SKY = {
-    DAY: ['#53b9ff', '#d8f3ff'],
-    SUNSET: ['#ff7e3f', '#ffd9a0'],
-    NIGHT: ['#08152f', '#274b73'],
-    RAIN: ['#2e4457', '#7d94a5'],
-    WIND: ['#3d6f8e', '#cfe6f2'],
-    STORM: ['#0b1622', '#3a4b5c'],
-    WORLD_FINAL: ['#1a0b2e', '#ff9933']
-  };
-
   function drawBackground() {
-    var pair = SKY[stage.key] || SKY.DAY;
-    var g = ctx.createLinearGradient(0, 0, 0, H);
-    g.addColorStop(0, pair[0]);
-    g.addColorStop(1, pair[1]);
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, W, H);
+    if (scenery) {
+      scenery.draw(ctx, { stage: stage.key, scroll: scroll, time: clock, flash: flash });
+    } else {                                   // scenery.js 가 없을 때의 최소 폴백
+      var g0 = ctx.createLinearGradient(0, 0, 0, H);
+      g0.addColorStop(0, '#3aa5f0');
+      g0.addColorStop(1, '#cdeeff');
+      ctx.fillStyle = g0;
+      ctx.fillRect(0, 0, W, H);
+    }
+    drawWeather();
+    drawField();
+  }
 
-    // 원경 관중석
-    ctx.fillStyle = 'rgba(0,0,0,0.18)';
-    ctx.fillRect(0, groundY - 60, W, 60);
-
+  function drawWeather() {
     if (stage.rain > 0) {
-      ctx.strokeStyle = 'rgba(255,255,255,' + (0.18 + 0.22 * stage.rain) + ')';
+      ctx.strokeStyle = 'rgba(255,255,255,' + (0.16 + 0.24 * stage.rain) + ')';
       ctx.lineWidth = 1;
-      var t = performance.now() / 5;
+      var t = clock * 190;
       for (var i = 0; i < 90; i++) {
         var x = (i * 97 + t) % (W + 40) - 20;
-        var y = (i * 53 + t * 1.6) % H;
+        var y = (i * 53 + t * 1.7) % H;
         ctx.beginPath();
         ctx.moveTo(x, y);
         ctx.lineTo(x - 7, y + 20);
         ctx.stroke();
       }
     }
-
     if (stage.wind > 0.5) {
-      ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+      ctx.strokeStyle = 'rgba(255,255,255,0.20)';
       ctx.lineWidth = 2;
       for (var w = 0; w < 5; w++) {
-        var wy = (w * 137 + (performance.now() / 6) % H) % H;
+        var wy = (w * 137 + clock * 26) % H;
+        var wx = (clock * 240 + w * 200) % (W + 300) - 150;
         ctx.beginPath();
-        ctx.moveTo((performance.now() / 3 + w * 200) % (W + 300) - 150, wy);
-        ctx.lineTo((performance.now() / 3 + w * 200) % (W + 300) - 60, wy);
+        ctx.moveTo(wx, wy);
+        ctx.lineTo(wx + 90, wy);
         ctx.stroke();
       }
     }
+  }
 
-    // 잔디
+  // 잔디 경기장 — 줄무늬가 스크롤과 함께 흐른다
+  function drawField() {
     ctx.fillStyle = '#1d6b39';
     ctx.fillRect(0, groundY, W, H - groundY);
-    ctx.fillStyle = 'rgba(255,255,255,0.08)';
-    for (var s = 0; s < W; s += 60) ctx.fillRect(s, groundY, 30, H - groundY);
+    ctx.fillStyle = 'rgba(255,255,255,0.07)';
+    var stripe = 60;
+    var off = -(scroll % (stripe * 2));
+    for (var x = off - stripe * 2; x < W + stripe * 2; x += stripe * 2) {
+      ctx.fillRect(x, groundY, stripe, H - groundY);
+    }
     ctx.fillStyle = 'rgba(255,255,255,0.55)';
     ctx.fillRect(0, groundY, W, 2);
   }
@@ -450,10 +482,23 @@
 
   /* ------------------------------------------------------------ 루프 */
 
+  // STORM / WORLD FINAL 에서 간헐적으로 번개가 친다
+  function tickLightning(dt) {
+    if (flash > 0) flash = Math.max(0, flash - dt * 3.5);
+    if (stage.key !== 'STORM' && stage.key !== 'WORLD_FINAL') return;
+    flashAt -= dt;
+    if (flashAt <= 0) {
+      flash = 1;
+      flashAt = 2.5 + Math.random() * 4.5;
+    }
+  }
+
   function frame(now) {
     var dt = lastFrame ? (now - lastFrame) / 1000 : 0;
     lastFrame = now;
     dt = Math.min(dt, 1 / 30);             // 탭 전환 후 큰 점프 방지
+    clock += dt;
+    tickLightning(dt);
     if (state === 'ready' || state === 'playing') update(dt);
     if (state !== 'idle') render();
     else drawBackground();
@@ -482,6 +527,21 @@
     }
   });
 
+  var muteBtn = $('btn-mute');
+  function refreshMute() {
+    var muted = profile.settings.muted;
+    muteBtn.textContent = muted ? '🔇' : '🔊';
+    muteBtn.classList.toggle('off', muted);
+    if (audio) audio.setMuted(muted);
+  }
+  muteBtn.addEventListener('click', function () {
+    profile.settings.muted = !profile.settings.muted;
+    storage.save(profile);
+    refreshMute();
+    if (audio && !profile.settings.muted) { audio.unlock(); audio.tap(); }
+  });
+  if (!AudioLib) muteBtn.classList.add('hidden');
+
   $('btn-start').addEventListener('click', startRun);
   $('btn-retry').addEventListener('click', startRun);
   $('btn-home').addEventListener('click', showStart);
@@ -489,6 +549,7 @@
     if (!window.confirm('플레이어 데이터를 초기화할까요?')) return;
     profile = storage.reset();
     storage.save(profile);
+    refreshMute();
     showStart();
   });
   var statButtons = screenResult.querySelectorAll('button[data-stat]');
@@ -504,12 +565,15 @@
   /* ------------------------------------------------------------ 시작 */
 
   resize();
+  refreshMute();
   showStart();
   requestAnimationFrame(frame);
 
   // 자동화 테스트/디버깅용 훅
   window.SkyGoal = {
     engine: E,
+    audio: function () { return audio; },
+    scenery: function () { return scenery; },
     getProfile: function () { return profile; },
     getState: function () { return state; },
     getRun: function () { return run; },
@@ -527,6 +591,17 @@
         endReason: lastEndReason,
         size: { w: W, h: H, groundY: groundY }
       };
+    },
+    // 아트 확인용: 특정 스테이지 연출을 즉시 적용한다
+    previewStage: function (key) {
+      for (var i = 0; i < E.STAGES.length; i++) {
+        if (E.STAGES[i].key === key) stage = E.STAGES[i];
+      }
+      arena = E.arenaParams(run ? run.difficulty : profile.difficulty, stage, profile.stats);
+      if (run) run.stage = stage.key;
+      if (audio) audio.setIntensity(musicLevel());
+      updateHud();
+      return stage.key;
     }
   };
 })();

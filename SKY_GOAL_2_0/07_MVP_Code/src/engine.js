@@ -63,6 +63,7 @@
       coins: 0,
       statPoints: 0,
       bestScore: 0,
+      settings: { muted: false },
       stats: { control: 50, power: 50, speed: 50, luck: 50, stamina: 50 },
       metrics: {
         games: 0,
@@ -98,6 +99,7 @@
     var m = raw.metrics && typeof raw.metrics === 'object' ? raw.metrics : {};
     var inv = raw.inventory && typeof raw.inventory === 'object' ? raw.inventory : {};
     var lr = raw.lastRun && typeof raw.lastRun === 'object' ? raw.lastRun : {};
+    var settings = raw.settings && typeof raw.settings === 'object' ? raw.settings : {};
 
     function numList(v, cap) {
       if (!Array.isArray(v)) return [];
@@ -119,6 +121,7 @@
       coins: Math.max(0, Math.floor(num(raw.coins, 0, 0, 1e12))),
       statPoints: Math.max(0, Math.floor(num(raw.statPoints, 0, 0, 9999))),
       bestScore: Math.max(0, Math.floor(num(raw.bestScore, 0, 0, 1e9))),
+      settings: { muted: settings.muted === true },
       stats: {
         control: num(stats.control, 50, 0, 100),
         power: num(stats.power, 50, 0, 100),
