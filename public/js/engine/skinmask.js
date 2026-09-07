@@ -9,15 +9,45 @@
  */
 import { rgbToYCbCr, rgbToHsv } from './color.js';
 
-/** 단일 픽셀이 피부색 범위인지 판정 */
-export function isSkinPixel(r, g, b) {
+/**
+ * 단일 픽셀이 피부색 범위인지 판정.
+ *
+ * 밝기 하한(vFloor/rFloor)은 고정하지 않는다. 절대값으로 박아두면
+ * 짙은 피부톤(Fitzpatrick V~VI)이 실내 조명에서 통째로 '피부 아님'으로 떨어진다.
+ * 색상(cb/cr)과 채널 간 관계(r>b, r-g)는 톤과 무관하게 유지되므로 그쪽으로 판별하고,
+ * 밝기 하한은 호출부가 이미지 평균에서 계산해 넘긴다.
+ */
+export function isSkinPixel(r, g, b, { vFloor = 0.12, rFloor = 32 } = {}) {
   const { cb, cr } = rgbToYCbCr(r, g, b);
   const { h, s, v } = rgbToHsv(r, g, b);
   const ycc = cb >= 77 && cb <= 135 && cr >= 133 && cr <= 180;
-  const hsv = (h <= 50 || h >= 335) && s >= 0.12 && s <= 0.72 && v >= 0.25;
-  const rgb = r > 60 && g > 30 && b > 15 && r > b && r - g > 8;
+  const hsv = (h <= 50 || h >= 335) && s >= 0.12 && s <= 0.82 && v >= vFloor;
+  const rgb = r > rFloor && g > rFloor * 0.5 && b > rFloor * 0.25 && r > b && r - g > 7;
   // 세 규칙 중 둘 이상 만족해야 피부로 본다 (머리카락/배경 오검출 억제)
   return (ycc ? 1 : 0) + (hsv ? 1 : 0) + (rgb ? 1 : 0) >= 2;
+}
+
+/** 얼굴 영역의 밝기에서 하한을 역산한다 (어두운 사진·짙은 톤 모두 대응) */
+export function adaptiveFloors(img, box) {
+  const { data, width, height } = img;
+  let sumV = 0, sumR = 0, n = 0;
+  const x0 = Math.max(0, box.x | 0), y0 = Math.max(0, box.y | 0);
+  const x1 = Math.min(width, (box.x + box.width) | 0), y1 = Math.min(height, (box.y + box.height) | 0);
+  for (let y = y0; y < y1; y += 3) {
+    for (let x = x0; x < x1; x += 3) {
+      const i = (y * width + x) * 4;
+      sumV += Math.max(data[i], data[i + 1], data[i + 2]);
+      sumR += data[i];
+      n++;
+    }
+  }
+  if (!n) return { vFloor: 0.12, rFloor: 32 };
+  const meanV = sumV / n / 255;
+  const meanR = sumR / n;
+  return {
+    vFloor: Math.min(0.24, Math.max(0.05, meanV * 0.42)),
+    rFloor: Math.min(70, Math.max(22, meanR * 0.42)),
+  };
 }
 
 /**
@@ -27,6 +57,7 @@ export function isSkinPixel(r, g, b) {
  */
 export function buildSkinMask(img, box) {
   const { data, width, height } = img;
+  const floors = adaptiveFloors(img, box);
   const mask = new Uint8Array(width * height);
   const cx = box.x + box.width / 2;
   const cy = box.y + box.height / 2;
@@ -39,7 +70,7 @@ export function buildSkinMask(img, box) {
       const nx = (x - cx) / rx;
       if (nx * nx + ny * ny > 1) continue; // 얼굴 타원 밖은 버린다
       const i = (y * width + x) * 4;
-      if (isSkinPixel(data[i], data[i + 1], data[i + 2])) {
+      if (isSkinPixel(data[i], data[i + 1], data[i + 2], floors)) {
         mask[y * width + x] = 1;
         count++;
       }

@@ -134,6 +134,7 @@ function revealAllConsult() {
     </div>`).join('');
   // 텍스트는 innerHTML 이 아니라 textContent 로 넣는다
   el.querySelectorAll('.bubble p').forEach((p, i) => { p.textContent = report.consult.script[i].text; });
+  el.dataset.playing = '0';
 }
 
 function showReport(report, { toConsult = false } = {}) {

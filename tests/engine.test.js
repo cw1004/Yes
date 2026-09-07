@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { rgbToLab, labToHex, ita, itaToCategory } from '../public/js/engine/color.js';
-import { isSkinPixel, faceZones } from '../public/js/engine/skinmask.js';
+import { isSkinPixel, faceZones, adaptiveFloors } from '../public/js/engine/skinmask.js';
 import { computeMetrics } from '../public/js/engine/metrics.js';
 import { assessQuality, fallbackFaceBox } from '../public/js/engine/quality.js';
 import { diagnose, skinTypeOf, personalColor } from '../public/js/engine/diagnose.js';
@@ -61,6 +61,33 @@ test('피부색 판정은 피부/비피부를 구분한다', () => {
   assert.equal(isSkinPixel(20, 18, 16), false);    // 머리카락
 });
 
+test('모든 피부톤이 조명 조건과 무관하게 검출된다', () => {
+  // Fitzpatrick I~VI. 밝기 하한을 절대값으로 박아두면 짙은 톤이 실내 조명에서
+  // 통째로 '피부 아님'이 되어 진단 자체가 불가능해진다.
+  const tones = [[246, 226, 208], [237, 205, 180], [222, 184, 155], [198, 150, 116], [150, 102, 72], [104, 66, 46], [72, 45, 33]];
+  const floorsOf = (rgb) => adaptiveFloors({ data: new Uint8ClampedArray([...rgb, 255]), width: 1, height: 1 }, { x: 0, y: 0, width: 1, height: 1 });
+  for (const tone of tones) {
+    for (const dim of [1, 0.8, 0.6, 0.45]) {
+      const c = tone.map((v) => Math.round(v * dim));
+      assert.equal(isSkinPixel(c[0], c[1], c[2], floorsOf(c)), true, `톤 ${tone} × ${dim} 미검출`);
+    }
+  }
+  // 배경·머리카락은 여전히 배제되어야 한다
+  for (const bad of [[30, 25, 22], [30, 90, 220], [130, 130, 132], [240, 240, 245], [60, 140, 70]]) {
+    assert.equal(isSkinPixel(bad[0], bad[1], bad[2], floorsOf(bad)), false, `${bad} 오검출`);
+  }
+});
+
+test('짙은 피부톤 얼굴도 마스크와 지표가 정상 산출된다', () => {
+  const deep = syntheticFace({ base: [104, 66, 46], noise: 8 });
+  const a = computeMetrics(deep.img, deep.box);
+  assert.ok(a.coverage.skinRatio > 0.5, `짙은 톤 skinRatio ${a.coverage.skinRatio}`);
+  assert.ok(a.tone.ita < 0, `짙은 톤은 ITA 음수여야 한다 (${a.tone.ita})`);
+  assert.ok(['V', 'VI'].includes(a.tone.fitzpatrick), `Fitzpatrick ${a.tone.fitzpatrick}`);
+  assert.equal(a.metrics.length, 9);
+  assert.ok(a.totalScore > 0);
+});
+
 test('깨끗한 합성 얼굴이 문제 있는 얼굴보다 총점이 높다', () => {
   const clean = syntheticFace({ noise: 4 });
   const bad = syntheticFace({ noise: 30, shine: 0.5, spots: 0.12, darkEye: 34 });
@@ -86,6 +113,25 @@ test('눈밑을 어둡게 하면 다크서클 점수가 떨어진다', () => {
   const a = computeMetrics(flat.img, flat.box).metrics.find((m) => m.key === 'darkCircle');
   const b = computeMetrics(circles.img, circles.box).metrics.find((m) => m.key === 'darkCircle');
   assert.ok(b.score < a.score, `${b.score} < ${a.score}`);
+});
+
+test('같은 정도의 피부 상태는 톤이 달라도 비슷하게 채점된다', () => {
+  // 결·주름은 ΔL 로 재므로, 보정 없이는 짙은 톤일수록 점수가 부풀어
+  // "손댈 게 없습니다"라는 잘못된 결론이 나온다.
+  const relFace = (base, rel) => {
+    const { img, box } = syntheticFace({ base, noise: rel * base[0] });
+    return computeMetrics(img, box);
+  };
+  for (const rel of [0.08, 0.16]) {
+    const scores = [[237, 205, 180], [198, 150, 116], [104, 66, 46]].map((b) => relFace(b, rel).totalScore);
+    const spread = Math.max(...scores) - Math.min(...scores);
+    assert.ok(spread <= 16, `상대 거칠기 ${rel}에서 톤별 총점 편차가 ${spread}점 (${scores.join('/')})`);
+  }
+  // 보정 계수가 실제로 톤에 반응하는지
+  const light = relFace([237, 205, 180], 0.1);
+  const deep = relFace([104, 66, 46], 0.1);
+  assert.ok(deep.toneCorrection > light.toneCorrection * 1.5,
+    `짙은 톤 보정이 더 커야 한다 (${deep.toneCorrection} vs ${light.toneCorrection})`);
 });
 
 test('흐리거나 어두운 사진은 품질 게이트에 걸린다', () => {
@@ -123,6 +169,32 @@ test('셰이드 매칭은 ITA와 언더톤이 가까운 호수를 고른다', ()
   assert.equal(light.code, '01');
   assert.equal(deep.code, '04');
   assert.ok(deep.fit > 70);
+  assert.equal(deep.matched, true);
+});
+
+test('커버되지 않는 톤에는 매칭을 표시하지 않는다', () => {
+  // 0% 매칭을 '추천 호수'로 내미는 건 추천이 아니라 오안내다
+  const cushion = catalog.products.find((p) => p.id === 'cus-001'); // ITA 12~58 커버
+  const outOfRange = bestShade(cushion, { ita: -40, undertone: 'cool' });
+  assert.equal(outOfRange.matched, false);
+
+  const foundation = catalog.products.find((p) => p.id === 'fnd-001'); // 딥까지 커버
+  const deep = bestShade(foundation, { ita: -32, undertone: 'cool' });
+  assert.equal(deep.matched, true, `딥 톤도 커버되어야 한다 (매칭 ${deep.fit}%)`);
+
+  // 커버 못 하는 제품은 랭킹에서 밀려야 한다
+  const profile = {
+    tone: { ita: -32, undertone: 'cool' }, skinType: 'combination', skinTypeLabel: '복합성',
+    concerns: [{ key: 'texture', label: '결', score: 30 }, { key: 'oiliness', label: '유분', score: 45 }, { key: 'redness', label: '홍조', score: 60 }],
+  };
+  const ranked = rankProducts(catalog, profile, { limit: 20 });
+  const matched = ranked.find((r) => r.shade?.matched);
+  const unmatched = ranked.find((r) => r.shade && !r.shade.matched);
+  if (matched && unmatched) {
+    assert.ok(matched.scores.total > unmatched.scores.total,
+      '내 톤을 커버하는 제품이 커버 못 하는 제품보다 위에 있어야 한다');
+    assert.ok(unmatched.reasons.some((x) => /커버하는 호수가 없습니다/.test(x)));
+  }
 });
 
 test('적합도는 내 고민을 겨냥한 제품을 더 높게 준다', () => {

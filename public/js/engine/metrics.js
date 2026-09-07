@@ -119,6 +119,17 @@ export function computeMetrics(img, box) {
   const skinRatio = maskObj.count / (box.width * box.height || 1);
   const meanL = mean(all.L), meanA = mean(all.A), meanB = mean(all.B);
 
+  /**
+   * 톤 보정 계수 (베버의 법칙).
+   *
+   * 결·주름·다크서클은 모두 밝기 차이(ΔL)로 잰다. 그런데 같은 정도의 요철이라도
+   * 어두운 피부에서는 ΔL 자체가 작게 나온다. 절대값으로 채점하면 짙은 톤일수록
+   * 점수가 부풀어 "손댈 게 없습니다"라는 잘못된 결론이 나온다.
+   * 그래서 지각 대비(ΔL/L)를 기준 밝기(L*65)로 환산해 톤과 무관하게 채점한다.
+   */
+  const weber = 65 / Math.max(20, meanL);
+  const norm = (v) => v * weber;
+
   // ---- 1. 피부톤 (ITA / 언더톤) ----
   const itaValue = ita(meanL, meanB);
   const category = itaToCategory(itaValue);
@@ -128,7 +139,8 @@ export function computeMetrics(img, box) {
   const undertoneLabel = { cool: '쿨톤', warm: '웜톤', neutral: '뉴트럴' }[undertone];
 
   // ---- 2. 톤 균일도 (밝기 편차가 작을수록 좋다) ----
-  const evenness = metric('evenness', '톤 균일도', 'ΔL', std(all.L), { good: 3, bad: 14 });
+  const stdL = std(all.L);
+  const evenness = metric('evenness', '톤 균일도', 'ΔL', norm(stdL), { good: 3, bad: 14 });
 
   // ---- 3. 홍조 / 민감도 (a* 상위 꼬리) ----
   const rednessRaw = Math.max(0, pct(all.A, 0.95) - meanA);
@@ -157,7 +169,7 @@ export function computeMetrics(img, box) {
   const texRaw = mean(
     ['nose', 'leftCheek', 'rightCheek'].map((k) => laplacianEnergy(img, maskObj, planes, zones[k]).energy)
   );
-  const texture = metric('texture', '모공·피부결', 'E', texRaw, { good: 3, bad: 16 });
+  const texture = metric('texture', '모공·피부결', 'E', norm(texRaw), { good: 3, bad: 16 });
 
   // ---- 6. 색소침착 (국소 어두운 반점 면적비) ----
   const spotRatio = (() => {
@@ -166,7 +178,8 @@ export function computeMetrics(img, box) {
     for (const k of [...T_ZONE, ...U_ZONE]) {
       forEachZonePixel(img, maskObj, zones[k], (_, __, ___, p) => {
         tot++;
-        if (planes.L[p] < base - 6 && planes.B[p] > meanB) dark++;
+        // 반점 판정 문턱도 톤에 맞춰 좁힌다 (짙은 톤에서 6은 너무 큰 낙차)
+        if (planes.L[p] < base - 6 / weber && planes.B[p] > meanB) dark++;
       });
     }
     return tot ? (dark / tot) * 100 : 0;
@@ -183,7 +196,7 @@ export function computeMetrics(img, box) {
     ...zoneSamples(img, maskObj, planes, zones.underEyeRight).L,
   ]);
   const darkCircleRaw = Math.max(0, cheekL - underL);
-  const darkCircle = metric('darkCircle', '다크서클', 'ΔL', darkCircleRaw, { good: 1.5, bad: 12 });
+  const darkCircle = metric('darkCircle', '다크서클', 'ΔL', norm(darkCircleRaw), { good: 1.5, bad: 12 });
 
   // ---- 8. 주름 (눈가 + 이마) ----
   const wrinkleRaw = mean(
@@ -191,14 +204,14 @@ export function computeMetrics(img, box) {
       directionalWrinkle(img, maskObj, planes, zones[k])
     )
   );
-  const wrinkle = metric('wrinkle', '주름·탄력', 'Δg', wrinkleRaw, { good: 0.4, bad: 3.2 });
+  const wrinkle = metric('wrinkle', '주름·탄력', 'Δg', norm(wrinkleRaw), { good: 0.4, bad: 3.2 });
 
   // ---- 9. 수분 추정 (결 거칠기 + 유분 부족의 복합 추정치) ----
-  const dryness = clamp(texRaw * 4 + Math.max(0, 10 - tShine) * 2.2, 0, 100);
+  const dryness = clamp(norm(texRaw) * 4 + Math.max(0, 10 - tShine) * 2.2, 0, 100);
   const hydration = metric('hydration', '수분 지수(추정)', 'idx', dryness, { good: 12, bad: 62 });
 
   // ---- 10. 투명도/광채 ----
-  const clarityRaw = std(all.L) * 0.6 + spotRatio * 0.25 + Math.max(0, 12 - tShine) * 0.3;
+  const clarityRaw = norm(stdL) * 0.6 + spotRatio * 0.25 + Math.max(0, 12 - tShine) * 0.3;
   const clarity = metric('clarity', '피부 투명도', 'idx', clarityRaw, { good: 4, bad: 22 });
 
   const metrics = [evenness, redness, oiliness, texture, pigmentation, darkCircle, wrinkle, hydration, clarity];
@@ -232,6 +245,7 @@ export function computeMetrics(img, box) {
       delta: Math.round((tShine - uShine) * 10) / 10,
     },
     coverage: { skinRatio: Math.round(skinRatio * 1000) / 1000, pixels: maskObj.count },
+    toneCorrection: Math.round(weber * 100) / 100,
     metrics,
   };
 }

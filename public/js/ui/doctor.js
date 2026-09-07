@@ -114,6 +114,7 @@ export function renderConsult(consult, { locked, narrated }) {
  */
 export function playConsult(container, script, { speed = 1 } = {}) {
   container.innerHTML = '';
+  container.dataset.playing = '1'; // 재생 상태를 DOM 에 드러낸다 (외부에서 완료를 알 수 있게)
   let i = 0;
   let stopped = false;
 
@@ -123,11 +124,13 @@ export function playConsult(container, script, { speed = 1 } = {}) {
 
   const next = () => {
     if (stopped) return;
-    if (i >= script.length) { typing.remove(); return; }
+    if (i >= script.length) { typing.remove(); container.dataset.playing = '0'; return; }
     const t = script[i++];
     container.appendChild(typing);
     container.scrollTop = container.scrollHeight;
-    const pause = Math.min(1100, 260 + t.text.length * 11) / speed;
+    // 무료 구간의 핵심(불일치 지적)은 네 번째 말풍선이다. 한 줄에 1초씩 쓰면
+    // 후크가 5초 뒤에 나오고, 그 전에 이탈한다. 상담 느낌은 유지하되 더 빠르게.
+    const pause = Math.min(700, 170 + t.text.length * 7) / speed;
     setTimeout(() => {
       if (stopped) return;
       typing.remove();
@@ -139,9 +142,9 @@ export function playConsult(container, script, { speed = 1 } = {}) {
       container.appendChild(b);
       container.scrollTop = container.scrollHeight;
       requestAnimationFrame(() => b.classList.add('in'));
-      setTimeout(next, 220 / speed);
+      setTimeout(next, 150 / speed);
     }, pause);
   };
   next();
-  return () => { stopped = true; typing.remove(); };
+  return () => { stopped = true; typing.remove(); container.dataset.playing = '0'; };
 }

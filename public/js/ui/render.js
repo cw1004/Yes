@@ -259,7 +259,10 @@ function renderProduct(it, idx) {
       </div>
       <span class="pill">${esc(categoryLabel(it.category))}</span>
     </div>
-    ${it.shade ? `<div class="shade-chip"><i style="background:${esc(it.shade.hex)}"></i> 추천 호수 ${esc(it.shade.code)} ${esc(it.shade.name)} · 매칭 ${it.shade.fit}%</div>` : ''}
+    ${!it.shade ? ''
+      : it.shade.matched
+        ? `<div class="shade-chip"><i style="background:${esc(it.shade.hex)}"></i> 추천 호수 ${esc(it.shade.code)} ${esc(it.shade.name)} · 매칭 ${it.shade.fit}%</div>`
+        : `<div class="shade-chip no-match">⚠ 내 톤에 맞는 호수가 없습니다 (가장 가까운 호수 ${esc(it.shade.code)}, 매칭 ${it.shade.fit}%)</div>`}
     <ul class="reasons">${it.reasons.map((r) => `<li>${esc(r)}</li>`).join('')}</ul>
     ${it.keyIngredients?.length ? `<div class="tags">${it.keyIngredients.map((k) => `<span class="tag">${esc(k)}</span>`).join('')}</div>` : ''}
     <div class="offers">

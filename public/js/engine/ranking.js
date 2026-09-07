@@ -39,7 +39,10 @@ export function bestShade(product, tone) {
     if (!best || d < best.distance) best = { ...s, distance: Math.round(d * 100) / 100 };
   }
   const fit = Math.max(0, Math.min(1, 1 - best.distance / 2.2));
-  return { ...best, fit: Math.round(fit * 100) };
+  const pct = Math.round(fit * 100);
+  // 맞는 호수가 없으면 '0% 매칭'을 추천으로 내밀지 않는다.
+  // 커버되지 않는 톤에는 없다고 말하는 게 맞다.
+  return { ...best, fit: pct, matched: pct >= 45 };
 }
 
 /**
@@ -66,8 +69,13 @@ export function relevanceOf(product, profile) {
 
   // 4) 베이스 메이크업은 셰이드 적합도가 곧 만족도
   const shade = bestShade(product, profile.tone);
-  if (shade) score += (shade.fit / 100) * 0.15;
-  else score += 0.06;
+  if (shade) {
+    score += (shade.fit / 100) * 0.15;
+    // 내 톤을 커버하지 못하는 베이스 제품은 상위에 올리면 안 된다
+    if (!shade.matched) score *= 0.45;
+  } else {
+    score += 0.06;
+  }
 
   return Math.min(1, score);
 }
@@ -163,7 +171,8 @@ function buildReasons(item, profile) {
   const hit = profile.concerns.slice(0, 3).filter((c) => (m.concerns || []).includes(c.key));
   if (hit.length) r.push(`${hit.map((h) => h.label).join('·')} 개선 성분 포함`);
   if ((m.skinType || []).includes(profile.skinType)) r.push(`${profile.skinTypeLabel ?? profile.skinType} 피부 타입에 적합`);
-  if (item.shade) r.push(`ITA ${profile.tone.ita}° 기준 ${item.shade.code} ${item.shade.name} 매칭도 ${item.shade.fit}%`);
+  if (item.shade?.matched) r.push(`ITA ${profile.tone.ita}° 기준 ${item.shade.code} ${item.shade.name} 매칭도 ${item.shade.fit}%`);
+  else if (item.shade) r.push(`내 톤(ITA ${profile.tone.ita}°)을 커버하는 호수가 없습니다`);
   if (item.topOffer?.isLowest) r.push(`현재 최저가 ${item.topOffer.netPrice.toLocaleString()}원`);
   if (item.topOffer?.shippingDays <= 1) r.push('내일 도착 가능');
   return r;
