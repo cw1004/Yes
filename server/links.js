@@ -54,12 +54,34 @@ export function hasPartnerId(merchant) {
 }
 
 /** 클릭 레코드를 만들고 최종 이동 URL을 돌려준다 */
-export function trackClick({ userId, productId, merchant, query, price, commissionRate, analysisId, position }) {
+/** 상품 URL 을 이미 알고 있으면 검색 대신 그 페이지로 보낸다 */
+const PARAM_FOR = {
+  coupang: (u, sub) => { u.searchParams.set('lptag', PARTNER.coupang); u.searchParams.set('subId', sub); },
+  naver: (u, sub) => { u.searchParams.set('nt_source', PARTNER.naver); u.searchParams.set('nt_detail', sub); },
+  oliveyoung: (u, sub) => { u.searchParams.set('utm_source', PARTNER.oliveyoung); u.searchParams.set('utm_content', sub); },
+  eleven: (u, sub) => { u.searchParams.set('trTypeCd', PARTNER.eleven); u.searchParams.set('trCtgrNo', sub); },
+  amazon: (u, sub) => { u.searchParams.set('tag', PARTNER.amazon); u.searchParams.set('ascsubtag', sub); },
+};
+
+function directLink(productUrl, merchant, sub) {
+  try {
+    const u = new URL(productUrl);
+    if (u.protocol !== 'https:') return null;       // http 로 내보내지 않는다
+    if (PARTNER[merchant]) PARAM_FOR[merchant]?.(u, sub);
+    return u.toString();
+  } catch {
+    return null; // 주소가 깨졌으면 검색 링크로 되돌아간다
+  }
+}
+
+export function trackClick({ userId, productId, merchant, query, price, commissionRate, analysisId, position, productUrl }) {
   const build = BUILDERS[merchant];
   if (!build) throw Object.assign(new Error(`지원하지 않는 판매처: ${merchant}`), { status: 400 });
   const clickId = `clk_${crypto.randomBytes(8).toString('hex')}`;
   const sub = `${clickId}`;
-  const url = build(query, sub);
+  // 상품 페이지를 알면 그리로, 모르면 검색 결과로. 검색으로 보내면 엉뚱한 상품을 살 수 있다.
+  const direct = productUrl ? directLink(productUrl, merchant, sub) : null;
+  const url = direct || build(query, sub);
   const click = {
     clickId, userId: userId || null, productId, merchant, analysisId: analysisId || null,
     position: position ?? null, price: price ?? null, commissionRate: commissionRate ?? null,
@@ -71,7 +93,7 @@ export function trackClick({ userId, productId, merchant, query, price, commissi
     if (d.clicks.length > 50000) d.clicks.splice(0, d.clicks.length - 50000);
   });
   logEvent('affiliate_click', { userId, productId, merchant, clickId });
-  return { clickId, url, partnerLinked: hasPartnerId(merchant) };
+  return { clickId, url, partnerLinked: hasPartnerId(merchant), direct: Boolean(direct) };
 }
 
 /** 머천트 S2S 포스트백 — 전환/수수료 확정 */

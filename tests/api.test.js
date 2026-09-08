@@ -12,6 +12,9 @@ process.env.SKINLAB_SECRET = 'test-secret';
 process.env.ADMIN_TOKEN = 'admin-test';
 process.env.AFFILIATE_POSTBACK_TOKEN = 'pb-test';
 process.env.COUPANG_PARTNER_ID = 'AF1234567';
+// 개발 중 동기화해 둔 실데이터가 있어도 테스트는 항상 시드 카탈로그로 돈다
+// (테스트 결과가 "누가 sync 를 돌렸는지"에 따라 달라지면 안 된다)
+process.env.SKINLAB_CATALOG = path.join(path.dirname(tmpDb), 'no-live-catalog.json');
 
 const { server } = await import('../server/index.js');
 const { computeMetrics } = await import('../public/js/engine/metrics.js');
@@ -136,6 +139,26 @@ test('제휴 클릭은 파트너 파라미터가 붙은 링크와 함께 기록�
   assert.match(r.json.url, /lptag=AF1234567/);
   assert.match(r.json.url, /subId=clk_/);
   clickId = r.json.clickId;
+});
+
+test('상품 URL 을 알면 검색이 아니라 그 페이지로 보낸다', async () => {
+  const { trackClick } = await import('../server/links.js');
+  const direct = trackClick({
+    productId: 'x', merchant: 'coupang', query: '아누아 토너',
+    productUrl: 'https://www.coupang.com/vp/products/123456',
+  });
+  assert.match(direct.url, /\/vp\/products\/123456/, '상품 페이지로 가야 한다');
+  assert.match(direct.url, /lptag=AF1234567/, '파트너 파라미터가 붙어야 한다');
+  assert.equal(direct.direct, true);
+
+  // 주소가 깨졌으면 검색으로 되돌아간다
+  const broken = trackClick({ productId: 'x', merchant: 'coupang', query: '아누아 토너', productUrl: 'not-a-url' });
+  assert.match(broken.url, /np\/search/);
+  assert.equal(broken.direct, false);
+
+  // http 는 내보내지 않는다
+  const insecure = trackClick({ productId: 'x', merchant: 'coupang', query: '아누아 토너', productUrl: 'http://www.coupang.com/vp/products/1' });
+  assert.match(insecure.url, /np\/search/);
 });
 
 test('전환 포스트백은 토큰이 있어야 수익으로 잡힌다', async () => {

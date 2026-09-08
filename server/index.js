@@ -208,6 +208,7 @@ const routes = {
     const result = trackClick({
       userId: user?.id, productId, merchant, analysisId, position,
       query: `${product.brand} ${product.name}`,
+      productUrl: offer.url || null,     // 동기화가 상품 URL 을 가져왔으면 그리로 보낸다
       price: Math.max(0, offer.price - (offer.coupon || 0)),
       commissionRate: offer.commissionRate,
     });
