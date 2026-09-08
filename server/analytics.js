@@ -10,9 +10,12 @@ const uniq = (events, type) => new Set(events.filter((e) => e.type === type).map
 
 export function kpis() {
   const d = db.read();
-  const e = d.events;
+  // 체험(시뮬레이션) 기록은 실제 사용자 행동이 아니다. 섞으면 전환율이 거짓말을 한다.
+  const simulatedIds = new Set(Object.values(d.analyses).filter((a) => a.simulated).map((a) => a.id));
+  const e = d.events.filter((x) => x.simulated !== true && !(x.analysisId && simulatedIds.has(x.analysisId)));
   const users = Object.keys(d.users).length;
-  const analyses = Object.keys(d.analyses).length;
+  const analyses = Object.values(d.analyses).filter((a) => !a.simulated).length;
+  const simulatedCount = simulatedIds.size;
   // 같은 분석에 대해 결과 화면과 결제 화면에서 두 번 찍히므로 분석 단위로 유니크 집계한다
   const paywallViews = new Set(
     e.filter((x) => x.type === 'paywall_view').map((x) => x.analysisId || x.userId)
@@ -54,6 +57,7 @@ export function kpis() {
   return {
     users,
     analyses,
+    simulated: simulatedCount,   // 참고용 — 위 지표에는 포함되지 않는다
     funnel: {
       analysisCompleted: analyses,
       paywallViews,

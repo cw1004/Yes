@@ -36,6 +36,9 @@ export function renderResult(report) {
   const qualityBadge = q
     ? `<span class="pill ${q.confidence >= 75 ? 'live' : ''}">촬영 신뢰도 ${q.confidence}%</span>`
     : '';
+  const simBadge = report.simulated
+    ? '<span class="sim-badge">🧪 체험용 샘플 데이터입니다</span>'
+    : '';
 
   const free = report.free;
   const preview = free.preview.map((p) => `
@@ -50,7 +53,7 @@ export function renderResult(report) {
     ${ring(a.totalScore)}
     <div class="grade">GRADE ${esc(a.grade)} · ${esc(report.skinType.label)} 피부</div>
     <p class="hint" style="margin-top:10px">${esc(report.skinType.desc)}</p>
-    <div style="margin-top:12px">${qualityBadge}</div>
+    <div style="margin-top:12px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap">${simBadge}${qualityBadge}</div>
   </div>
 
   <div class="card">
@@ -314,7 +317,7 @@ export function renderHistory(items) {
       const prev = items[i + 1];
       const delta = prev ? it.totalScore - prev.totalScore : null;
       return `<div class="hist-row">
-        <div><b>${it.totalScore}</b> <span class="pill">${esc(it.grade)}</span>
+        <div><b>${it.totalScore}</b> <span class="pill">${esc(it.grade)}</span>${it.simulated ? ' <span class="pill gold">체험</span>' : ''}
           <div style="color:var(--dim);font-size:11.5px;margin-top:3px">${new Date(it.createdAt).toLocaleString('ko-KR')}</div></div>
         <div style="text-align:right">
           ${delta === null ? '<span class="pill">첫 측정</span>' : `<span class="delta ${delta >= 0 ? 'up' : 'down'}">${delta >= 0 ? '▲' : '▼'} ${Math.abs(delta)}</span>`}

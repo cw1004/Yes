@@ -52,6 +52,7 @@ function buildReportLocal(rec) {
   return {
     analysisId: rec.id,
     createdAt: rec.createdAt,
+    simulated: Boolean(rec.simulated),
     quality: rec.quality,
     analysis: {
       totalScore: rec.analysis.totalScore, grade: rec.analysis.grade, tone: rec.analysis.tone,
@@ -89,11 +90,15 @@ const api = {
       coupons: Object.entries(COUPONS).map(([code, c]) => ({ code, label: c.label })),
     };
   },
-  async submitAnalysis(analysis, quality, intake) {
+  async submitAnalysis(analysis, quality, intake, opts = {}) {
     const id = `an_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+    const simulated = opts.simulated === true;
+    // 체험에서만 날짜 소급을 허용한다 — '4주 전 기준선'을 만들어 전후 비교를 보여주기 위해서
+    const backdate = simulated ? Math.min(365, Math.max(0, Number(opts.backdateDays) || 0)) : 0;
+    const createdAt = new Date(Date.now() - backdate * 864e5).toISOString();
     const rec = {
-      id, createdAt: new Date().toISOString(), analysis, quality: quality || null,
-      diagnosis: diagnose(analysis), intake: sanitizeIntake(intake),
+      id, createdAt, analysis: { ...analysis, createdAt }, quality: quality || null,
+      diagnosis: diagnose(analysis), intake: sanitizeIntake(intake), simulated,
     };
     const all = store.analyses; all[id] = rec; store.analyses = all;
     return buildReportLocal(rec);
@@ -109,7 +114,8 @@ const api = {
       .slice(0, 30)
       .map((a) => ({
         id: a.id, createdAt: a.createdAt, totalScore: a.analysis.totalScore, grade: a.analysis.grade,
-        tone: a.analysis.tone, metrics: a.analysis.metrics.map((m) => ({ key: m.key, label: m.label, score: m.score, level: m.level })),
+        simulated: Boolean(a.simulated), tone: a.analysis.tone,
+        metrics: a.analysis.metrics.map((m) => ({ key: m.key, label: m.label, score: m.score, level: m.level })),
       }));
     return { items };
   },

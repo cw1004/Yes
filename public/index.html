@@ -32,6 +32,7 @@
         <li>🛒 내 톤(ITA°) 기준 제품을 판매처 최저가까지 비교</li>
       </ul>
       <button class="cta" id="btn-start">무료 상담 시작</button>
+      <button class="ghost" id="btn-simulate">📱 카메라 없이 체험하기 (샘플)</button>
       <button class="ghost" id="btn-history-home">지난 기록 보기</button>
       <p class="fineprint" id="home-disclaimer"></p>
     </header>
@@ -112,6 +113,21 @@
     <div id="compare-body"></div>
   </section>
 
+</div>
+
+<div class="sheet-backdrop" id="sim-sheet" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sim-title">
+    <div class="sheet-grip"></div>
+    <h3 id="sim-title">어떤 피부로 체험해 볼까요?</h3>
+    <p class="hint" style="margin-top:0">샘플 얼굴로 진단부터 상담·추천·전후 비교까지 그대로 돌려봅니다.
+      실제 사진이 아니며 기록에는 <b>체험</b>으로 표시됩니다.</p>
+    <div id="sim-list"></div>
+    <label class="sim-toggle">
+      <input type="checkbox" id="sim-followup" checked />
+      <span>4주 뒤 재측정까지 함께 만들어 전·후 비교 바로 보기</span>
+    </label>
+    <button class="ghost" data-action="sim-close">닫기</button>
+  </div>
 </div>
 
 <nav class="tabbar tabs-5" id="tabbar">

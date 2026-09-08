@@ -181,13 +181,26 @@ const routes = {
 
     const id = `an_${crypto.randomBytes(6).toString('hex')}`;
     const diagnosis = diagnose(analysis);
+
+    // 체험 모드로 만든 기록. 실제 사용자 행동이 아니므로 매출·퍼널 지표에서 제외한다
+    // (체험이 전환율에 섞이면 지표가 거짓말을 한다).
+    const simulated = body.simulated === true;
+    // 날짜 소급은 체험에서만 허용한다 — '4주 전 기준선'을 만들어 전후 비교를 보여주기 위해서다
+    const backdateDays = simulated ? Math.min(365, Math.max(0, Number(body.backdateDays) || 0)) : 0;
+    const createdAt = new Date(Date.now() - backdateDays * 864e5).toISOString();
+
     const record = {
-      id, userId: user.id, createdAt: new Date().toISOString(),
-      analysis, quality: sanitizeQuality(body.quality), diagnosis,
+      id, userId: user.id, createdAt,
+      analysis: { ...analysis, createdAt },
+      quality: sanitizeQuality(body.quality), diagnosis,
       intake: sanitizeIntake(body.intake),
+      simulated,
     };
     db.update((d) => { d.analyses[id] = record; });
-    logEvent('analysis_completed', { userId: user.id, analysisId: id, score: analysis.totalScore, intake: Object.keys(record.intake).length });
+    logEvent('analysis_completed', {
+      userId: user.id, analysisId: id, score: analysis.totalScore,
+      intake: Object.keys(record.intake).length, simulated,
+    });
 
     return await buildReport(record, user);
   },
@@ -209,7 +222,9 @@ const routes = {
       .slice(0, 30)
       .map((a) => ({
         id: a.id, createdAt: a.createdAt, totalScore: a.analysis.totalScore, grade: a.analysis.grade,
-        tone: a.analysis.tone, metrics: a.analysis.metrics.map((m) => ({ key: m.key, label: m.label, score: m.score })),
+        simulated: Boolean(a.simulated),
+        tone: a.analysis.tone,
+        metrics: a.analysis.metrics.map((m) => ({ key: m.key, label: m.label, score: m.score, level: m.level })),
       }));
     return { items };
   },
@@ -326,6 +341,7 @@ async function buildReport(record, user) {
     : { doctor: consult.doctor, script: consult.free.script, free: consult.free, discordance: consult.discordance.filter((x) => x.tier === 'free'), followUpAt: null };
 
   return {
+    simulated: Boolean(record.simulated),
     consult: consultOut,
     consultNarrated: narrated,
     intake: record.intake || {},

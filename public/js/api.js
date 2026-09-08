@@ -26,7 +26,8 @@ export const api = {
     return r;
   },
   config: () => request('GET', '/api/config'),
-  submitAnalysis: (analysis, quality, intake) => request('POST', '/api/analysis', { analysis, quality, intake }),
+  submitAnalysis: (analysis, quality, intake, opts = {}) =>
+    request('POST', '/api/analysis', { analysis, quality, intake, ...opts }),
   report: (id) => request('GET', `/api/report?id=${encodeURIComponent(id)}`),
   recommend: (id, category) => request('GET', `/api/recommend?id=${encodeURIComponent(id)}${category ? `&category=${category}` : ''}`),
   history: () => request('GET', '/api/history'),

@@ -11,6 +11,8 @@ import { renderIntake, renderConsult, playConsult, doctorAvatar } from './ui/doc
 import { renderCompare, bindCompare } from './ui/compare.js';
 import { savePhoto, getPhoto, allPhotos } from './storage.js';
 import { INTAKE } from './engine/intake.js';
+import { PERSONAS, personaById } from './sim/personas.js';
+import { faceImageData, drawFace, improved } from './sim/faces.js';
 
 const $ = (s) => document.querySelector(s);
 const state = {
@@ -82,8 +84,8 @@ async function startCapture() {
 /* ───────── 분석 파이프라인 ───────── */
 const STEPS = ['피부 영역 검출 중…', '색공간(Lab) 변환 중…', '9개 지표 계산 중…', '진단 규칙 적용 중…', '맞춤 처방 생성 중…'];
 
-async function runAnalysis(imageData, box) {
-  go('analyzing');
+async function runAnalysis(imageData, box, opts = {}) {
+  if (!opts.silent) go('analyzing');
   const canvas = $('#preview-canvas');
   canvas.width = imageData.width;
   canvas.height = imageData.height;
@@ -92,12 +94,15 @@ async function runAnalysis(imageData, box) {
   const faceBox = box || fallbackFaceBox(imageData.width, imageData.height);
   const quality = assessQuality(imageData, faceBox);
 
+  let analysis;
   for (let i = 0; i < STEPS.length; i++) {
-    $('#analyzing-step').textContent = STEPS[i];
-    $('#analyze-bar').style.width = `${((i + 1) / STEPS.length) * 100}%`;
+    if (!opts.silent) {
+      $('#analyzing-step').textContent = STEPS[i];
+      $('#analyze-bar').style.width = `${((i + 1) / STEPS.length) * 100}%`;
+    }
     // 무거운 계산은 3단계에서 한 번만 — 그 전에 프레임을 한 번 넘겨 UI가 멈추지 않게 한다
-    await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 220)));
-    if (i === 2) var analysis = computeMetrics(imageData, faceBox);
+    await new Promise((r) => requestAnimationFrame(() => setTimeout(r, opts.silent ? 0 : 220)));
+    if (i === 2) analysis = computeMetrics(imageData, faceBox);
   }
 
   if (quality.issues.length && quality.confidence < 45) {
@@ -105,7 +110,9 @@ async function runAnalysis(imageData, box) {
   }
 
   try {
-    const report = await api.submitAnalysis(analysis, quality, state.intake);
+    const report = await api.submitAnalysis(analysis, quality, state.intake, {
+      simulated: opts.simulated, backdateDays: opts.backdate,
+    });
     // 사진은 서버로 보내지 않고 이 기기에만 남긴다 (전/후 비교용 기준선)
     try {
       await savePhoto({
@@ -116,10 +123,11 @@ async function runAnalysis(imageData, box) {
       console.warn('사진 로컬 저장 실패:', e.message);
       toast('사진을 기기에 저장하지 못해 전/후 비교가 제한될 수 있습니다.', 3200);
     }
+    if (opts.silent) return report;      // 기준선만 만들고 화면은 넘기지 않는다
     showReport(report, { toConsult: true });
   } catch (err) {
     toast(err.message);
-    go('capture');
+    go(opts.simulated ? 'home' : 'capture');
   }
 }
 
@@ -131,7 +139,7 @@ function showConsult() {
     return;
   }
   $('#consult-body').innerHTML = renderConsult(report.consult, {
-    locked: report.locked, narrated: report.consultNarrated,
+    locked: report.locked, narrated: report.consultNarrated, simulated: report.simulated,
   });
   const script = report.consult.script;
   state.stopTyping = playConsult($('#chat-stream'), script);
@@ -160,6 +168,63 @@ function showReport(report, { toConsult = false } = {}) {
   $('#result-body').innerHTML = renderResult(report);
   go(toConsult ? 'consult' : 'result');
   if (report.locked) api.paywallView(report.analysisId, toConsult ? 'consult_lock' : 'result_lock');
+}
+
+/* ───────── 체험(시뮬레이션) ───────── */
+function openSimSheet() {
+  const list = $('#sim-list');
+  list.textContent = '';
+  for (const p of PERSONAS) {
+    const btn = document.createElement('button');
+    btn.className = 'sim-item';
+    btn.dataset.persona = p.id;
+    const img = document.createElement('img');
+    img.className = 'face';
+    img.alt = '';
+    img.src = drawFace(p.face, { width: 84, height: 104 }).toDataURL('image/jpeg', 0.7);
+    const text = document.createElement('div');
+    const b = document.createElement('b');
+    b.textContent = p.title;
+    const sp = document.createElement('span');
+    sp.textContent = p.hint;
+    text.append(b, sp);
+    btn.append(img, text);
+    if (p.badge) {
+      const pill = document.createElement('span');
+      pill.className = 'pill gold';
+      pill.textContent = p.badge;
+      btn.appendChild(pill);
+    }
+    list.appendChild(btn);
+  }
+  $('#sim-sheet').hidden = false;
+}
+
+const closeSimSheet = () => { $('#sim-sheet').hidden = true; };
+
+/**
+ * 선택한 페르소나로 전체 흐름을 돌린다.
+ * 4주 뒤까지 선택하면 '관리 후' 얼굴을 하나 더 만들어 전·후 비교를 바로 볼 수 있게 한다.
+ */
+async function runSimulation(personaId, withFollowUp) {
+  const persona = personaById(personaId);
+  closeSimSheet();
+  state.intake = { ...persona.intake };
+  saveIntake();
+
+  if (withFollowUp) {
+    // 4주 전 상태를 먼저 기록해야 비교가 성립한다
+    toast('4주 전 기준 측정을 만드는 중…', 2000);
+    await analyzeSample(persona.face, { simulated: true, backdate: 28 });
+  }
+  await analyzeSample(withFollowUp ? improved(persona.face) : persona.face, { simulated: true });
+}
+
+/** 샘플 얼굴 하나를 실제 분석 경로로 통과시킨다 (촬영만 건너뛴다) */
+async function analyzeSample(faceSpec, { simulated, backdate = 0 } = {}) {
+  const img = faceImageData(faceSpec);
+  await camera?.stop();
+  return runAnalysis(img, null, { simulated, backdate, silent: backdate > 0 });
 }
 
 /* ───────── 페이월 ───────── */
@@ -294,7 +359,10 @@ async function loadHistory() {
 
 /* ───────── 이벤트 바인딩 ───────── */
 document.addEventListener('click', async (e) => {
-  const el = e.target.closest('[data-goto],[data-action],[data-plan],[data-cat],[data-buy],[data-open],[data-intake]');
+  // 시트 바깥을 누르면 닫는다
+  if (e.target.id === 'sim-sheet') return closeSimSheet();
+
+  const el = e.target.closest('[data-goto],[data-action],[data-plan],[data-cat],[data-buy],[data-open],[data-intake],[data-persona]');
   if (!el) return;
 
   if (el.dataset.intake) {
@@ -317,6 +385,7 @@ document.addEventListener('click', async (e) => {
     state.category = el.dataset.cat;
     return loadShop();
   }
+  if (el.dataset.persona) return runSimulation(el.dataset.persona, $('#sim-followup').checked);
   if (el.dataset.buy) return buy(el.dataset.buy, el.dataset.merchant, Number(el.dataset.pos));
   if (el.dataset.open) {
     const report = await api.report(el.dataset.open).catch((err) => { toast(err.message); return null; });
@@ -326,6 +395,7 @@ document.addEventListener('click', async (e) => {
 
   switch (el.dataset.action) {
     case 'intake-done': return go('capture');
+    case 'sim-close': return closeSimSheet();
     case 'toggle-markers': {
       state.showMarkers = !state.showMarkers;
       return loadCompare();
@@ -355,6 +425,7 @@ $('#btn-start').addEventListener('click', () => go('intake'));
 $('#btn-skip-typing').addEventListener('click', revealAllConsult);
 $('#hero-doctor').innerHTML = doctorAvatar(104, 'happy');
 $('#btn-history-home').addEventListener('click', () => go('history'));
+$('#btn-simulate').addEventListener('click', openSimSheet);
 $('#btn-retake').addEventListener('click', () => go('capture'));
 $('#btn-flip').addEventListener('click', () => camera?.flip());
 
@@ -401,5 +472,9 @@ $('#file-input').addEventListener('change', async (e) => {
       finishPurchase(res);
     } catch (err) { toast(`결제 확인 실패: ${err.message}`); }
   }
+  // 터미널 리허설(scripts/simulate.mjs)이 앱과 같은 샘플 얼굴을 쓰도록 노출한다.
+  // 두 곳이 다른 얼굴을 쓰면 "리허설은 통과했는데 앱은 다르다"가 된다.
+  window.__skinlabSim = { PERSONAS, drawFace, improved, runSimulation };
+
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
 })();

@@ -73,7 +73,7 @@ export function renderIntake(answers = {}) {
 }
 
 /** ───── 상담 화면 ───── */
-export function renderConsult(consult, { locked, narrated }) {
+export function renderConsult(consult, { locked, narrated, simulated }) {
   const script = locked ? consult.free.script : consult.script;
   return `
   <div class="card doctor-card">
@@ -85,6 +85,7 @@ export function renderConsult(consult, { locked, narrated }) {
         <p class="hint" style="margin:4px 0 0">${esc(consult.doctor.intro)}</p>
       </div>
     </div>
+    ${simulated ? '<div style="margin-top:12px"><span class="sim-badge">🧪 체험용 샘플 얼굴로 만든 상담입니다</span></div>' : ''}
     <p class="fineprint" style="margin-top:12px">⚠️ ${esc(consult.doctor.disclaimerShort)}${narrated ? ' · 응답 문장은 Claude 가 다듬었습니다' : ''}</p>
   </div>
 

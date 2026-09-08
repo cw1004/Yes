@@ -23,6 +23,8 @@ const ORDER = [
   'public/js/engine/consult.js',
   'public/js/engine/ranking.js',
   'public/js/storage.js',
+  'public/js/sim/faces.js',
+  'public/js/sim/personas.js',
   'public/js/ui/render.js',
   'public/js/ui/doctor.js',
   'public/js/ui/compare.js',
