@@ -26,10 +26,13 @@ export function personalColor(tone) {
 
 /** T존/U존 유분 차이와 수분 지표로 피부 타입 판정 */
 export function skinTypeOf(a) {
-  const t = a.zoneBalance.tZoneShine;
-  const u = a.zoneBalance.uZoneShine;
-  const hydration = a.metrics.find((m) => m.key === 'hydration').score;
-  const redness = a.metrics.find((m) => m.key === 'redness').score;
+  // 지표가 일부만 들어올 수 있다(구버전 클라이언트, 손상된 요청).
+  // 없는 항목을 단정하면 요청 하나가 서버 오류가 된다 — 중립값으로 넘긴다.
+  const score = (key, fallback = 70) => a.metrics.find((m) => m.key === key)?.score ?? fallback;
+  const t = a.zoneBalance?.tZoneShine ?? 0;
+  const u = a.zoneBalance?.uZoneShine ?? 0;
+  const hydration = score('hydration');
+  const redness = score('redness');
 
   if (redness < 45) return { key: 'sensitive', label: '민감성', desc: '장벽이 약해져 자극에 쉽게 붉어지는 상태입니다.' };
   if (t > 22 && u > 18) return { key: 'oily', label: '지성', desc: '전체적으로 피지 분비가 많아 번들거림과 모공이 두드러집니다.' };

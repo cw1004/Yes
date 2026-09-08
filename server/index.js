@@ -19,6 +19,7 @@ import { kpis } from './analytics.js';
 import { loadCatalog } from './feeds/index.js';
 import { diagnose, DISCLAIMER } from '../public/js/engine/diagnose.js';
 import { sanitizeIntake } from '../public/js/engine/intake.js';
+import { sanitizeAnalysis, sanitizeQuality } from './validate.js';
 import { narrate } from './doctor.js';
 import { rankProducts, buildBundle } from '../public/js/engine/ranking.js';
 
@@ -32,6 +33,66 @@ const catalog = catalogSource.catalog;
 if (catalogSource.source !== 'live') console.warn(`[카탈로그] ${catalogSource.reason}`);
 
 seedCoupons();
+
+/** 토큰 비교는 상수 시간으로 — 문자열 비교는 일치하는 앞부분 길이만큼 시간이 달라진다 */
+function tokenEquals(given, expected) {
+  if (typeof given !== 'string' || typeof expected !== 'string' || !expected) return false;
+  const a = Buffer.from(given);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
+}
+
+/**
+ * 운영 환경에서 위험한 기본값으로 뜨는 걸 막는다.
+ * 데모 설정 그대로 배포되면 토큰 위조와 무료 결제가 가능해진다.
+ */
+function assertProductionSafety() {
+  if (process.env.NODE_ENV !== 'production') return;
+  const fatal = [];
+  if (!process.env.SKINLAB_SECRET) fatal.push('SKINLAB_SECRET 이 없습니다 — 기본 키로는 이용권 토큰을 누구나 위조할 수 있습니다.');
+  if ((process.env.SKINLAB_PAYMENTS || 'mock') === 'mock') fatal.push('SKINLAB_PAYMENTS=mock 은 결제 없이 이용권을 내줍니다. toss 또는 stripe 로 설정하세요.');
+  if (!process.env.ADMIN_TOKEN) fatal.push('ADMIN_TOKEN 이 없습니다 — 관리자 지표가 열려 있게 됩니다.');
+  if (fatal.length) {
+    console.error('\n서버를 시작할 수 없습니다 (운영 안전 점검):');
+    for (const f of fatal) console.error(`  · ${f}`);
+    console.error('');
+    process.exit(1);
+  }
+}
+
+/**
+ * 아주 단순한 IP 단위 호출 제한.
+ * 목적은 정교한 방어가 아니라 '한 명이 분석/클릭을 무한히 만들어 DB와 실적을 오염시키는 것'을 막는 것.
+ * 인스턴스를 여러 대 띄우면 이 카운터는 공유되지 않는다 — 그때는 앞단(nginx/CDN)에서 걸어야 한다.
+ */
+const RATE_RULES = [
+  { test: (p) => p === '/api/analysis', limit: 30, windowMs: 60 * 60e3, name: '분석' },
+  { test: (p) => p === '/api/session', limit: 20, windowMs: 60 * 60e3, name: '세션' },
+  { test: (p) => p === '/api/click', limit: 120, windowMs: 60 * 60e3, name: '클릭' },
+  { test: (p) => p === '/api/checkout' || p === '/api/checkout/confirm', limit: 40, windowMs: 60 * 60e3, name: '결제' },
+  { test: (p) => p.startsWith('/api/'), limit: 600, windowMs: 60 * 60e3, name: 'API' },
+];
+const buckets = new Map();
+
+function rateLimit(req, pathname) {
+  const rule = RATE_RULES.find((r) => r.test(pathname));
+  if (!rule) return null;
+  const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket.remoteAddress || 'unknown';
+  const key = `${ip}|${rule.name}`;
+  const now = Date.now();
+  const b = buckets.get(key);
+  if (!b || now > b.resetAt) {
+    buckets.set(key, { count: 1, resetAt: now + rule.windowMs });
+    if (buckets.size > 20000) for (const [k, v] of buckets) if (now > v.resetAt) buckets.delete(k);
+    return null;
+  }
+  b.count++;
+  if (b.count > rule.limit) {
+    return { retryAfter: Math.ceil((b.resetAt - now) / 1000), rule: rule.name };
+  }
+  return null;
+}
 
 const MIME = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
@@ -114,15 +175,16 @@ const routes = {
   'POST /api/analysis': async (req) => {
     const user = userFromRequest(req);
     if (!user) throw Object.assign(new Error('세션이 필요합니다.'), { status: 401 });
-    const { analysis, quality, intake } = await json(req);
-    if (!analysis?.metrics?.length || !analysis?.tone) throw Object.assign(new Error('분석 데이터가 올바르지 않습니다.'), { status: 400 });
+    const body = await json(req);
+    // 분석은 브라우저에서 계산되므로 서버는 그 값을 믿지 않는다 (server/validate.js)
+    const analysis = sanitizeAnalysis(body.analysis);
 
     const id = `an_${crypto.randomBytes(6).toString('hex')}`;
     const diagnosis = diagnose(analysis);
     const record = {
       id, userId: user.id, createdAt: new Date().toISOString(),
-      analysis, quality: quality || null, diagnosis,
-      intake: sanitizeIntake(intake),
+      analysis, quality: sanitizeQuality(body.quality), diagnosis,
+      intake: sanitizeIntake(body.intake),
     };
     db.update((d) => { d.analyses[id] = record; });
     logEvent('analysis_completed', { userId: user.id, analysisId: id, score: analysis.totalScore, intake: Object.keys(record.intake).length });
@@ -216,8 +278,7 @@ const routes = {
   },
 
   'POST /api/postback': async (req) => {
-    const token = req.headers['x-postback-token'];
-    if (!process.env.AFFILIATE_POSTBACK_TOKEN || token !== process.env.AFFILIATE_POSTBACK_TOKEN) {
+    if (!tokenEquals(req.headers['x-postback-token'], process.env.AFFILIATE_POSTBACK_TOKEN)) {
       throw Object.assign(new Error('인증 실패'), { status: 401 });
     }
     const { clickId, revenue, orderAmount, status } = await json(req);
@@ -243,8 +304,7 @@ const routes = {
   },
 
   'GET /api/admin/metrics': async (req) => {
-    const expected = process.env.ADMIN_TOKEN;
-    if (!expected || req.headers['x-admin-token'] !== expected) {
+    if (!tokenEquals(req.headers['x-admin-token'], process.env.ADMIN_TOKEN)) {
       throw Object.assign(new Error('ADMIN_TOKEN 이 필요합니다.'), { status: 401 });
     }
     return kpis();
@@ -296,10 +356,21 @@ async function buildReport(record, user) {
 }
 
 function serveStatic(req, res, url) {
-  let rel = decodeURIComponent(url.pathname);
+  let rel;
+  try {
+    rel = decodeURIComponent(url.pathname);   // '/%' 같은 잘못된 인코딩은 여기서 던진다
+  } catch {
+    return send(res, 400, { error: 'bad path' });
+  }
+  // '..' 이 들어간 경로는 정규화 뒤 흔적이 사라져 SPA 폴백으로 200 을 받는다.
+  // 의도가 분명한 요청이 아니므로 정규화 전에 막는다.
+  if (rel.split('/').includes('..')) return send(res, 403, { error: 'forbidden' });
   if (rel === '/') rel = '/index.html';
-  const filePath = path.join(PUBLIC_DIR, rel);
-  if (!filePath.startsWith(PUBLIC_DIR)) return send(res, 403, { error: 'forbidden' });
+  const filePath = path.resolve(PUBLIC_DIR, `.${path.posix.normalize(rel)}`);
+  // startsWith(PUBLIC_DIR) 만으로는 'public-secret' 같은 형제 디렉터리가 통과한다
+  if (filePath !== PUBLIC_DIR && !filePath.startsWith(PUBLIC_DIR + path.sep)) {
+    return send(res, 403, { error: 'forbidden' });
+  }
   fs.readFile(filePath, (err, data) => {
     if (err) {
       // SPA 라우팅 대비: 확장자 없는 경로는 index.html 로
@@ -314,15 +385,32 @@ function serveStatic(req, res, url) {
 }
 
 const server = http.createServer(async (req, res) => {
-  const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+ try {
+  let url;
+  try {
+    url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+  } catch {
+    return send(res, 400, { error: 'bad request' });
+  }
   const key = `${req.method} ${url.pathname}`;
 
   if (req.method === 'OPTIONS') {
+    // 기본은 동일 출처만. 다른 도메인에서 쓰려면 CORS_ORIGIN 을 명시적으로 지정한다.
+    const origin = process.env.CORS_ORIGIN;
+    if (!origin) return send(res, 204, '');
     return send(res, 204, '', {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Admin-Token, X-Postback-Token',
+      'Access-Control-Allow-Origin': origin,
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      Vary: 'Origin',
     });
+  }
+
+  const limited = rateLimit(req, url.pathname);
+  if (limited) {
+    return send(res, 429,
+      { error: `요청이 너무 잦습니다(${limited.rule}). ${limited.retryAfter}초 뒤에 다시 시도해 주세요.` },
+      { 'Retry-After': String(limited.retryAfter) });
   }
 
   const handler = routes[key];
@@ -339,12 +427,22 @@ const server = http.createServer(async (req, res) => {
   }
   if (url.pathname.startsWith('/api/')) return send(res, 404, { error: 'not found' });
   serveStatic(req, res, url);
+ } catch (err) {
+  // 어떤 요청도 프로세스를 죽여선 안 된다 ('/%' 하나로 서비스가 내려간 적이 있다)
+  console.error('[request]', req.method, req.url, err);
+  if (!res.headersSent) send(res, 500, { error: '서버 오류' });
+ }
 });
+
+// 마지막 방어선: 예기치 못한 예외로 프로세스가 통째로 죽지 않게 한다
+process.on('uncaughtException', (err) => console.error('[uncaught]', err));
+process.on('unhandledRejection', (err) => console.error('[unhandled]', err));
 
 process.on('SIGINT', () => { db.flushNow(); process.exit(0); });
 process.on('SIGTERM', () => { db.flushNow(); process.exit(0); });
 
 if (process.env.NODE_ENV !== 'test') {
+  assertProductionSafety();
   server.listen(PORT, () => {
     const src = { seed: '샘플 카탈로그', live: '실데이터', 'live-stale': '실데이터(오래됨)' }[catalogSource.source];
     console.log(`SkinLab AI  →  http://localhost:${PORT}  (결제: ${provider()}, ${src} 상품 ${catalog.products.length}종)`);

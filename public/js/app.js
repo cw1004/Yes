@@ -34,6 +34,15 @@ function toast(msg, ms = 2600) {
   toast._t = setTimeout(() => el.classList.remove('show'), ms);
 }
 
+/** 안내/오류 문구는 textContent 로 넣는다 (서버 문자열을 HTML 로 해석하지 않게) */
+function showEmpty(el, message) {
+  el.textContent = '';
+  const div = document.createElement('div');
+  div.className = 'empty';
+  div.textContent = message;
+  el.appendChild(div);
+}
+
 function go(name) {
   document.querySelectorAll('.screen').forEach((s) => s.classList.toggle('active', s.id === `screen-${name}`));
   document.querySelectorAll('.tabbar button').forEach((b) => b.classList.toggle('active', b.dataset.goto === name));
@@ -118,7 +127,7 @@ async function runAnalysis(imageData, box) {
 function showConsult() {
   const report = state.report;
   if (!report?.consult) {
-    $('#consult-body').innerHTML = `<div class="empty">먼저 진단을 받으면<br>닥터 세라가 결과를 짚어드립니다.</div>`;
+    showEmpty($('#consult-body'), '먼저 진단을 받으면 닥터 세라가 결과를 짚어드립니다.');
     return;
   }
   $('#consult-body').innerHTML = renderConsult(report.consult, {
@@ -204,15 +213,19 @@ function finishPurchase(res) {
 /* ───────── 전/후 비교 ───────── */
 async function loadCompare() {
   const body = $('#compare-body');
-  body.innerHTML = `<div class="empty">기록을 불러오는 중…</div>`;
+  showEmpty(body, '기록을 불러오는 중…');
   let items = [];
-  try { ({ items } = await api.history()); } catch (err) { body.innerHTML = `<div class="empty">${err.message}</div>`; return; }
+  try { ({ items } = await api.history()); } catch (err) { showEmpty(body, err.message); return; }
 
   const asc = [...items].reverse(); // 오래된 것부터
   const sel = $('#compare-select');
-  sel.innerHTML = asc.map((it, i) =>
-    `<option value="${it.id}">${new Date(it.createdAt).toLocaleDateString('ko-KR')} · ${it.totalScore}점</option>`
-  ).join('');
+  sel.textContent = '';
+  for (const it of asc) {
+    const opt = document.createElement('option');
+    opt.value = it.id;
+    opt.textContent = `${new Date(it.createdAt).toLocaleDateString('ko-KR')} · ${it.totalScore}점`;
+    sel.appendChild(opt);
+  }
 
   if (asc.length < 2) {
     body.innerHTML = renderCompare({ records: null });
@@ -247,16 +260,16 @@ $('#compare-select')?.addEventListener('change', async (e) => {
 /* ───────── 커머스 ───────── */
 async function loadShop() {
   if (!state.analysisId) {
-    $('#shop-body').innerHTML = `<div class="empty">먼저 피부를 진단하면<br>내 톤에 맞는 제품을 랭킹해 드립니다.</div>`;
+    showEmpty($('#shop-body'), '먼저 피부를 진단하면 내 톤에 맞는 제품을 랭킹해 드립니다.');
     return;
   }
-  $('#shop-body').innerHTML = `<div class="empty">추천을 계산하는 중…</div>`;
+  showEmpty($('#shop-body'), '추천을 계산하는 중…');
   try {
     const data = await api.recommend(state.analysisId, state.category);
     state.shop = data;
     $('#shop-body').innerHTML = renderShop(data, state.category);
   } catch (err) {
-    $('#shop-body').innerHTML = `<div class="empty">${err.message}</div>`;
+    showEmpty($('#shop-body'), err.message);
   }
 }
 
@@ -275,7 +288,7 @@ async function loadHistory() {
     const { items } = await api.history();
     $('#history-body').innerHTML = renderHistory(items);
   } catch (err) {
-    $('#history-body').innerHTML = `<div class="empty">${err.message}</div>`;
+    showEmpty($('#history-body'), err.message);
   }
 }
 
