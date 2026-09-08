@@ -13,6 +13,9 @@ npm test           # 36개 테스트 (분석 엔진 + 상담 엔진 + API)
 npm run simulate   # 실사용 리허설 5개 페르소나 × 전체 여정 (91개 검사)
 npm run build:demo # 서버 없이 도는 단일 파일 데모 (dist/demo.html)
 npm run audit:mobile # 5개 기기 폭 × 8개 화면 모바일 감사
+npm run catalog:status  # 지금 샘플/실데이터 중 무엇을 쓰는지
+npm run catalog:check   # 판매처 API 키가 살아있는지 확인
+npm run sync:catalog    # 판매처 데이터 동기화 (--dry 로 연습)
 ```
 의존성 0개 — Node 20+ 내장 모듈만 사용합니다.
 
@@ -186,9 +189,31 @@ npm run audit:mobile # 5개 기기 폭 × 8개 화면 모바일 감사
 노치/홈 인디케이터 안전영역, `100dvh`, `touch-action:manipulation`, 짧은 화면·가로 모드,
 apple-touch-icon 과 홈 화면 추가 메타도 함께 넣었습니다.
 
+## 6-D. 판매처 실데이터 연동 (`npm run sync:catalog`)
+
+샘플 카탈로그를 실제 판매처 데이터로 바꾸는 층입니다. 자세한 절차는
+**[docs/파트너-API-연동.md](docs/파트너-API-연동.md)** 에 초보자 기준으로 적어두었습니다.
+
+```
+data/curation.json      무엇을 팔지 + 피부 매칭 태그 + 셰이드  ← 사람이 정하는 부분
+data/commission-rates.json  프로그램별 수수료율             ← 요율표 보고 입력
+data/manual/*.csv       공개 API 가 없는 판매처(올리브영 등)   ← 엑셀로 편집
+server/feeds/*.js       판매처별 어댑터 (쿠팡·네이버·Amazon)
+data/catalog.live.json  동기화 결과 (커밋 안 함)
+```
+
+- **API 가 주지 않는 것**: 피부 타입·고민 매칭과 셰이드 ITA 값. 이건 `curation.json` 에 사람이 씁니다.
+  가격은 누구나 긁을 수 있지만 이 매칭은 못 베낍니다 — 이 앱의 실제 자산입니다.
+- **쿠팡 검색 API 는 1시간 10회, 1회 10개** 제한이라 사용자 요청마다 부를 수 없습니다.
+  그래서 미리 동기화해 파일로 들고 있습니다.
+- 한 판매처가 실패해도 나머지는 살리고, 실패한 곳은 **직전 가격을 유지**합니다.
+- 검증에 실패한 결과는 **저장하지 않습니다**. 깨진 카탈로그보다 어제 데이터가 낫습니다.
+- 실데이터가 없거나 48시간 이상 낡으면 서버 로그와 `/api/config` 가 알려줍니다.
+
 ## 7. 운영 전 반드시 할 일
 
-1. `data/products.json` 은 **샘플 시드**입니다. 가격·재고·평점을 파트너 API 실데이터로 교체하세요.
+1. `data/products.json` 은 **샘플 시드**입니다. → **[docs/파트너-API-연동.md](docs/파트너-API-연동.md)** 를 따라 실데이터로 교체하세요.
+   키 없이 CSV 만으로 오늘 시작할 수 있고, 네이버(당일 발급) → 쿠팡(심사) 순으로 붙이면 됩니다.
 2. `SKINLAB_SECRET` / `ADMIN_TOKEN` 교체, HTTPS 종단 적용.
 3. JSON 스토어 → RDB 전환 (`server/store.js` 인터페이스 유지).
 4. 각 제휴 프로그램 약관에 맞는 고지 문구 확인 (현재 랭킹 근거 + 수수료 고지 노출 중).

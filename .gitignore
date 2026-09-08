@@ -4,3 +4,5 @@ data/db.json.*.tmp
 .env
 .DS_Store
 dist/
+data/catalog.live.json
+.env

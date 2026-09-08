@@ -16,6 +16,7 @@ import { createUser, userFromRequest } from './auth.js';
 import { PLANS, provider, createOrder, startPayment, confirmPayment, hasProAccess, activeEntitlement, verifyStripeSignature } from './payments.js';
 import { trackClick, recordConversion, hasPartnerId } from './links.js';
 import { kpis } from './analytics.js';
+import { loadCatalog } from './feeds/index.js';
 import { diagnose, DISCLAIMER } from '../public/js/engine/diagnose.js';
 import { sanitizeIntake } from '../public/js/engine/intake.js';
 import { narrate } from './doctor.js';
@@ -25,7 +26,10 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PUBLIC_DIR = path.join(ROOT, 'public');
 const PORT = Number(process.env.PORT || 8787);
 
-const catalog = JSON.parse(fs.readFileSync(path.join(ROOT, 'data', 'products.json'), 'utf8'));
+// 실데이터가 동기화돼 있으면 그것을, 없으면 샘플로 되돌아간다 (server/feeds/index.js)
+const catalogSource = loadCatalog();
+const catalog = catalogSource.catalog;
+if (catalogSource.source !== 'live') console.warn(`[카탈로그] ${catalogSource.reason}`);
 
 seedCoupons();
 
@@ -88,7 +92,13 @@ const routes = {
     plans: Object.values(PLANS),
     provider: provider(),
     disclaimer: DISCLAIMER,
-    catalogNote: catalog._meta.note,
+    catalogNote: catalog._meta?.note,
+    catalogSource: {
+      source: catalogSource.source,          // seed | live | live-stale
+      syncedAt: catalog._meta?.syncedAt || null,
+      ageHours: catalogSource.ageHours ?? null,
+      note: catalogSource.reason || null,
+    },
     merchants: catalog.merchants,
     partnerLinked: Object.fromEntries(Object.keys(catalog.merchants).map((m) => [m, hasPartnerId(m)])),
     coupons: Object.entries(db.read().coupons).map(([code, c]) => ({ code, label: c.label })),
@@ -335,7 +345,8 @@ process.on('SIGTERM', () => { db.flushNow(); process.exit(0); });
 
 if (process.env.NODE_ENV !== 'test') {
   server.listen(PORT, () => {
-    console.log(`SkinLab AI  →  http://localhost:${PORT}  (결제: ${provider()}, 상품 ${catalog.products.length}종)`);
+    const src = { seed: '샘플 카탈로그', live: '실데이터', 'live-stale': '실데이터(오래됨)' }[catalogSource.source];
+    console.log(`SkinLab AI  →  http://localhost:${PORT}  (결제: ${provider()}, ${src} 상품 ${catalog.products.length}종)`);
   });
 }
 
