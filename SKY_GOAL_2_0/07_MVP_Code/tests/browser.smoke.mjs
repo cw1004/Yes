@@ -198,6 +198,54 @@ try {
   check('가로 스크롤이 생기지 않는다',
     await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
 
+  // 공 선택 · 상점
+  await page.evaluate(() => window.SkyGoal.home());
+  await page.click('#btn-balls');
+  check('공 선택 화면이 열린다', await page.isVisible('#screen-balls'));
+  const rows = await page.evaluate(() => document.querySelectorAll('#ball-list .ballrow').length);
+  check('공 5종이 표시된다', rows === 5, '행 ' + rows + '개');
+
+  const lockedFirst = await page.evaluate(() => {
+    const btns = [...document.querySelectorAll('#ball-list .ballrow button')];
+    return { buyDisabled: btns.slice(1).every((b) => b.disabled), first: btns[0].textContent };
+  });
+  check('코인이 부족하면 구매 버튼이 잠긴다', lockedFirst.buyDisabled, JSON.stringify(lockedFirst));
+
+  await page.evaluate(() => {
+    window.SkyGoal.getProfile().coins = 5000;
+    window.SkyGoal.balls();
+  });
+  await page.evaluate(() => {
+    const rows = [...document.querySelectorAll('#ball-list .ballrow')];
+    rows[1].querySelector('button').click();          // 고무공 구매
+  });
+  const bought = await page.evaluate(() => {
+    const p = window.SkyGoal.getProfile();
+    return { coins: p.coins, owned: p.balls.owned, selected: p.balls.selected,
+             gravity: Math.round(window.SkyGoal.getArena().gravity) };
+  });
+  check('코인으로 공을 사면 바로 장착된다',
+    bought.selected === 'rubber' && bought.coins === 4700 && bought.owned.includes('rubber'),
+    JSON.stringify(bought));
+
+  const heavier = await page.evaluate(() => {
+    window.SkyGoal.engine.selectBall(window.SkyGoal.getProfile(), 'street');
+    window.SkyGoal.balls();
+    return Math.round(window.SkyGoal.getArena().gravity);
+  });
+  check('가벼운 공이 실제로 중력을 낮춘다', bought.gravity < heavier,
+    '고무 ' + bought.gravity + ' < 기본 ' + heavier);
+
+  await page.evaluate(() => {
+    const rows = [...document.querySelectorAll('#ball-list .ballrow')];
+    rows[1].querySelector('button').click();          // 다시 고무공 선택
+  });
+  await page.reload({ waitUntil: 'load' });
+  await page.waitForFunction(() => !!window.SkyGoal, null, { timeout: 5000 });
+  check('선택한 공이 새로고침 후에도 유지된다',
+    await page.evaluate(() => window.SkyGoal.getProfile().balls.selected === 'rubber'));
+  await page.evaluate(() => window.SkyGoal.home());
+
   // 조작 설정 슬라이더
   await page.evaluate(() => window.SkyGoal.home());
   await page.click('#btn-settings');

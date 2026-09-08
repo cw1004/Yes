@@ -165,6 +165,83 @@ test('골문은 난이도가 낮아도 항상 살짝 오르내린다', () => {
   assert.ok(hard.bob > easy.bob, '난이도가 높을수록 더 흔들린다');
 });
 
+test('공 5종이 서로 다른 무게를 가진다', () => {
+  assert.strictEqual(E.BALLS.length, 5);
+  const ids = E.BALLS.map((b) => b.id);
+  assert.strictEqual(new Set(ids).size, 5, 'id 가 중복되지 않는다');
+  const weights = E.BALLS.map((b) => b.weight);
+  assert.strictEqual(new Set(weights).size, 5, '무게가 모두 다르다');
+  for (const b of E.BALLS) {
+    assert.ok(b.weight >= 0.7 && b.weight <= 1.4, b.id + ' 무게 범위');
+    assert.ok(b.price >= 0 && Number.isInteger(b.price));
+    assert.ok(b.name && b.desc && b.skin && b.skin.base);
+  }
+  assert.strictEqual(E.BALLS[0].price, 0, '기본 공은 무료');
+  assert.strictEqual(E.ballById('없는공').id, E.DEFAULT_BALL, '없는 id 는 기본 공');
+});
+
+test('무게에 따라 점프 높이와 체공 시간이 달라진다', () => {
+  const stats = E.createProfile().stats;
+  const stage = E.stageFor(0, 50);
+  const of = (id) => {
+    const a = E.arenaParams(50, stage, stats, {}, E.ballById(id));
+    return { h: (a.flap * a.flap) / (2 * a.gravity), t: (2 * Math.abs(a.flap)) / a.gravity };
+  };
+  const rubber = of('rubber');      // 0.78 — 가벼움
+  const street = of('street');      // 1.00 — 표준
+  const training = of('training');  // 1.30 — 무거움
+
+  assert.ok(rubber.h > street.h, '가벼운 공이 더 높이 뜬다');
+  assert.ok(training.h < street.h, '무거운 공은 낮게 뜬다');
+  assert.ok(rubber.t > street.t && street.t > training.t, '가벼울수록 체공이 길다');
+  assert.ok(rubber.h / training.h > 1.15, '차이가 체감될 만큼 벌어진다');
+});
+
+test('공 구매와 선택', () => {
+  const p = E.createProfile();
+  assert.deepStrictEqual(p.balls.owned, ['street']);
+  assert.strictEqual(p.balls.selected, 'street');
+
+  let res = E.buyBall(p, 'rubber');
+  assert.strictEqual(res.ok, false);
+  assert.strictEqual(res.reason, 'coins');
+  assert.strictEqual(res.short, 300);
+  assert.strictEqual(p.coins, 0, '실패하면 코인이 줄지 않는다');
+
+  p.coins = 1000;
+  res = E.buyBall(p, 'rubber');
+  assert.strictEqual(res.ok, true);
+  assert.strictEqual(p.coins, 700);
+  assert.strictEqual(p.balls.selected, 'rubber', '사면 바로 장착된다');
+
+  assert.strictEqual(E.buyBall(p, 'rubber').reason, 'owned');
+  assert.strictEqual(E.selectBall(p, 'training'), false, '없는 공은 선택 못 한다');
+  assert.strictEqual(E.selectBall(p, 'street'), true);
+  assert.strictEqual(E.selectedBall(p).id, 'street');
+  assert.strictEqual(E.ownsBall(p, 'rubber'), true);
+  assert.strictEqual(E.ownsBall(p, 'gold2030'), false);
+});
+
+test('저장된 공 목록이 손상되어도 복구된다', () => {
+  const p = E.normalizeProfile({ balls: { owned: ['없는공', 'gold2030', 'gold2030'], selected: '없는공' } });
+  assert.deepStrictEqual(p.balls.owned, ['street', 'gold2030'], '기본 공 포함, 중복·미존재 제거');
+  assert.strictEqual(p.balls.selected, 'street', '보유하지 않은 선택은 기본으로');
+  const q = E.normalizeProfile({ balls: 'nonsense' });
+  assert.deepStrictEqual(q.balls.owned, ['street']);
+});
+
+test('골든볼은 코인을 15% 더 준다', () => {
+  const base = E.createProfile();
+  const gold = E.createProfile();
+  gold.balls = { owned: ['street', 'gold2030'], selected: 'gold2030' };
+  const run = { score: 100, combo: 5, passCount: 5, perfectCount: 2, duration: 20,
+                tapIntervals: [250, 250, 250], difficulty: 50 };
+  const a = E.commitRun(base, Object.assign({}, run), () => 0.5);
+  const b = E.commitRun(gold, Object.assign({}, run), () => 0.5);
+  assert.strictEqual(b.ballId, 'gold2030');
+  assert.strictEqual(b.coins, Math.round(a.coins * 1.15));
+});
+
 test('퍼펙트 보너스와 통과 점수', () => {
   assert.strictEqual(E.perfectBonus(0, 200), 10);
   assert.strictEqual(E.perfectBonus(100, 200), 0);

@@ -73,6 +73,26 @@ p { margin: 8px 0; line-height: 1.55; color: #dbe7f7; font-size: 14px; }
 }
 .statpick button:disabled { opacity: 0.35; cursor: default; }
 .reasons { margin: 8px 0 0; padding-left: 18px; color: var(--sub); font-size: 12px; }
+.ballrow {
+  display: flex; gap: 12px; align-items: center; text-align: left;
+  padding: 10px; margin: 8px 0; border-radius: 14px;
+  background: rgba(255, 255, 255, 0.06); border: 1px solid var(--line);
+}
+.ballrow.on { border-color: var(--accent); background: rgba(255, 153, 51, 0.12); }
+.ballrow.locked { opacity: 0.72; }
+.ballrow .orb { flex: 0 0 46px; width: 46px; height: 46px; display: block; }
+.ballrow .meta { flex: 1 1 auto; min-width: 0; }
+.ballrow .meta b { display: block; font-size: 14px; }
+.ballrow .meta span { display: block; font-size: 11px; color: var(--sub); line-height: 1.35; }
+.ballrow .spec { font-size: 11px; color: var(--accent); margin-top: 3px; }
+.ballrow button {
+  flex: 0 0 auto; padding: 9px 12px; border-radius: 10px; cursor: pointer;
+  font-size: 12px; font-weight: 700; color: var(--ink);
+  background: rgba(255, 255, 255, 0.1); border: 1px solid var(--line);
+}
+.ballrow button.buy { background: linear-gradient(90deg, var(--accent), #ffd28a); color: #0d1b2a; }
+.ballrow button:disabled { opacity: 0.45; cursor: default; }
+
 .slider { margin: 16px 0 18px; }
 .slider label {
   display: flex; justify-content: space-between; align-items: baseline;

@@ -15,6 +15,11 @@
 | `statPoints` | int | 미사용 스탯 포인트 |
 | `bestScore` | int | 최고 점수 |
 | `stats.*` | 0~100 | CONTROL / POWER / SPEED / LUCK / STAMINA |
+| `settings.muted` | bool | 음소거 |
+| `settings.ballFine` | 20~100 | 공 상하 미세 조정 |
+| `settings.speed` | 30~100 | 스피드 |
+| `balls.owned` | string[] | 보유 공 id (기본 공은 항상 포함) |
+| `balls.selected` | string | 사용 중인 공 id |
 | `metrics.*` | — | AI 난이도 엔진 입력 지표 |
 | `metrics.recentScores` | number[10] | 최근 10게임 점수 |
 | `metrics.recentSuccesses` | 0\|1[10] | 최근 10게임 성공 여부 |
@@ -27,5 +32,6 @@
 - JSON 파싱 실패 → 새 프로필
 - 숫자가 아닌 값 / 범위 밖 값 → 기본값 또는 clamp
 - 배열이 아닌 `recentScores` → 빈 배열, 숫자가 아닌 원소는 제거
+- 존재하지 않는 공 id → 목록에서 제거, 보유하지 않은 공을 선택 중이면 기본 공으로
 - `localStorage` 자체가 막힌 환경(시크릿 모드, 일부 `file://`) → 세션 메모리로 폴백하고
   시작 화면에 "이번 세션에서만 기록이 유지됩니다" 라고 알린다.

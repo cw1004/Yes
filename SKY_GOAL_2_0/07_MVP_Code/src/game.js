@@ -21,6 +21,7 @@
   var screenResult = $('screen-result');
   var screenContinue = $('screen-continue');
   var screenSettings = $('screen-settings');
+  var screenBalls = $('screen-balls');
   var bridge = window.SkyGoalNative || null;      // 안드로이드 앱이 주입하는 브리지
 
   /* ---------------------------------------------------------- 상태 변수 */
@@ -83,8 +84,9 @@
     gates = [];
     sparks = [];
     stage = E.stageFor(0, profile.difficulty);
-    arena = E.arenaParams(profile.difficulty, stage, profile.stats, profile.settings);
+    arena = E.arenaParams(profile.difficulty, stage, profile.stats, profile.settings, E.selectedBall(profile));
     refreshStartScreen();
+    screenBalls.classList.add('hidden');
     screenSettings.classList.add('hidden');
     screenResult.classList.add('hidden');
     screenStart.classList.remove('hidden');
@@ -92,7 +94,107 @@
     hud.classList.add('hidden');
   }
 
+  /* ------------------------------------------------------- 공 선택 · 상점 */
+
+  function ballSpecLabel(b) {
+    var weight = b.weight < 0.9 ? '가벼움' : (b.weight > 1.1 ? '무거움' : '표준');
+    var bits = ['무게 ' + weight + ' (' + b.weight.toFixed(2) + ')'];
+    if (b.perfectBonus) bits.push('퍼펙트 판정 +');
+    if (b.coinBonus > 1) bits.push('코인 +' + Math.round((b.coinBonus - 1) * 100) + '%');
+    return bits.join(' · ');
+  }
+
+  function renderBallList() {
+    var list = $('ball-list');
+    list.innerHTML = '';
+    $('ball-coins').textContent = profile.coins;
+
+    E.BALLS.forEach(function (b) {
+      var owned = E.ownsBall(profile, b.id);
+      var picked = profile.balls.selected === b.id;
+
+      var row = document.createElement('div');
+      row.className = 'ballrow' + (picked ? ' on' : '') + (owned ? '' : ' locked');
+
+      // 미리보기는 실제 게임과 같은 그리기 코드를 쓴다
+      var orb = document.createElement('canvas');
+      orb.className = 'orb';
+      var dpr = Math.min(window.devicePixelRatio || 1, 2);
+      orb.width = 46 * dpr;
+      orb.height = 46 * dpr;
+      var octx = orb.getContext('2d');
+      octx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      octx.translate(23, 23);
+      paintBall(octx, 20, b.skin, 0.35);
+
+      var meta = document.createElement('div');
+      meta.className = 'meta';
+      var name = document.createElement('b');
+      name.textContent = b.name + (picked ? ' ✓' : '');
+      var desc = document.createElement('span');
+      desc.textContent = b.desc;
+      var spec = document.createElement('div');
+      spec.className = 'spec';
+      spec.textContent = ballSpecLabel(b);
+      meta.appendChild(name);
+      meta.appendChild(desc);
+      meta.appendChild(spec);
+
+      var btn = document.createElement('button');
+      if (picked) {
+        btn.textContent = '사용 중';
+        btn.disabled = true;
+      } else if (owned) {
+        btn.textContent = '선택';
+        btn.addEventListener('click', function () {
+          if (E.selectBall(profile, b.id)) {
+            storage.save(profile);
+            refreshArena();
+            renderBallList();
+            if (audio) audio.tap();
+          }
+        });
+      } else {
+        btn.className = 'buy';
+        btn.textContent = b.price + '코인';
+        btn.disabled = profile.coins < b.price;
+        btn.addEventListener('click', function () {
+          var res = E.buyBall(profile, b.id);
+          if (res.ok) {
+            storage.save(profile);
+            refreshArena();
+            renderBallList();
+            refreshStartScreen();
+            if (audio) audio.levelUp();
+          }
+        });
+      }
+
+      row.appendChild(orb);
+      row.appendChild(meta);
+      row.appendChild(btn);
+      list.appendChild(row);
+    });
+  }
+
+  function showBalls() {
+    refreshArena();          // 다른 경로로 공이 바뀌었어도 화면과 물리를 맞춘다
+    renderBallList();
+    screenStart.classList.add('hidden');
+    screenResult.classList.add('hidden');
+    screenSettings.classList.add('hidden');
+    hideContinuePrompt();
+    screenBalls.classList.remove('hidden');
+    panel.classList.remove('hidden');
+    hud.classList.add('hidden');
+  }
+
   /* ---------------------------------------------------------- 조작 설정 */
+
+  function refreshArena() {
+    arena = E.arenaParams(run ? run.difficulty : profile.difficulty, stage,
+                          profile.stats, profile.settings, E.selectedBall(profile));
+  }
 
   function applySettings(save) {
     var t = E.tuningFactors(profile.settings);
@@ -103,8 +205,7 @@
     $('set-fine-val').textContent = t.ballFine;
     $('set-speed-val').textContent = t.speed;
     // 준비 상태에서 바꾸면 즉시 반영된다 (플레이 중에는 다음 판부터)
-    arena = E.arenaParams(run ? run.difficulty : profile.difficulty, stage,
-                          profile.stats, profile.settings);
+    refreshArena();
     if (save) storage.save(profile);
   }
 
@@ -112,6 +213,7 @@
     applySettings(false);
     screenStart.classList.add('hidden');
     screenResult.classList.add('hidden');
+    screenBalls.classList.add('hidden');
     hideContinuePrompt();
     screenSettings.classList.remove('hidden');
     panel.classList.remove('hidden');
@@ -125,6 +227,7 @@
     $('s-level').textContent = profile.level;
     $('s-coin').textContent = profile.coins;
     $('s-games').textContent = profile.metrics.games;
+    $('s-ball').textContent = E.selectedBall(profile).name;
     $('s-storage').textContent = storage.persistent
       ? '진행 상황은 이 브라우저에 저장됩니다.'
       : '이 환경에서는 저장이 차단되어 이번 세션에서만 기록이 유지됩니다.';
@@ -172,7 +275,7 @@
 
   function startRun() {
     stage = E.stageFor(0, profile.difficulty);
-    arena = E.arenaParams(profile.difficulty, stage, profile.stats, profile.settings);
+    arena = E.arenaParams(profile.difficulty, stage, profile.stats, profile.settings, E.selectedBall(profile));
     run = {
       score: 0,
       combo: 0,
@@ -245,7 +348,7 @@
     var next = E.stageFor(run.passCount, run.difficulty);
     if (next.key !== stage.key) {
       stage = next;
-      arena = E.arenaParams(run.difficulty, stage, profile.stats, profile.settings);
+      arena = E.arenaParams(run.difficulty, stage, profile.stats, profile.settings, E.selectedBall(profile));
       run.stage = stage.key;
       if (audio) { audio.stage(); audio.setIntensity(musicLevel()); }
     }
@@ -427,6 +530,7 @@
 
     refreshStatBox();
     hideContinuePrompt();
+    screenBalls.classList.add('hidden');
     screenSettings.classList.add('hidden');
     screenStart.classList.add('hidden');
     screenResult.classList.remove('hidden');
@@ -624,21 +728,118 @@
     }
   }
 
+  // 공 5종. 무게가 다른 만큼 겉모습도 다르게 그린다.
+  function paintBall(c, r, skin, spin) {
+    c.save();
+    c.rotate(spin);
+    c.beginPath();
+    c.arc(0, 0, r, 0, Math.PI * 2);
+
+    if (skin.style === 'gold') {
+      var gg = c.createRadialGradient(-r * 0.35, -r * 0.4, r * 0.15, 0, 0, r);
+      gg.addColorStop(0, skin.accent);
+      gg.addColorStop(0.55, skin.base);
+      gg.addColorStop(1, skin.patch);
+      c.fillStyle = gg;
+    } else if (skin.style === 'glossy') {
+      var gl = c.createRadialGradient(-r * 0.3, -r * 0.35, r * 0.1, 0, 0, r);
+      gl.addColorStop(0, '#ffffff');
+      gl.addColorStop(0.35, skin.base);
+      gl.addColorStop(1, skin.patch);
+      c.fillStyle = gl;
+    } else {
+      c.fillStyle = skin.base;
+    }
+    c.fill();
+    c.lineWidth = skin.style === 'heavy' ? 3.5 : 2;
+    c.strokeStyle = skin.style === 'heavy' ? skin.accent : '#16202c';
+    c.stroke();
+
+    c.save();
+    c.beginPath();
+    c.arc(0, 0, r - 1, 0, Math.PI * 2);
+    c.clip();
+
+    if (skin.style === 'worn') {                       // 낡은 가죽 — 오각형 + 조각들
+      c.fillStyle = skin.patch;
+      c.beginPath();
+      c.moveTo(0, -r * 0.48); c.lineTo(r * 0.45, -r * 0.14);
+      c.lineTo(r * 0.28, r * 0.4); c.lineTo(-r * 0.28, r * 0.4);
+      c.lineTo(-r * 0.45, -r * 0.14);
+      c.closePath(); c.fill();
+      c.fillStyle = skin.accent;
+      c.fillRect(-r, r * 0.55, r * 2, r * 0.22);
+      c.globalAlpha = 0.35;
+      c.fillRect(-r, -r * 0.9, r * 2, r * 0.16);
+      c.globalAlpha = 1;
+    } else if (skin.style === 'glossy') {              // 고무 — 굵은 띠 + 하이라이트
+      c.strokeStyle = skin.patch;
+      c.lineWidth = r * 0.28;
+      c.beginPath();
+      c.ellipse(0, 0, r * 0.98, r * 0.42, 0, 0, Math.PI * 2);
+      c.stroke();
+      c.fillStyle = 'rgba(255,255,255,0.75)';
+      c.beginPath();
+      c.ellipse(-r * 0.35, -r * 0.4, r * 0.26, r * 0.16, -0.6, 0, Math.PI * 2);
+      c.fill();
+    } else if (skin.style === 'heavy') {               // 중량구 — 주황 밴드 + 무게 표시
+      c.fillStyle = skin.patch;
+      c.fillRect(-r, -r * 0.22, r * 2, r * 0.44);
+      c.fillStyle = skin.accent;
+      c.beginPath();
+      c.arc(0, 0, r * 0.28, 0, Math.PI * 2);
+      c.fill();
+      c.fillStyle = skin.base;
+      c.beginPath();
+      c.arc(0, 0, r * 0.14, 0, Math.PI * 2);
+      c.fill();
+    } else if (skin.style === 'panel') {               // 경기구 — 곡선 패널 3장
+      c.strokeStyle = skin.patch;
+      c.lineWidth = r * 0.2;
+      for (var k = 0; k < 3; k++) {
+        c.save();
+        c.rotate((k * Math.PI * 2) / 3);
+        c.beginPath();
+        c.arc(r * 1.05, 0, r * 0.85, Math.PI * 0.65, Math.PI * 1.35);
+        c.stroke();
+        c.restore();
+      }
+      c.fillStyle = skin.accent;
+      c.beginPath();
+      c.arc(0, 0, r * 0.16, 0, Math.PI * 2);
+      c.fill();
+    } else if (skin.style === 'gold') {                // 골든볼 — 별 + 반짝임
+      c.fillStyle = skin.patch;
+      c.beginPath();
+      for (var i = 0; i < 10; i++) {
+        var ang = (Math.PI / 5) * i - Math.PI / 2;
+        var rad = i % 2 === 0 ? r * 0.52 : r * 0.22;
+        c.lineTo(Math.cos(ang) * rad, Math.sin(ang) * rad);
+      }
+      c.closePath();
+      c.fill();
+      c.globalAlpha = 0.5 + 0.5 * Math.abs(Math.sin(clock * 3));
+      c.fillStyle = '#ffffff';
+      c.fillRect(-r * 0.75, -r * 0.62, r * 0.3, 2);
+      c.fillRect(-r * 0.62, -r * 0.75, 2, r * 0.3);
+      c.globalAlpha = 1;
+    }
+    c.restore();
+    c.restore();
+  }
+
   function drawBall() {
+    var skin = E.selectedBall(profile).skin;
     ctx.save();
     ctx.translate(ball.x, ball.y);
-    ctx.rotate(ball.spin);
+    // 그림자
+    ctx.globalAlpha = 0.18;
+    ctx.fillStyle = '#000';
     ctx.beginPath();
-    ctx.arc(0, 0, 15, 0, Math.PI * 2);
-    ctx.fillStyle = '#ffffff';
+    ctx.ellipse(2, 4, 15, 14, 0, 0, Math.PI * 2);
     ctx.fill();
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = '#16202c';
-    ctx.stroke();
-    ctx.fillStyle = '#16202c';
-    ctx.beginPath();
-    ctx.moveTo(0, -7); ctx.lineTo(6.5, -2); ctx.lineTo(4, 6); ctx.lineTo(-4, 6); ctx.lineTo(-6.5, -2);
-    ctx.closePath(); ctx.fill();
+    ctx.globalAlpha = 1;
+    paintBall(ctx, 15, skin, ball.spin);
     ctx.restore();
   }
 
@@ -734,6 +935,8 @@
   });
   if (!AudioLib) muteBtn.classList.add('hidden');
 
+  $('btn-balls').addEventListener('click', showBalls);
+  $('btn-balls-close').addEventListener('click', showStart);
   $('btn-settings').addEventListener('click', showSettings);
   $('btn-settings-close').addEventListener('click', showStart);
   $('btn-settings-reset').addEventListener('click', function () {
@@ -822,6 +1025,8 @@
     forceEnd: function () { if (state === 'ready') state = 'playing'; endRun(); },
     home: showStart,
     settings: showSettings,
+    balls: showBalls,
+    paintBall: paintBall,          // 아트 확인용
     getArena: function () { return arena; },
     // 보상형 광고 제공자 주입: fn(callback) → callback(성공 여부)
     setRewardProvider: function (fn) { rewardProvider = typeof fn === 'function' ? fn : null; },
@@ -851,7 +1056,7 @@
       for (var i = 0; i < E.STAGES.length; i++) {
         if (E.STAGES[i].key === key) stage = E.STAGES[i];
       }
-      arena = E.arenaParams(run ? run.difficulty : profile.difficulty, stage, profile.stats, profile.settings);
+      arena = E.arenaParams(run ? run.difficulty : profile.difficulty, stage, profile.stats, profile.settings, E.selectedBall(profile));
       if (run) run.stage = stage.key;
       if (audio) audio.setIntensity(musicLevel());
       updateHud();

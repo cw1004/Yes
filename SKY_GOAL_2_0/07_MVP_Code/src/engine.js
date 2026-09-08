@@ -54,6 +54,82 @@
     return list;
   }
 
+  /* ---------------------------------------------------------------- 공 종류 */
+
+  /**
+   * 5종의 공. 무게가 상하 운동을 바꾼다.
+   *   weight  중력 배율 — 가벼울수록 높이 뜨고 천천히 떨어진다(체공↑)
+   *   kick    탭 상승력 배율
+   *   점프 높이 = (flap*kick)^2 / (2*gravity*weight) 이므로 공마다 실제로 다르다.
+   * 디자인은 전부 독자 디자인이며 실제 브랜드를 모방하지 않는다.
+   */
+  var BALLS = [
+    {
+      id: 'street', name: '거리의 낡은 공', tag: 'STREET',
+      desc: '소년의 첫 공. 무겁지도 가볍지도 않은 기준.',
+      price: 0, weight: 1.00, kick: 1.00, coinBonus: 1.00, perfectBonus: 0,
+      skin: { base: '#e8ddc8', patch: '#5b4632', accent: '#8a6a44', style: 'worn' }
+    },
+    {
+      id: 'rubber', name: '고무공', tag: 'RUBBER',
+      desc: '아주 가볍다. 높이 뜨고 천천히 떨어져 체공이 길다.',
+      price: 300, weight: 0.78, kick: 0.96, coinBonus: 1.00, perfectBonus: 0,
+      skin: { base: '#d8f24a', patch: '#5aa02c', accent: '#ffffff', style: 'glossy' }
+    },
+    {
+      id: 'training', name: '훈련용 중량구', tag: 'TRAINING',
+      desc: '묵직하다. 낮게 뜨고 빠르게 떨어져 반응이 민첩하다.',
+      price: 800, weight: 1.30, kick: 1.12, coinBonus: 1.00, perfectBonus: 0,
+      skin: { base: '#3b444f', patch: '#ff7a2f', accent: '#9aa7b4', style: 'heavy' }
+    },
+    {
+      id: 'match', name: '공식 경기구', tag: 'MATCH',
+      desc: '가장 균형 잡힌 공. 퍼펙트 판정이 조금 넓다.',
+      price: 1500, weight: 0.94, kick: 1.02, coinBonus: 1.00, perfectBonus: 0.02,
+      skin: { base: '#ffffff', patch: '#1f6fd0', accent: '#0f2a4a', style: 'panel' }
+    },
+    {
+      id: 'gold2030', name: '2030 골든볼', tag: 'GOLD',
+      desc: '가볍고 단단하다. 획득 코인이 15% 늘어난다.',
+      price: 3000, weight: 0.88, kick: 1.06, coinBonus: 1.15, perfectBonus: 0.01,
+      skin: { base: '#ffd77a', patch: '#b8791a', accent: '#fff3c9', style: 'gold' }
+    }
+  ];
+
+  var DEFAULT_BALL = 'street';
+
+  function ballById(id) {
+    for (var i = 0; i < BALLS.length; i++) if (BALLS[i].id === id) return BALLS[i];
+    return BALLS[0];
+  }
+
+  function selectedBall(profile) {
+    if (!profile || !profile.balls) return BALLS[0];
+    return ballById(profile.balls.selected);
+  }
+
+  function ownsBall(profile, id) {
+    return !!(profile && profile.balls && profile.balls.owned.indexOf(id) >= 0);
+  }
+
+  /** 코인을 지불하고 공을 해금한다. { ok, reason } 을 돌려준다. */
+  function buyBall(profile, id) {
+    var ball = ballById(id);
+    if (!profile || !profile.balls) return { ok: false, reason: 'no-profile' };
+    if (ownsBall(profile, ball.id)) return { ok: false, reason: 'owned' };
+    if (profile.coins < ball.price) return { ok: false, reason: 'coins', short: ball.price - profile.coins };
+    profile.coins -= ball.price;
+    profile.balls.owned.push(ball.id);
+    profile.balls.selected = ball.id;
+    return { ok: true, ball: ball };
+  }
+
+  function selectBall(profile, id) {
+    if (!ownsBall(profile, id)) return false;
+    profile.balls.selected = ballById(id).id;
+    return true;
+  }
+
   /* -------------------------------------------------------------- profile */
 
   function createProfile() {
@@ -68,6 +144,7 @@
       statPoints: 0,
       bestScore: 0,
       settings: { muted: false, ballFine: 50, speed: 50 },
+      balls: { owned: [DEFAULT_BALL], selected: DEFAULT_BALL },
       stats: { control: 50, power: 50, speed: 50, luck: 50, stamina: 50 },
       metrics: {
         games: 0,
@@ -95,6 +172,21 @@
   }
 
   // 저장 데이터가 손상/구버전이어도 게임이 죽지 않도록 항상 안전한 프로필로 정규화한다.
+  // 보유 공 목록을 실제 존재하는 id 로만 정리한다 (기본 공은 항상 포함).
+  function normalizeBalls(raw) {
+    var owned = [DEFAULT_BALL];
+    var list = raw && Array.isArray(raw.owned) ? raw.owned : [];
+    for (var i = 0; i < list.length; i++) {
+      var id = list[i];
+      for (var b = 0; b < BALLS.length; b++) {
+        if (BALLS[b].id === id && owned.indexOf(id) < 0) owned.push(id);
+      }
+    }
+    var selected = raw && typeof raw.selected === 'string' ? raw.selected : DEFAULT_BALL;
+    if (owned.indexOf(selected) < 0) selected = DEFAULT_BALL;
+    return { owned: owned, selected: selected };
+  }
+
   function normalizeProfile(raw) {
     var base = createProfile();
     if (!raw || typeof raw !== 'object') return base;
@@ -104,6 +196,7 @@
     var inv = raw.inventory && typeof raw.inventory === 'object' ? raw.inventory : {};
     var lr = raw.lastRun && typeof raw.lastRun === 'object' ? raw.lastRun : {};
     var settings = raw.settings && typeof raw.settings === 'object' ? raw.settings : {};
+    var balls = raw.balls && typeof raw.balls === 'object' ? raw.balls : {};
 
     function numList(v, cap) {
       if (!Array.isArray(v)) return [];
@@ -130,6 +223,7 @@
         ballFine: num(settings.ballFine, 50, BALL_FINE_MIN, 100),
         speed: num(settings.speed, 50, SPEED_MIN, 100)
       },
+      balls: normalizeBalls(balls),
       stats: {
         control: num(stats.control, 50, 0, 100),
         power: num(stats.power, 50, 0, 100),
@@ -277,11 +371,12 @@
   }
 
   // 문서 5장 + 성장 스탯 보정
-  function arenaParams(difficulty, stage, stats, settings) {
+  function arenaParams(difficulty, stage, stats, settings, ball) {
     var d = clamp(difficulty, 10, 95);
     var s = stats || { control: 50, power: 50, speed: 50, luck: 50, stamina: 50 };
     var st = stage || STAGES[0];
     var tune = tuningFactors(settings);
+    var b = ball && ball.weight ? ball : BALLS[0];
 
     var gap = Math.max(145, 220 - 0.9 * d);
     var speed = 210 + 2.8 * d;
@@ -296,8 +391,9 @@
     // 플레이어 설정은 AI 가 정한 값 위에 곱해지는 개인 취향 보정이다.
     // 느리게 맞춰 두면 성적이 올라가고, 그만큼 AI 가 난이도를 올려 균형이 맞는다.
     speed = clamp(speed, 180, 560) * tune.speedMul;
-    var gravity = 950 * (1 - (s.stamina - 50) / 1200) * tune.response * tune.response;
-    var flap = -340 * (1 + (s.power - 50) / 800) * tune.response;
+    // 공의 무게가 상하 운동을 바꾼다. 가벼운 공은 높이 뜨고 천천히 떨어진다.
+    var gravity = 950 * (1 - (s.stamina - 50) / 1200) * tune.response * tune.response * b.weight;
+    var flap = -340 * (1 + (s.power - 50) / 800) * tune.response * b.kick;
 
     // 골문은 난이도가 낮아도 항상 살짝 오르내린다 (8~34px)
     var bob = clamp(movement * 12, 8, 34);
@@ -311,8 +407,9 @@
       rain: st.rain,
       gravity: gravity,
       flap: flap,
-      perfectWindow: 0.12 + (s.control - 50) / 1000,       // gap 대비 퍼펙트 판정 비율
-      tuning: tune
+      perfectWindow: 0.12 + (s.control - 50) / 1000 + (b.perfectBonus || 0),
+      tuning: tune,
+      ball: b
     };
   }
 
@@ -415,7 +512,8 @@
 
     profile.bestScore = Math.max(profile.bestScore, score);
 
-    var coins = coinReward(score);
+    var ballKind = selectedBall(profile);
+    var coins = Math.round(coinReward(score) * (ballKind.coinBonus || 1));
     var xp = xpReward(score, perfect, run.difficulty !== undefined ? run.difficulty : profile.difficulty);
     profile.coins += coins;
     profile.xp += xp;
@@ -448,6 +546,7 @@
       coins: coins,
       xp: xp,
       loot: loot,
+      ballId: ballKind.id,
       levelsGained: levelsGained,
       previousDifficulty: previousDifficulty,
       difficulty: profile.difficulty,
@@ -515,6 +614,13 @@
     norm: norm,
     mean: mean,
     coefficientOfVariation: coefficientOfVariation,
+    BALLS: BALLS,
+    DEFAULT_BALL: DEFAULT_BALL,
+    ballById: ballById,
+    selectedBall: selectedBall,
+    ownsBall: ownsBall,
+    buyBall: buyBall,
+    selectBall: selectBall,
     createProfile: createProfile,
     normalizeProfile: normalizeProfile,
     skillComponents: skillComponents,

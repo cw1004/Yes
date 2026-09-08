@@ -37,11 +37,24 @@
       <div class="stat">레벨<b id="s-level">1</b></div>
       <div class="stat">코인<b id="s-coin">0</b></div>
       <div class="stat">누적 게임<b id="s-games">0</b></div>
+      <div class="stat" style="grid-column:1/-1">사용 중인 공<b id="s-ball">거리의 낡은 공</b></div>
     </div>
     <button class="btn" id="btn-start" type="button">경기 시작</button>
+    <button class="btn ghost" id="btn-balls" type="button">⚽ 공 선택 · 상점</button>
     <button class="btn ghost" id="btn-settings" type="button">⚙ 조작 설정</button>
     <button class="btn ghost" id="btn-reset" type="button">플레이어 데이터 초기화</button>
     <p class="small" id="s-storage">진행 상황은 브라우저에 저장됩니다.</p>
+  </div>
+
+  <!-- 공 선택 · 상점 -->
+  <div class="card hidden" id="screen-balls">
+    <div class="tag">BALLS</div>
+    <h2>공 선택</h2>
+    <p class="small">공마다 무게가 다릅니다. 가벼우면 높이 뜨고 천천히 떨어지며,
+    무거우면 낮게 뜨고 빠르게 떨어져 반응이 민첩합니다.</p>
+    <p class="small">보유 코인 <b id="ball-coins">0</b></p>
+    <div id="ball-list"></div>
+    <button class="btn" id="btn-balls-close" type="button">확인</button>
   </div>
 
   <!-- 조작 설정 -->
