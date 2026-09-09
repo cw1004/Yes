@@ -30,6 +30,16 @@ export const PLANS = {
 
 export const provider = () => process.env.SKINLAB_PAYMENTS || 'mock';
 
+/**
+ * 'none' = 결제 기능을 끄고 전체 리포트를 무료로 여는 모드.
+ *
+ * 국내에서 유료 판매를 하려면 사업자등록과 통신판매업 신고가 필요하고,
+ * 결제대행사(토스 등)도 사업자만 계약할 수 있다. 개인이 먼저 시작할 때는
+ * 리포트를 무료로 열고 제휴 커머스 수익만 받는 구성이 현실적이다.
+ * 나중에 사업자 등록을 마치면 SKINLAB_PAYMENTS 만 toss/stripe 로 바꾸면 된다.
+ */
+export const paywallEnabled = () => provider() !== 'none';
+
 export function activeEntitlement(userId) {
   const ent = db.read().entitlements[userId];
   if (!ent) return null;
@@ -38,6 +48,7 @@ export function activeEntitlement(userId) {
 }
 
 export function hasProAccess(userId, analysisId) {
+  if (!paywallEnabled()) return true;   // 무료 공개 모드
   const ent = activeEntitlement(userId);
   if (!ent || ent.expired) return false;
   if (ent.plan === 'monthly' || ent.plan === 'yearly') return true;
@@ -61,6 +72,7 @@ export function grantEntitlement(userId, planId, orderId, analysisId) {
 }
 
 export function createOrder({ userId, planId, analysisId, couponCode }) {
+  if (!paywallEnabled()) throw Object.assign(new Error('이 서비스는 현재 결제 없이 무료로 제공됩니다.'), { status: 400 });
   const plan = PLANS[planId];
   if (!plan) throw Object.assign(new Error('알 수 없는 요금제입니다.'), { status: 400 });
   const discount = applyCoupon(couponCode, plan.price);

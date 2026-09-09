@@ -9,6 +9,7 @@ AI 상담 캐릭터 **닥터 세라**가 진료 흐름 그대로 짚어줍니다
 
 ```bash
 npm start          # http://localhost:8787
+npm run check:deploy # 배포 전 설정 점검 (초보자용)
 npm test           # 58개 테스트 (분석 엔진 + 상담 + API + 피드 + 보안)
 npm run simulate   # 실사용 리허설 5개 페르소나 × 전체 여정 (91개 검사)
 npm run build:demo # 서버 없이 도는 단일 파일 데모 (dist/demo.html)
@@ -125,7 +126,7 @@ npm run sync:catalog    # 판매처 데이터 동기화 (--dry 로 연습)
 | `PORT` | 기본 8787 |
 | `SKINLAB_SECRET` | 토큰 서명 키 — **운영에서 반드시 교체** |
 | `SKINLAB_DB` | JSON 스토어 경로 (기본 `data/db.json`) |
-| `SKINLAB_PAYMENTS` | `mock`(기본) / `toss` / `stripe` |
+| `SKINLAB_PAYMENTS` | `mock`(데모) / `none`(무료 공개·제휴 수익만) / `toss` / `stripe` |
 | `ANTHROPIC_API_KEY` | 있으면 닥터 대사를 Claude가 다듬음 (없으면 규칙 엔진) |
 | `SKINLAB_DOCTOR_MODEL` | 기본 `claude-opus-5` |
 | `TOSS_CLIENT_KEY`, `TOSS_SECRET_KEY` | 국내 결제 |
@@ -251,6 +252,19 @@ data/catalog.live.json  동기화 결과 (커밋 안 함)
 
 확인된 안전 사항: 얼굴 사진은 서버로 전송되지 않고, 무료/유료 경계는 서버에서 강제되며,
 남의 리포트는 403, 1회 이용권은 결제한 리포트에만 적용됩니다.
+
+## 6-F. 진짜 홈페이지로 띄우기
+
+**[docs/홈페이지-띄우기.md](docs/홈페이지-띄우기.md)** — 개발 경험이 없는 사람 기준으로 쓴 배포 가이드입니다.
+터미널 명령 없이 웹에서 버튼만 눌러 배포합니다.
+
+- `render.yaml` — 저장소만 연결하면 서버 사양·디스크·헬스체크·자동배포가 자동 설정됩니다
+- `Dockerfile` — 다른 플랫폼(Fly.io, Cloudtype 등)이나 직접 서버에 올릴 때
+- `npm run check:deploy` — 무엇이 비었고 그래서 무슨 일이 생기는지 알려줍니다
+
+**결제 없이 시작하는 길**: 국내에서 유료 결제를 받으려면 사업자등록이 필요합니다(결제대행사가 개인과 계약하지 않습니다).
+`SKINLAB_PAYMENTS=none` 으로 두면 리포트를 전부 무료로 열고 **제휴 커머스 수익만** 받습니다.
+사업자등록을 마친 뒤 이 값만 `toss` 로 바꾸면 유료 전환이 끝납니다 — 코드는 그대로입니다.
 
 ## 7. 운영 전 반드시 할 일
 

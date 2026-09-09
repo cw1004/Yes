@@ -189,6 +189,35 @@ test('잘못된 요청은 400/401 로 막힌다', async () => {
   assert.equal((await call('POST', '/api/click', { token, body: { productId: 'zzz', merchant: 'coupang' } })).status, 404);
 });
 
+test('무료 공개 모드(SKINLAB_PAYMENTS=none)에서는 전체 리포트가 결제 없이 열린다', async () => {
+  // 국내에서 유료 결제를 받으려면 사업자등록이 필요해, 개인은 이 모드로 먼저 시작한다.
+  const saved = process.env.SKINLAB_PAYMENTS;
+  process.env.SKINLAB_PAYMENTS = 'none';
+  try {
+    const s = await call('POST', '/api/session');
+    const token = s.json.token;
+
+    const cfg = await call('GET', '/api/config');
+    assert.equal(cfg.json.paywall, false);
+    assert.equal(cfg.json.plans.length, 0, '무료 공개 모드에서는 요금제를 보여주지 않는다');
+
+    const r = await call('POST', '/api/analysis', { token, body: { analysis: fakeFace(170, 220) } });
+    assert.equal(r.json.locked, false, '결제 없이 열려야 한다');
+    assert.equal(r.json.analysis.metrics.length, 9);
+    assert.ok(r.json.pro.routine.am.length === 5);
+    assert.ok(r.json.consult.script.some((t) => t.stage === 'plan'), '관리 순서까지 열려야 한다');
+    assert.ok(r.json.consult.followUpAt);
+
+    // 결제 시도는 막는다 (팔지 않는 상태이므로)
+    const c = await call('POST', '/api/checkout', { token, body: { planId: 'monthly' } });
+    assert.equal(c.status, 400);
+    assert.match(c.json.error, /무료/);
+  } finally {
+    if (saved === undefined) delete process.env.SKINLAB_PAYMENTS;
+    else process.env.SKINLAB_PAYMENTS = saved;
+  }
+});
+
 test('정적 파일과 헬스체크가 서빙된다', async () => {
   const res = await fetch(`${base}/`);
   assert.equal(res.status, 200);

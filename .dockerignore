@@ -1,0 +1,12 @@
+node_modules
+dist
+.git
+.env
+data/db.json
+data/catalog.live.json
+tests
+scripts/simulate.mjs
+scripts/mobile-audit.mjs
+scripts/verify-personas.mjs
+*.md
+!README.md

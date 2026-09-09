@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url';
 
 import { db, logEvent } from './store.js';
 import { createUser, userFromRequest } from './auth.js';
-import { PLANS, provider, createOrder, startPayment, confirmPayment, hasProAccess, activeEntitlement, verifyStripeSignature } from './payments.js';
+import { PLANS, provider, paywallEnabled, createOrder, startPayment, confirmPayment, hasProAccess, activeEntitlement, verifyStripeSignature } from './payments.js';
 import { trackClick, recordConversion, hasPartnerId } from './links.js';
 import { kpis } from './analytics.js';
 import { loadCatalog } from './feeds/index.js';
@@ -51,7 +51,10 @@ function assertProductionSafety() {
   if (process.env.NODE_ENV !== 'production') return;
   const fatal = [];
   if (!process.env.SKINLAB_SECRET) fatal.push('SKINLAB_SECRET 이 없습니다 — 기본 키로는 이용권 토큰을 누구나 위조할 수 있습니다.');
-  if ((process.env.SKINLAB_PAYMENTS || 'mock') === 'mock') fatal.push('SKINLAB_PAYMENTS=mock 은 결제 없이 이용권을 내줍니다. toss 또는 stripe 로 설정하세요.');
+  const pay = process.env.SKINLAB_PAYMENTS || 'mock';
+  if (pay === 'mock') {
+    fatal.push('SKINLAB_PAYMENTS=mock 은 데모용입니다. 결제를 받으려면 toss 또는 stripe,\n     결제 없이 무료로 공개하려면 none 으로 설정하세요.');
+  }
   if (!process.env.ADMIN_TOKEN) fatal.push('ADMIN_TOKEN 이 없습니다 — 관리자 지표가 열려 있게 됩니다.');
   if (fatal.length) {
     console.error('\n서버를 시작할 수 없습니다 (운영 안전 점검):');
@@ -150,7 +153,8 @@ function profileOf(record) {
 
 const routes = {
   'GET /api/config': async () => ({
-    plans: Object.values(PLANS),
+    plans: paywallEnabled() ? Object.values(PLANS) : [],
+    paywall: paywallEnabled(),
     provider: provider(),
     disclaimer: DISCLAIMER,
     catalogNote: catalog._meta?.note,
@@ -461,7 +465,8 @@ if (process.env.NODE_ENV !== 'test') {
   assertProductionSafety();
   server.listen(PORT, () => {
     const src = { seed: '샘플 카탈로그', live: '실데이터', 'live-stale': '실데이터(오래됨)' }[catalogSource.source];
-    console.log(`SkinLab AI  →  http://localhost:${PORT}  (결제: ${provider()}, ${src} 상품 ${catalog.products.length}종)`);
+    const pay = paywallEnabled() ? `결제: ${provider()}` : '무료 공개 (제휴 수익만)';
+    console.log(`SkinLab AI  →  http://localhost:${PORT}  (${pay}, ${src} 상품 ${catalog.products.length}종)`);
   });
 }
 

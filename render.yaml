@@ -1,0 +1,52 @@
+# Render 배포 설정 (https://render.com)
+#
+# 이 파일이 저장소에 있으면 Render 에서 "New → Blueprint" 로 저장소만 고르면
+# 아래 설정 그대로 배포됩니다. 값을 직접 입력할 필요가 없습니다.
+#
+# 단 하나, 아래 sync:false 항목(비밀값)은 배포 후 Render 대시보드에서 채워야 합니다.
+services:
+  - type: web
+    name: skinlab-ai
+    runtime: node
+    plan: starter          # free 플랜에는 디스크를 붙일 수 없어 재배포마다 기록이 지워집니다
+    region: singapore      # 한국에서 가장 가까운 지역
+    buildCommand: npm install --omit=dev
+    startCommand: node server/index.js
+    healthCheckPath: /api/health
+    autoDeploy: true
+    disk:
+      name: skinlab-data
+      mountPath: /data     # 사용자 기록·카탈로그가 여기 남습니다
+      sizeGB: 1
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SKINLAB_DB
+        value: /data/db.json
+      - key: SKINLAB_CATALOG
+        value: /data/catalog.live.json
+      - key: SKINLAB_SECRET
+        generateValue: true    # Render 가 자동으로 긴 무작위 값을 만들어 줍니다
+      - key: ADMIN_TOKEN
+        generateValue: true
+      - key: AFFILIATE_POSTBACK_TOKEN
+        generateValue: true
+      # ── 아래는 직접 입력해야 하는 값들 ──
+      - key: SKINLAB_PAYMENTS
+        value: toss            # 결제 준비 전이라면 이 줄을 지우고 배포하세요 (그러면 서버가 뜨지 않습니다 — 의도된 안전장치)
+      - key: TOSS_CLIENT_KEY
+        sync: false
+      - key: TOSS_SECRET_KEY
+        sync: false
+      - key: NAVER_CLIENT_ID
+        sync: false
+      - key: NAVER_CLIENT_SECRET
+        sync: false
+      - key: COUPANG_ACCESS_KEY
+        sync: false
+      - key: COUPANG_SECRET_KEY
+        sync: false
+      - key: COUPANG_PARTNER_ID
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
