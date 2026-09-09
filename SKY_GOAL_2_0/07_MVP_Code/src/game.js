@@ -52,6 +52,7 @@
   var audio = AudioLib ? AudioLib.create({ muted: profile.settings.muted }) : null;
 
   var kick = null;                   // 킥오프 연출 상태
+  var ceremony = null;               // 완주 헹가래 세리머니
   var cheer = null;                  // 사이드라인 응원단 (배경 연출)
   var popups = [];                   // 화면에 떠오르는 점수 문구
   var usedContinue = false;          // 한 판에 이어하기는 1회
@@ -232,7 +233,8 @@
     $('s-best').textContent = profile.bestScore;
     $('s-level').textContent = profile.level;
     $('s-coin').textContent = profile.coins;
-    $('s-games').textContent = profile.metrics.games;
+    $('s-games').textContent = profile.metrics.games +
+      (profile.metrics.clears ? ' (완주 ' + profile.metrics.clears + ')' : '');
     $('s-ball').textContent = E.selectedBall(profile).name;
     $('s-storage').textContent = storage.persistent
       ? '진행 상황은 이 브라우저에 저장됩니다.'
@@ -304,6 +306,7 @@
       targetX: W * 0.26,
       targetY: groundY * 0.5
     };
+    ceremony = null;
     boardSeq = Math.floor(Math.random() * 5);
     lastMid = kick.targetY;           // 첫 골문은 플레이 시작 높이 근처에서
     gates = [];
@@ -363,6 +366,10 @@
   }
 
   function flap() {
+    if (state === 'ceremony') {       // 1.4초 뒤부터 건너뛸 수 있다 (선물은 보고 넘어가게)
+      if (ceremony.t > 1.4) endCeremony();
+      return;
+    }
     if (state === 'kickoff') {        // 연출 건너뛰기
       ball.y = kick.targetY;
       ball.vy = arena.flap;
@@ -418,10 +425,12 @@
       run.stage = stage.key;
       cheerUp(1.4);                        // 스테이지 전환 — 최고조
       if (audio) { audio.stage(); audio.setIntensity(musicLevel()); }
+      if (stage.key === E.CLEAR_STAGE && !run.cleared) startCeremony();
     }
   }
 
   function update(dt) {
+    if (state === 'ceremony') { updateCeremony(dt); return; }
     if (state === 'kickoff') { updateKickoff(dt); return; }
     if (state === 'ready') {
       // 준비 상태: 공이 살짝 위아래로 떠 있고 게이트는 멈춰 있다.
@@ -708,6 +717,122 @@
     }
   }
 
+  /* ------------------------------------------------- 완주 헹가래 세리머니 */
+
+  var TOSS_TIME = 0.62;              // 한 번 띄웠다 받는 데 걸리는 시간
+  var TOSS_COUNT = 3;
+
+  // 마지막 스테이지에 도달하면 동료들이 헹가래를 치고 선물을 준다.
+  function startCeremony() {
+    run.cleared = true;
+    ceremony = { t: 0, lift: 0, tossed: 0, popped: false, gift: E.grantClearReward(profile) };
+    storage.save(profile);
+    state = 'ceremony';
+    cheerUp(1.6);
+    if (audio) { audio.stopMusic(); audio.fanfare(); }
+    updateHud();
+  }
+
+  function updateCeremony(dt) {
+    ceremony.t += dt;
+    var phase = ceremony.t - 0.4;                    // 팡파르가 울린 뒤 헹가래 시작
+    if (phase > 0) {
+      var idx = Math.floor(phase / TOSS_TIME);
+      var k = (phase % TOSS_TIME) / TOSS_TIME;
+      ceremony.lift = idx < TOSS_COUNT ? Math.sin(Math.PI * k) * (110 + idx * 22) : 0;
+      if (idx > ceremony.tossed && idx <= TOSS_COUNT) {
+        ceremony.tossed = idx;
+        cheerUp(1.2);
+        if (audio) audio.hoist();
+      }
+    }
+    if (!ceremony.popped && ceremony.t > 1.1) {
+      ceremony.popped = true;
+      popups.push({ x: W / 2, y: H * 0.46, text: ceremony.gift.label, age: 0, life: 2.4 });
+    }
+    updateCheer(dt);
+    updatePopups(dt);
+    if (ceremony.t >= 3.2) endCeremony();
+  }
+
+  // 세리머니가 끝나면 눈앞을 비우고 다시 플레이로 (경기는 계속된다)
+  function endCeremony() {
+    ceremony = null;
+    ball.x = W * 0.26;
+    ball.y = groundY * 0.5;
+    ball.vy = 0;
+    ball.vx = 0;
+    lastMid = ball.y;
+    for (var i = gates.length - 1; i >= 0; i--) {
+      if (gates[i].x < ball.x + W * 0.8) gates.splice(i, 1);
+    }
+    var rightMost = ball.x + W * 0.8;
+    for (var k = 0; k < gates.length; k++) rightMost = Math.max(rightMost, gates[k].x);
+    while (gates.length < 4) {
+      gates.push(makeGate(rightMost + GATE_SPACING * (gates.length + 1)));
+    }
+    state = 'ready';
+    updateHud();
+    if (audio) audio.startMusic(musicLevel());
+  }
+
+  function lifterPose(i) {
+    var wob = Math.sin(clock * 6 + i) * 5;
+    return {
+      frontLeg: 8 + wob * 0.3, frontBend: 16, backLeg: -10, backBend: 18,
+      lean: -4, armF: -158 + wob, armB: -152 - wob, crouch: Math.max(0, -wob * 0.4),
+      headTilt: -10
+    };
+  }
+
+  function tossedPose() {
+    var spread = 1 + ceremony.lift / 160;
+    return {
+      frontLeg: -34 * spread, frontBend: 26, backLeg: 30 * spread, backBend: 20,
+      lean: 0, armF: -126 * spread, armB: 128 * spread, crouch: 0, headTilt: 6
+    };
+  }
+
+  function drawCeremony() {
+    if (!ceremony) return;
+    var sc = playerScale() * 0.92;
+    var cx = W * 0.5;
+    var spacing = 62 * sc;
+
+    // 헹가래를 치는 동료 3명
+    for (var i = -1; i <= 1; i++) {
+      drawPlayer(cx + i * spacing, groundY + 2, sc, lifterPose(i + 1), 1);
+    }
+
+    // 헹가래로 떠오른 선수 — 살짝 기울며 회전한다
+    var lift = ceremony.lift;
+    var tilt = Math.sin(clock * 5) * 0.12 * (lift / 120 + 0.2);
+    var baseY = groundY - 46 * sc - lift;
+    ctx.save();
+    ctx.translate(cx, baseY - 60 * sc);
+    ctx.rotate(tilt);
+    ctx.translate(-cx, -(baseY - 60 * sc));
+    drawPlayer(cx, baseY, sc, tossedPose(), 1);
+    ctx.restore();
+
+    // 문구
+    var fade = Math.min(1, ceremony.t / 0.25) * Math.min(1, (3.2 - ceremony.t) / 0.4);
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, fade);
+    ctx.textAlign = 'center';
+    ctx.font = '800 30px system-ui, sans-serif';
+    ctx.lineWidth = 6;
+    ctx.strokeStyle = 'rgba(7,17,31,0.8)';
+    ctx.strokeText('WORLD FINAL 완주!', W / 2, H * 0.3);
+    ctx.fillStyle = '#ffd75a';
+    ctx.fillText('WORLD FINAL 완주!', W / 2, H * 0.3);
+    ctx.font = '600 14px system-ui, sans-serif';
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText('완주 ' + ceremony.gift.clears + '회 · 탭하면 경기 재개', W / 2, H * 0.3 + 26);
+    ctx.restore();
+    ctx.textAlign = 'start';
+  }
+
   /* -------------------------------------------------------- 점수 팝업 */
 
   function updatePopups(dt) {
@@ -808,7 +933,7 @@
     $('r-stage').textContent = stage.label;
     $('r-title').textContent = sum.score >= profile.bestScore && sum.score > 0 ? 'NEW BEST!' : 'GAME OVER';
     $('r-line').textContent = '점수 ' + sum.score + ' · 콤보 ' + sum.combo +
-      ' · 퍼펙트 ' + sum.perfectCount;
+      ' · 퍼펙트 ' + sum.perfectCount + (sum.cleared ? ' · 🏆 완주' : '');
     $('r-coin').textContent = '+' + sum.coins;
     $('r-xp').textContent = '+' + Math.round(sum.xp);
     $('r-loot').textContent = sum.loot.toUpperCase();
@@ -1248,6 +1373,11 @@
     ctx.restore();
   }
 
+  // 화면 높이에 맞춘 선수 크기 배율
+  function playerScale() {
+    return Math.max(1, Math.min(1.6, H / 700));
+  }
+
   /**
    * 흰색 유니폼 선수. 이름·얼굴 특징·등번호가 없는 가상의 선수다.
    * pose = { frontLeg, frontBend, backLeg, backBend, lean, armF, armB, crouch, headTilt }
@@ -1372,7 +1502,7 @@
 
   function drawKicker() {
     var t = kick.t;
-    var scale = Math.max(1, Math.min(1.6, H / 700));
+    var scale = playerScale();
     var standX = ball.x - 58 * scale;
     var runT = 0.55;
     var px = t < runT ? lerp(kick.startX, standX, easeOut(t / runT)) : standX;
@@ -1434,6 +1564,7 @@
     drawBackground();
     for (var i = 0; i < gates.length; i++) drawGate(gates[i]);
     if (state === 'kickoff') drawKicker();
+    if (state === 'ceremony') drawCeremony();
     drawSparks();
     if (ball) drawBall();
     drawPopups();
@@ -1461,7 +1592,8 @@
     clock += dt;
     tickLightning(dt);
     if (state !== 'playing') updateCheer(dt);
-    if (state === 'kickoff' || state === 'ready' || state === 'playing') update(dt);
+    if (state === 'kickoff' || state === 'ready' || state === 'playing' ||
+        state === 'ceremony') update(dt);
     if (state !== 'idle') render();
     else drawBackground();
     requestAnimationFrame(frame);
@@ -1623,6 +1755,8 @@
         endReason: lastEndReason,
         kick: kick ? { t: kick.t, launched: kick.launched } : null,
         boards: Sponsor ? Sponsor.count() : 0,
+        ceremony: ceremony ? { t: +ceremony.t.toFixed(2), lift: Math.round(ceremony.lift),
+                               gift: ceremony.gift } : null,
         cheer: cheer ? {
           count: cheer.girls.length,
           excite: +cheer.excite.toFixed(2),
@@ -1634,6 +1768,7 @@
     },
     // 자동화 테스트용
     debugClearGates: function () { gates = []; },
+    debugRefreshStage: function () { if (run) refreshStage(); },
     // 아트 확인용: 특정 스테이지 연출을 즉시 적용한다
     previewStage: function (key) {
       for (var i = 0; i < E.STAGES.length; i++) {

@@ -242,6 +242,40 @@ test('골든볼은 코인을 15% 더 준다', () => {
   assert.strictEqual(b.coins, Math.round(a.coins * 1.15));
 });
 
+test('완주 보상 — 처음엔 골든볼, 다음부터는 코인', () => {
+  const p = E.createProfile();
+  assert.strictEqual(p.metrics.clears, 0);
+  assert.strictEqual(E.CLEAR_STAGE, 'WORLD_FINAL');
+
+  const first = E.grantClearReward(p);
+  assert.strictEqual(first.type, 'ball');
+  assert.strictEqual(first.ballId, E.CLEAR_GIFT_BALL);
+  assert.ok(E.ownsBall(p, E.CLEAR_GIFT_BALL), '골든볼을 선물로 받는다');
+  assert.strictEqual(p.balls.selected, E.CLEAR_GIFT_BALL, '받은 공이 바로 장착된다');
+  assert.strictEqual(p.coins, 0, '공을 받을 때는 코인을 주지 않는다');
+  assert.strictEqual(p.metrics.clears, 1);
+
+  const second = E.grantClearReward(p);
+  assert.strictEqual(second.type, 'coins');
+  assert.strictEqual(p.coins, E.CLEAR_COINS);
+  assert.strictEqual(p.inventory.legendary, 1);
+  assert.strictEqual(p.metrics.clears, 2);
+  assert.strictEqual(second.clears, 2);
+
+  // 이미 골든볼을 산 사람도 코인으로 받는다
+  const rich = E.createProfile();
+  rich.coins = 5000;
+  E.buyBall(rich, E.CLEAR_GIFT_BALL);
+  const g = E.grantClearReward(rich);
+  assert.strictEqual(g.type, 'coins');
+});
+
+test('완주 횟수는 저장 데이터에서 복구된다', () => {
+  assert.strictEqual(E.normalizeProfile({ metrics: { clears: 7 } }).metrics.clears, 7);
+  assert.strictEqual(E.normalizeProfile({ metrics: { clears: -3 } }).metrics.clears, 0);
+  assert.strictEqual(E.normalizeProfile({ metrics: { clears: 'x' } }).metrics.clears, 0);
+});
+
 test('퍼펙트 보너스와 통과 점수', () => {
   assert.strictEqual(E.perfectBonus(0, 200), 10);
   assert.strictEqual(E.perfectBonus(100, 200), 0);

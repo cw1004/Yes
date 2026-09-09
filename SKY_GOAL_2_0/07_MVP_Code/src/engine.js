@@ -157,7 +157,8 @@
         recentSuccesses: [],
         perfectCount: 0,
         winStreak: 0,
-        loseStreak: 0
+        loseStreak: 0,
+        clears: 0
       },
       inventory: { common: 0, rare: 0, epic: 0, legendary: 0 },
       lastRun: { score: 0, combo: 0, difficulty: 50, stage: 'DAY' }
@@ -242,7 +243,8 @@
         recentSuccesses: numList(m.recentSuccesses, 10),
         perfectCount: Math.max(0, Math.floor(num(m.perfectCount, 0, 0, 1e9))),
         winStreak: Math.max(0, Math.floor(num(m.winStreak, 0, 0, 1e6))),
-        loseStreak: Math.max(0, Math.floor(num(m.loseStreak, 0, 0, 1e6)))
+        loseStreak: Math.max(0, Math.floor(num(m.loseStreak, 0, 0, 1e6))),
+        clears: Math.max(0, Math.floor(num(m.clears, 0, 0, 1e9)))
       },
       inventory: {
         common: Math.max(0, Math.floor(num(inv.common, 0, 0, 1e9))),
@@ -426,6 +428,37 @@
     return Math.round(10 + 2 * Math.max(0, combo) + perfectBonus(error, gap));
   }
 
+  /* ------------------------------------------------------------ 완주 보상 */
+
+  // 마지막 스테이지(WORLD FINAL)에 도달하면 "완주"로 본다.
+  var CLEAR_STAGE = 'WORLD_FINAL';
+  var CLEAR_COINS = 1000;
+  var CLEAR_GIFT_BALL = 'gold2030';
+
+  /**
+   * 완주 선물을 정하고 프로필에 반영한다.
+   * 아직 골든볼이 없으면 그 공을 선물하고(가장 비싼 3000코인짜리),
+   * 이미 있으면 코인 + 레전더리 아이템으로 준다.
+   */
+  function grantClearReward(profile, rng) {
+    if (!profile) return null;
+    profile.metrics.clears = (profile.metrics.clears || 0) + 1;
+
+    var gift;
+    if (!ownsBall(profile, CLEAR_GIFT_BALL)) {
+      var ball = ballById(CLEAR_GIFT_BALL);
+      profile.balls.owned.push(ball.id);
+      profile.balls.selected = ball.id;
+      gift = { type: 'ball', ballId: ball.id, label: ball.name + ' 획득!', coins: 0 };
+    } else {
+      profile.coins += CLEAR_COINS;
+      profile.inventory.legendary += 1;
+      gift = { type: 'coins', coins: CLEAR_COINS, label: '+' + CLEAR_COINS + ' 코인 · 레전더리 아이템' };
+    }
+    gift.clears = profile.metrics.clears;
+    return gift;
+  }
+
   function coinReward(score) {
     return Math.round(10 + 25 * Math.log(Math.max(0, score) + 1));
   }
@@ -543,6 +576,7 @@
       score: score,
       combo: combo,
       perfectCount: perfect,
+      cleared: !!run.cleared,
       coins: coins,
       xp: xp,
       loot: loot,
@@ -635,6 +669,10 @@
     perfectBonus: perfectBonus,
     passScore: passScore,
     coinReward: coinReward,
+    CLEAR_STAGE: CLEAR_STAGE,
+    CLEAR_COINS: CLEAR_COINS,
+    CLEAR_GIFT_BALL: CLEAR_GIFT_BALL,
+    grantClearReward: grantClearReward,
     xpReward: xpReward,
     xpRequired: xpRequired,
     lootTable: lootTable,

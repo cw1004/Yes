@@ -218,7 +218,13 @@ try {
     await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
 
   // 공 선택 · 상점
-  await page.evaluate(() => window.SkyGoal.home());
+  // 앞 단계(완주 선물 등)의 영향을 받지 않도록 알려진 상태에서 시작한다
+  await page.evaluate(() => {
+    const p = window.SkyGoal.getProfile();
+    p.coins = 0;
+    p.balls = { owned: ['street'], selected: 'street' };
+    window.SkyGoal.home();
+  });
   await page.click('#btn-balls');
   check('공 선택 화면이 열린다', await page.isVisible('#screen-balls'));
   const rows = await page.evaluate(() => document.querySelectorAll('#ball-list .ballrow').length);
@@ -311,6 +317,51 @@ try {
       return s.speed === 50 && s.ballFine === 50;
     }));
   await page.evaluate(() => window.SkyGoal.home());
+
+  // 완주 헹가래 세리머니
+  await page.evaluate(() => {
+    window.SkyGoal.home();
+    window.SkyGoal.start();
+    window.SkyGoal.flap();                       // 킥오프 통과
+    // 마지막 스테이지 조건을 만들고 다음 통과 판정에서 완주가 걸리게 한다
+    const r = window.SkyGoal.getRun();
+    r.passCount = 90;
+    r.score = 500;
+    window.SkyGoal.debugClearGates();
+    window.SkyGoal.debugRefreshStage();          // 통과 시점에 도는 실제 경로
+  });
+  const clearInfo = await page.waitForFunction(() => {
+    const d = window.SkyGoal.debug();
+    if (window.SkyGoal.getState() === 'ceremony' && d.ceremony) {
+      return { gift: d.ceremony.gift, stage: d.stage };
+    }
+    return false;
+  }, null, { timeout: 8000 }).then((h) => h.jsonValue()).catch(() => null);
+  check('마지막 스테이지에 닿으면 세리머니가 시작된다',
+    !!clearInfo && clearInfo.stage === 'WORLD_FINAL', JSON.stringify(clearInfo && clearInfo.stage));
+  check('완주 선물로 골든볼을 준다',
+    !!clearInfo && clearInfo.gift.type === 'ball' && clearInfo.gift.ballId === 'gold2030',
+    clearInfo ? clearInfo.gift.label : 'none');
+  check('선물이 프로필에 실제로 반영된다', await page.evaluate(() => {
+    const p = window.SkyGoal.getProfile();
+    return p.balls.owned.includes('gold2030') && p.metrics.clears === 1;
+  }));
+  const tossed = await page.waitForFunction(() => window.SkyGoal.debug().ceremony &&
+    window.SkyGoal.debug().ceremony.lift > 40, null, { timeout: 4000 })
+    .then(() => true).catch(() => false);
+  check('선수를 헹가래로 띄운다', tossed);
+  await page.waitForTimeout(1600);
+  await page.evaluate(() => window.SkyGoal.flap());     // 세리머니 건너뛰기
+  const afterCeremony = await page.evaluate(() => ({
+    state: window.SkyGoal.getState(),
+    score: window.SkyGoal.getRun().score
+  }));
+  check('세리머니 뒤 경기가 이어진다',
+    afterCeremony.state === 'ready' && afterCeremony.score === 500,
+    JSON.stringify(afterCeremony));
+  await page.evaluate(() => window.SkyGoal.forceEnd());
+  check('결과 화면에 완주 표시가 남는다',
+    (await page.textContent('#r-line')).includes('완주'), (await page.textContent('#r-line')).trim());
 
   // 경기장 광고판 — 그려지되 조작을 훔치지 않아야 한다
   await page.evaluate(() => {

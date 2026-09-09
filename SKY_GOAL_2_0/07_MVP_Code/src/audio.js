@@ -231,6 +231,27 @@
         hit({ at: t + 0.02, filter: 'highpass', cutoff: 5200, dur: 0.06, gain: 0.18 });
       },
 
+      // 완주 팡파르 — 상승 3화음 + 관중 함성
+      fanfare: function () {
+        var t = now();
+        var notes = [0, 2, 4, 7];
+        notes.forEach(function (i, k) {
+          tone({ at: t + k * 0.11, type: 'triangle', from: SCALE[i] * 2, to: SCALE[i] * 2,
+                 dur: 0.45, gain: 0.30 });
+          tone({ at: t + k * 0.11, type: 'square', from: SCALE[i] * 4, to: SCALE[i] * 4,
+                 dur: 0.30, gain: 0.10 });
+        });
+        hit({ at: t, filter: 'bandpass', cutoff: 900, sweepTo: 3000, dur: 1.4, gain: 0.26 });
+        tone({ at: t + 0.44, type: 'sine', from: 180, to: 60, dur: 0.4, gain: 0.5 });
+      },
+
+      // 헹가래로 받아낼 때 나는 짧은 함성
+      hoist: function () {
+        var t = now();
+        hit({ at: t, filter: 'bandpass', cutoff: 1400, sweepTo: 2600, dur: 0.35, gain: 0.20 });
+        tone({ at: t, type: 'triangle', from: 520, to: 780, dur: 0.18, gain: 0.16 });
+      },
+
       tap: function () {
         tone({ type: 'triangle', from: 680, to: 340, dur: 0.09, gain: 0.30 });
         hit({ filter: 'highpass', cutoff: 3200, dur: 0.04, gain: 0.10 });
