@@ -90,6 +90,7 @@ MARKERS = {
     "/* __ENGINE__ */": SRC / "engine.js",
     "/* __AUDIO__ */": SRC / "audio.js",
     "/* __SCENERY__ */": SRC / "scenery.js",
+    "/* __SPONSOR__ */": SRC / "sponsor.js",
     "/* __GAME__ */": SRC / "game.js",
 }
 
@@ -139,7 +140,8 @@ def check() -> None:
     if not node:
         print("[check] node 를 찾을 수 없어 문법 검사를 건너뜁니다.")
         return
-    for js in (SRC / "engine.js", SRC / "audio.js", SRC / "scenery.js", SRC / "game.js"):
+    for js in (SRC / "engine.js", SRC / "audio.js", SRC / "scenery.js",
+               SRC / "sponsor.js", SRC / "game.js"):
         subprocess.run([node, "--check", str(js)], check=True)
         print(f"[check] {js.name} 문법 OK")
 

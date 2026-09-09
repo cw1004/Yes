@@ -312,6 +312,44 @@ try {
     }));
   await page.evaluate(() => window.SkyGoal.home());
 
+  // 경기장 광고판 — 그려지되 조작을 훔치지 않아야 한다
+  await page.evaluate(() => {
+    window.SkyGoal.home();
+    window.SkyGoal.start();
+    window.SkyGoal.flap();                 // 킥오프 통과
+  });
+  const boards = await page.evaluate(() => window.SkyGoal.debug().boards);
+  check('광고판 목록이 로드된다', boards >= 3, boards + '종');
+  // 기둥 광고판 위를 실제로 탭했을 때 광고가 아니라 공이 반응해야 한다
+  await page.waitForFunction(() => {
+    const d = window.SkyGoal.debug();
+    return d.gates.some((g) => g.x > 30 && g.x < d.size.w - 70);
+  }, null, { timeout: 5000 });
+  const tapTest = await page.evaluate(() => {
+    const d = window.SkyGoal.debug();
+    const g = d.gates.filter((x) => x.x > 30 && x.x < d.size.w - 70)[0];
+    // 게임이 기둥 광고판을 거는 위치와 같은 식으로 배너 중심을 구한다
+    const top = g.mid - g.gap / 2;
+    const bottom = g.mid + g.gap / 2;
+    const upper = top - 46;
+    const lower = d.size.groundY - (bottom + 46);
+    let y;
+    if (lower >= upper && lower > 90) y = bottom + 46 + Math.min(150, lower - 12) / 2;
+    else y = top - 46 - Math.min(150, upper - 12) / 2;
+    y = Math.max(20, Math.min(y, d.size.groundY - 20));
+    return { x: g.x + 27, y: y, before: window.SkyGoal.getRun().tapIntervals.length };
+  });
+  await page.mouse.click(tapTest.x, tapTest.y);
+  await page.waitForTimeout(60);
+  const afterTap = await page.evaluate(() => window.SkyGoal.getRun().tapIntervals.length);
+  check('광고판을 탭해도 광고가 아니라 공이 반응한다 (클릭 영역 없음)',
+    afterTap === tapTest.before + 1,
+    '탭 기록 ' + tapTest.before + ' → ' + afterTap + ' @ (' +
+      tapTest.x.toFixed(0) + ',' + tapTest.y.toFixed(0) + ')');
+  check('광고는 클릭 불가로 고정되어 있다',
+    await page.evaluate(() => window.SkyGoalSponsor.CLICKABLE === false));
+  await page.evaluate(() => window.SkyGoal.forceEnd());
+
   // 사이드라인 응원단 (배경 연출 — 플레이에 관여하지 않는다)
   await page.evaluate(() => {
     window.SkyGoal.home();

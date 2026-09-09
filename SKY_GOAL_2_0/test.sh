@@ -7,8 +7,9 @@ echo "== 1/3 빌드 =="
 python3 build.py --check --pwa
 
 echo
-echo "== 2/3 단위 테스트 (엔진 · 사운드 · 배경) =="
-node --test 07_MVP_Code/tests/engine.test.js 07_MVP_Code/tests/audio.test.js 07_MVP_Code/tests/scenery.test.js
+echo "== 2/3 단위 테스트 (엔진 · 사운드 · 배경 · 광고판) =="
+node --test 07_MVP_Code/tests/engine.test.js 07_MVP_Code/tests/audio.test.js \
+  07_MVP_Code/tests/scenery.test.js 07_MVP_Code/tests/sponsor.test.js
 
 echo
 echo "== 3/3 브라우저 스모크 테스트 =="

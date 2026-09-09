@@ -9,6 +9,7 @@
   if (!E) { console.error('SkyGoalEngine 을 찾을 수 없습니다.'); return; }
   var Scenery = window.SkyGoalScenery;
   var AudioLib = window.SkyGoalAudio;
+  var Sponsor = window.SkyGoalSponsor;
 
   /* ------------------------------------------------------------ DOM 참조 */
 
@@ -57,6 +58,7 @@
   var rewardProvider = null;         // 보상형 광고 제공자 (네이티브 앱에서 주입)
   var pendingReward = null;          // 광고 결과를 기다리는 콜백
 
+  var boardSeq = 0;                  // 골문 광고판 순환용
   var GATE_W = 54;
   var GATE_SPACING = 260;
 
@@ -273,6 +275,7 @@
       phase: Math.random() * Math.PI * 2,
       flagPhase: Math.random() * Math.PI * 2,           // 깃발이 각자 다르게 나부낀다
       banner: Math.floor(Math.random() * 3),            // 상단 장식 종류
+      board: boardSeq++,                                // 기둥 광고판 순번
       passed: false
     };
   }
@@ -301,6 +304,7 @@
       targetX: W * 0.26,
       targetY: groundY * 0.5
     };
+    boardSeq = Math.floor(Math.random() * 5);
     lastMid = kick.targetY;           // 첫 골문은 플레이 시작 높이 근처에서
     gates = [];
     sparks = [];
@@ -859,6 +863,7 @@
     }
     drawWeather();
     drawField();
+    if (Sponsor) Sponsor.drawPerimeter(ctx, 0, groundY + 3, W, 17, scroll * 0.9, 0.9);
     drawCheerSquad();
   }
 
@@ -1016,6 +1021,21 @@
     // 기둥 끝 깃발 (위/아래에서 서로 반대로 나부낀다)
     drawFlag(g.x + GATE_W / 2, top - 15, -1, g.flagPhase, '#ff9933');
     drawFlag(g.x + GATE_W / 2, bottom + 15, 1, g.flagPhase + 2, '#138808');
+
+    // 기둥 광고판 — 긴 쪽 기둥에, 골문 틈에서 충분히 떨어뜨려 건다
+    if (Sponsor) {
+      var board = Sponsor.pick(g.board);
+      var upper = top - 46;                    // 위 기둥에서 쓸 수 있는 길이
+      var lower = groundY - (bottom + 46);
+      var bw = GATE_W - 12;
+      var bx = g.x + 6;
+      if (lower >= upper && lower > 90) {
+        Sponsor.drawPostBanner(ctx, board, bx, bottom + 46, bw, Math.min(150, lower - 12), 0.92);
+      } else if (upper > 90) {
+        var bh = Math.min(150, upper - 12);
+        Sponsor.drawPostBanner(ctx, board, bx, top - 46 - bh, bw, bh, 0.92);
+      }
+    }
 
     // 바닥 받침
     if (groundY - bottom > 6) {
@@ -1601,6 +1621,7 @@
         gateWidth: GATE_W,
         endReason: lastEndReason,
         kick: kick ? { t: kick.t, launched: kick.launched } : null,
+        boards: Sponsor ? Sponsor.count() : 0,
         cheer: cheer ? {
           count: cheer.girls.length,
           excite: +cheer.excite.toFixed(2),
