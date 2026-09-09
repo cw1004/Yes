@@ -19,7 +19,8 @@
     "catalog:check": "node scripts/sync-catalog.mjs --check",
     "setup:sim": "npm i -D playwright && npx playwright install chromium",
     "sim:verify": "node scripts/verify-personas.mjs",
-    "check:deploy": "node scripts/check-deploy.mjs"
+    "check:deploy": "node scripts/check-deploy.mjs",
+    "backup": "node scripts/backup.mjs"
   },
   "dependencies": {},
   "devDependencies": {

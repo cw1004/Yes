@@ -99,7 +99,26 @@ linked.length
   ? ok('제휴 추적 ID', linked.join(', '))
   : warn('제휴 추적 ID', '하나도 없음', '없으면 구매 링크가 그냥 검색 결과로 나가고 수수료가 잡히지 않습니다. 즉 수익이 0입니다.');
 
-/* ── 7. 비밀이 저장소에 올라갔는지 ── */
+/* ── 7. 약관·개인정보처리방침 ── */
+const legalPath = path.join(ROOT, 'public', 'legal.html');
+if (!fs.existsSync(legalPath)) {
+  bad('약관·처리방침', '파일 없음', 'public/legal.html 이 있어야 합니다.');
+} else {
+  const legal = fs.readFileSync(legalPath, 'utf8');
+  const blanks = [...legal.matchAll(/\[\[([^\]]+)\]\]/g)].map((m) => m[1]);
+  blanks.length
+    ? bad('약관·처리방침', `채워야 할 칸 ${blanks.length}개`,
+        `public/legal.html 에서 [[…]] 를 실제 정보로 바꾸세요: ${[...new Set(blanks)].slice(0, 5).join(', ')}\n     연락처 없이 공개하면 개인정보 열람·삭제 요청을 받을 방법이 없습니다.`)
+    : ok('약관·처리방침', '작성 완료');
+}
+
+/* ── 8. 백업 ── */
+const backupDir = process.env.BACKUP_DIR || path.join(path.dirname(dbPath), 'backups');
+fs.existsSync(backupDir) && fs.readdirSync(backupDir).some((f) => f.startsWith('db-'))
+  ? ok('백업', `${backupDir}`)
+  : warn('백업', '아직 없음', 'npm run backup 을 하루 한 번 돌게 예약하세요. 회원 기록은 파일 하나뿐이라 잃으면 끝입니다.');
+
+/* ── 9. 비밀이 저장소에 올라갔는지 ── */
 try {
   const tracked = execSync('git ls-files .env', { cwd: ROOT, encoding: 'utf8' }).trim();
   tracked

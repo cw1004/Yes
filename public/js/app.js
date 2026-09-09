@@ -2,14 +2,14 @@
  * SkinLab AI — 화면 전환과 데이터 흐름을 잇는 컨트롤러.
  * 분석은 전부 이 브라우저 안에서 끝나고, 서버에는 숫자 지표만 보낸다.
  */
-import { api } from './api.js';
+import { api, setToken } from './api.js';
 import { Camera, imageDataFromFile } from './ui/camera.js';
 import { computeMetrics } from './engine/metrics.js';
 import { assessQuality, fallbackFaceBox } from './engine/quality.js';
-import { renderResult, renderPaywall, renderShop, renderHistory } from './ui/render.js';
+import { renderResult, renderPaywall, renderShop, renderHistory, renderAccount } from './ui/render.js';
 import { renderIntake, renderConsult, playConsult, doctorAvatar } from './ui/doctor.js';
 import { renderCompare, bindCompare } from './ui/compare.js';
-import { savePhoto, getPhoto, allPhotos } from './storage.js';
+import { savePhoto, getPhoto, allPhotos, deleteAllPhotos } from './storage.js';
 import { INTAKE } from './engine/intake.js';
 import { PERSONAS, personaById } from './sim/personas.js';
 import { faceImageData, drawFace, improved } from './sim/faces.js';
@@ -355,6 +355,62 @@ async function loadHistory() {
   } catch (err) {
     showEmpty($('#history-body'), err.message);
   }
+  try {
+    const { hasCode } = await api.recoveryStatus();
+    $('#account-body').innerHTML = renderAccount({ hasCode });
+  } catch {
+    $('#account-body').textContent = '';
+  }
+}
+
+/* ───────── 내 데이터 (복구 · 삭제) ───────── */
+async function createRecoveryCode() {
+  try {
+    const { code, notice } = await api.createRecoveryCode();
+    const out = $('#recovery-out');
+    out.textContent = '';
+    const box = document.createElement('div');
+    box.className = 'code-box';
+    box.textContent = code;                       // 서버가 만든 값이지만 textContent 로 넣는다
+    const note = document.createElement('p');
+    note.className = 'hint';
+    note.textContent = notice;
+    const copy = document.createElement('button');
+    copy.className = 'ghost small';
+    copy.textContent = '복사하기';
+    copy.onclick = async () => {
+      try { await navigator.clipboard.writeText(code); toast('복사했습니다. 안전한 곳에 보관하세요.'); }
+      catch { toast('복사할 수 없습니다. 화면의 코드를 직접 적어 두세요.'); }
+    };
+    out.append(box, note, copy);
+  } catch (err) { toast(err.message); }
+}
+
+async function redeemRecoveryCode() {
+  const code = prompt('복구 코드를 입력하세요 (하이픈은 있어도 됩니다)');
+  if (!code) return;
+  try {
+    const { token } = await api.redeemRecoveryCode(code);
+    setToken(token);
+    toast('기록을 이어받았습니다.');
+    state.report = null;
+    state.analysisId = null;
+    await loadHistory();
+  } catch (err) { toast(err.message, 4000); }
+}
+
+async function deleteAccountData() {
+  if (!confirm('서버의 진단 기록과 이 기기의 사진을 모두 삭제합니다.\n되돌릴 수 없습니다. 계속할까요?')) return;
+  try {
+    const { removed } = await api.deleteAccount();
+    await deleteAllPhotos().catch(() => {});
+    localStorage.removeItem('skinlab.token');
+    localStorage.removeItem('skinlab.intake');
+    state.report = null; state.analysisId = null; state.intake = {};
+    toast(`삭제했습니다 (진단 ${removed.analyses}건).`, 4000);
+    await api.ensureSession();
+    go('home');
+  } catch (err) { toast(err.message); }
 }
 
 /* ───────── 이벤트 바인딩 ───────── */
@@ -396,6 +452,9 @@ document.addEventListener('click', async (e) => {
   switch (el.dataset.action) {
     case 'intake-done': return go('capture');
     case 'sim-close': return closeSimSheet();
+    case 'recovery-create': return createRecoveryCode();
+    case 'recovery-redeem': return redeemRecoveryCode();
+    case 'account-delete': return deleteAccountData();
     case 'toggle-markers': {
       state.showMarkers = !state.showMarkers;
       return loadCompare();

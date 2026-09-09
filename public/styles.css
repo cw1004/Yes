@@ -366,3 +366,13 @@ button,.opt,.chip,.upload,.tabbar button{
 .sim-toggle input{width:20px;height:20px;flex:none;accent-color:var(--accent)}
 .sim-badge{display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:5px 10px;border-radius:99px;
   background:rgba(232,192,125,.14);border:1px solid rgba(232,192,125,.4);color:var(--gold)}
+
+/* ───────── 약관 링크 / 내 데이터 ───────── */
+.legal-links{display:flex;flex-wrap:wrap;gap:6px 10px;margin-top:14px}
+.legal-links a{color:var(--muted);text-decoration:none;border-bottom:1px solid var(--line)}
+.code-box{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:22px;letter-spacing:.12em;
+  text-align:center;padding:18px 12px;border-radius:14px;background:var(--bg-soft);
+  border:1px dashed var(--line);color:var(--gold);margin:12px 0;word-break:break-all}
+.danger{border-color:rgba(255,107,129,.45)!important;color:var(--bad)!important}
+.row-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.row-actions button{flex:1;min-width:130px}

@@ -35,4 +35,8 @@ export const api = {
   confirm: (orderId, paymentKey, amount) => request('POST', '/api/checkout/confirm', { orderId, paymentKey, amount }),
   paywallView: (analysisId, source) => request('POST', '/api/paywall-view', { analysisId, source }).catch(() => {}),
   click: (productId, merchant, analysisId, position) => request('POST', '/api/click', { productId, merchant, analysisId, position }),
+  recoveryStatus: () => request('GET', '/api/recovery/status'),
+  createRecoveryCode: () => request('POST', '/api/recovery/create'),
+  redeemRecoveryCode: (code) => request('POST', '/api/recovery/redeem', { code }),
+  deleteAccount: () => request('POST', '/api/me/delete', { confirm: '삭제' }),
 };

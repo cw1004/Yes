@@ -74,10 +74,13 @@ for (const rel of ORDER) {
 
 // index.html 의 본문 마크업만 가져온다 (아티팩트는 <html>/<head>/<body> 를 직접 쓰지 않는다)
 const html = fs.readFileSync(path.join(ROOT, 'public/index.html'), 'utf8');
-const body = html
+let body = html
   .slice(html.indexOf('<div id="app">'), html.indexOf('<script type="module"'))
   .replace(/<script[\s\S]*?<\/script>/g, '')
   .trim();
+// 데모는 한 파일이라 /legal.html 이 없다. 깨진 링크를 두느니 안내로 바꾼다.
+body = body.replace(/<p class="fineprint legal-links">[\s\S]*?<\/p>/g,
+  '<p class="fineprint">약관·개인정보처리방침은 실제 배포본에 포함됩니다 (/legal.html).</p>');
 const css = fs.readFileSync(path.join(ROOT, 'public/styles.css'), 'utf8');
 
 const demoBanner = `

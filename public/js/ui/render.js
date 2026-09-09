@@ -327,3 +327,32 @@ export function renderHistory(items) {
     }).join('')}
   </div>`;
 }
+
+/** ───── 내 데이터 (복구 코드 · 삭제) ───── */
+export function renderAccount({ hasCode }) {
+  return `
+  <div class="card">
+    <h3>🔑 다른 기기에서 이어보기</h3>
+    <p class="hint" style="margin-top:0">이 앱은 회원가입이 없습니다. 브라우저 기록을 지우거나 폰을 바꾸면
+      <b>지금까지의 진단 기록에 접근할 수 없게 됩니다.</b> 복구 코드를 발급받아 보관해 두세요.</p>
+    ${hasCode ? '<p class="hint">이미 발급된 코드가 있습니다. 새로 만들면 이전 코드는 즉시 사용할 수 없게 됩니다.</p>' : ''}
+    <div id="recovery-out"></div>
+    <div class="row-actions">
+      <button class="cta secondary" data-action="recovery-create">${hasCode ? '코드 새로 만들기' : '복구 코드 발급'}</button>
+      <button class="ghost small" data-action="recovery-redeem">코드로 이어받기</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>🗑 내 데이터 삭제</h3>
+    <p class="hint" style="margin-top:0">서버에 저장된 진단 기록·문진·복구 코드를 모두 지웁니다.
+      결제 기록은 법령상 보관 의무가 있어 <b>금액과 시각만 남기고 사람과의 연결을 끊습니다</b>.
+      기기에 저장된 사진도 함께 삭제됩니다. <b>되돌릴 수 없습니다.</b></p>
+    <button class="ghost danger" style="margin-top:12px" data-action="account-delete">전체 삭제</button>
+  </div>
+
+  <p class="fineprint legal-links" style="margin-top:6px">
+    <a href="/legal.html">이용약관 · 개인정보처리방침</a> ·
+    <a href="/legal.html#medical">의료 관련 고지</a>
+  </p>`;
+}

@@ -17,6 +17,7 @@ import { PLANS, provider, paywallEnabled, createOrder, startPayment, confirmPaym
 import { trackClick, recordConversion, hasPartnerId } from './links.js';
 import { kpis } from './analytics.js';
 import { loadCatalog } from './feeds/index.js';
+import { createRecoveryCode, redeemRecoveryCode, hasRecoveryCode, deleteAccount } from './account.js';
 import { diagnose, DISCLAIMER } from '../public/js/engine/diagnose.js';
 import { sanitizeIntake } from '../public/js/engine/intake.js';
 import { sanitizeAnalysis, sanitizeQuality } from './validate.js';
@@ -70,6 +71,8 @@ function assertProductionSafety() {
  * 인스턴스를 여러 대 띄우면 이 카운터는 공유되지 않는다 — 그때는 앞단(nginx/CDN)에서 걸어야 한다.
  */
 const RATE_RULES = [
+  // 복구 코드는 그 자체가 열쇠다. 무차별 대입을 막으려면 가장 먼저, 가장 빡빡하게 건다.
+  { test: (p) => p === '/api/recovery/redeem', limit: 8, windowMs: 60 * 60e3, name: '복구 코드' },
   { test: (p) => p === '/api/analysis', limit: 30, windowMs: 60 * 60e3, name: '분석' },
   { test: (p) => p === '/api/session', limit: 20, windowMs: 60 * 60e3, name: '세션' },
   { test: (p) => p === '/api/click', limit: 120, windowMs: 60 * 60e3, name: '클릭' },
@@ -270,6 +273,36 @@ const routes = {
     const result = await confirmPayment({ orderId, paymentKey, amount });
     const record = order.analysisId ? db.read().analyses[order.analysisId] : null;
     return { ...result, report: record ? await buildReport(record, db.read().users[user.id]) : null };
+  },
+
+  'POST /api/recovery/create': async (req) => {
+    const user = userFromRequest(req);
+    if (!user) throw Object.assign(new Error('세션이 필요합니다.'), { status: 401 });
+    const { formatted } = createRecoveryCode(user.id);
+    // 코드는 이 응답에서만 볼 수 있다. 서버는 해시만 갖고 있어 다시 보여줄 수 없다.
+    return { code: formatted, notice: '이 코드는 지금만 볼 수 있습니다. 캡처하거나 안전한 곳에 적어두세요.' };
+  },
+
+  'GET /api/recovery/status': async (req) => {
+    const user = userFromRequest(req);
+    if (!user) throw Object.assign(new Error('세션이 필요합니다.'), { status: 401 });
+    return { hasCode: hasRecoveryCode(user.id) };
+  },
+
+  'POST /api/recovery/redeem': async (req) => {
+    const { code } = await json(req);
+    const result = redeemRecoveryCode(code);
+    if (!result) throw Object.assign(new Error('복구 코드를 찾을 수 없습니다. 대소문자와 하이픈을 빼고 다시 입력해 보세요.'), { status: 404 });
+    return result;
+  },
+
+  'POST /api/me/delete': async (req) => {
+    const user = userFromRequest(req);
+    if (!user) throw Object.assign(new Error('세션이 필요합니다.'), { status: 401 });
+    const { confirm } = await json(req);
+    if (confirm !== '삭제') throw Object.assign(new Error('확인 문구가 일치하지 않습니다.'), { status: 400 });
+    const removed = deleteAccount(user.id);
+    return { ok: true, removed };
   },
 
   'POST /api/paywall-view': async (req) => {

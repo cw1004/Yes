@@ -67,6 +67,9 @@ export function grantEntitlement(userId, planId, orderId, analysisId) {
     d.entitlements[userId] = { userId, plan: planId, orderId, grantedAt: new Date().toISOString(), expiresAt, reports };
     if (d.users[userId]) d.users[userId].plan = planId;
   });
+  // 돈이 오간 기록은 미루지 않고 바로 디스크에 쓴다.
+  // 기본 저장은 120ms 지연이라, 그 사이에 서버가 죽으면 결제한 이용권이 사라진다.
+  db.flushNow();
   logEvent('entitlement_granted', { userId, plan: planId, orderId, analysisId });
   return activeEntitlement(userId);
 }
@@ -168,6 +171,7 @@ export async function confirmPayment({ orderId, paymentKey, amount }) {
   db.update((d) => {
     d.orders[orderId] = { ...d.orders[orderId], status: 'paid', paidAt: new Date().toISOString(), paymentKey: paymentKey || null };
   });
+  db.flushNow();
   const entitlement = grantEntitlement(order.userId, order.planId, orderId, order.analysisId);
   logEvent('purchase', { userId: order.userId, planId: order.planId, amount: order.amount, orderId });
   return { order: db.read().orders[orderId], entitlement };

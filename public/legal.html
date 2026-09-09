@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>이용약관 및 개인정보처리방침 · SkinLab AI</title>
+<meta name="theme-color" content="#0e0b12" />
+<link rel="stylesheet" href="/styles.css" />
+<style>
+  #app{max-width:720px;padding:0 20px calc(40px + var(--safe-b))}
+  .legal h1{font-size:24px;margin:26px 0 6px}
+  .legal h2{font-size:17px;margin:34px 0 10px;padding-top:22px;border-top:1px solid var(--line)}
+  .legal h3{font-size:14.5px;margin:20px 0 8px;color:var(--accent-2)}
+  .legal p,.legal li{font-size:14px;line-height:1.85;color:var(--muted)}
+  .legal b,.legal strong{color:var(--text)}
+  .legal ul{padding-left:18px}
+  .legal table{width:100%;border-collapse:collapse;margin:12px 0;font-size:13px}
+  .legal th,.legal td{text-align:left;padding:10px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+  .legal th{color:var(--dim);font-size:11.5px;letter-spacing:.04em;font-weight:600}
+  .updated{font-size:12px;color:var(--dim)}
+  .toc{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0 6px}
+  .toc a{font-size:12.5px;padding:9px 14px;border-radius:99px;border:1px solid var(--line);color:var(--muted);text-decoration:none}
+  .callout{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--accent);
+    border-radius:12px;padding:14px 16px;margin:16px 0}
+  .callout p{margin:0}
+  .fill{color:var(--warn);font-weight:600}
+</style>
+</head>
+<body>
+<div id="app" class="legal">
+  <div class="topbar" style="padding-top:calc(14px + var(--safe-t))">
+    <a class="back" href="/" style="text-decoration:none">‹</a>
+    <span>약관 및 처리방침</span><span></span>
+  </div>
+
+  <div class="callout">
+    <p><b>운영자에게</b> — <span class="fill">[[대괄호]]</span> 로 표시된 곳을 실제 정보로 채운 뒤 공개하세요.
+    이 문서는 이 앱이 실제로 하는 동작에 맞춰 작성됐지만, 법률 자문은 아닙니다.
+    유료 판매·사업자 등록 여부에 따라 필요한 내용이 달라지므로 공개 전 확인을 권합니다.</p>
+  </div>
+
+  <div class="toc">
+    <a href="#privacy">개인정보처리방침</a>
+    <a href="#terms">이용약관</a>
+    <a href="#medical">의료 관련 고지</a>
+    <a href="#affiliate">제휴 수수료 고지</a>
+  </div>
+
+  <!-- ══════════ 개인정보처리방침 ══════════ -->
+  <h1 id="privacy">개인정보처리방침</h1>
+  <p class="updated">시행일 <span class="fill">[[YYYY-MM-DD]]</span> · 서비스명 SkinLab AI · 운영자 <span class="fill">[[이름 또는 상호]]</span></p>
+
+  <h2>1. 가장 먼저 알아야 할 것 — 얼굴 사진은 전송되지 않습니다</h2>
+  <p><b>촬영한 얼굴 사진은 서버로 전송되지 않습니다.</b> 분석은 이용자의 브라우저 안에서 이루어지며,
+  서버로는 계산이 끝난 <b>숫자 지표만</b> 전달됩니다.</p>
+  <p>전후 비교를 위해 사진은 이용자의 <b>기기 안(브라우저 IndexedDB)에만</b> 최대 24장까지 보관되며,
+  브라우저 데이터를 삭제하면 함께 지워집니다. 운영자는 이 사진에 접근할 수 없습니다.</p>
+
+  <h2>2. 수집하는 항목</h2>
+  <h3>서버에 저장되는 것</h3>
+  <table>
+    <tr><th>항목</th><th>내용</th><th>목적</th></tr>
+    <tr><td>익명 식별자</td><td>임의로 생성된 문자열(예: u_3f2a…). 이름·연락처와 연결되지 않습니다</td><td>내 기록을 다시 불러오기</td></tr>
+    <tr><td>진단 수치</td><td>9개 지표 점수, 피부톤 좌표(L*a*b*, ITA°), 부위별 광택 비율, 총점</td><td>리포트 생성, 전후 비교</td></tr>
+    <tr><td>문진 답변</td><td>연령대·자각 피부타입·주요 고민·루틴 단계·수면 시간·자극 이력 (6개 선택지)</td><td>상담 내용 개인화</td></tr>
+    <tr><td>촬영 품질 수치</td><td>밝기·선명도·얼굴 비율·신뢰도</td><td>재촬영 안내</td></tr>
+    <tr><td>이용 기록</td><td>분석 시각, 리포트 조회, 추천 조회, 제휴 링크 클릭(상품·판매처·시각)</td><td>서비스 개선, 제휴 정산</td></tr>
+    <tr><td>결제 기록<br><span class="updated">(유료 운영 시)</span></td><td>주문번호·금액·상태·결제사 참조번호. <b>카드번호 등 결제수단 정보는 저장하지 않습니다</b>(결제대행사가 처리)</td><td>이용권 부여, 정산</td></tr>
+    <tr><td>복구 코드</td><td>코드 원문이 아닌 <b>해시값</b>만 저장</td><td>기기 변경 시 기록 이어받기</td></tr>
+  </table>
+
+  <h3>수집하지 않는 것</h3>
+  <ul>
+    <li>얼굴 사진 및 이미지 데이터 (서버 전송 없음)</li>
+    <li>이름, 전화번호, 주소, 생년월일</li>
+    <li>접속 IP 주소 — 과도한 호출을 막기 위해 <b>메모리에서만</b> 일시적으로 세며, 저장하지 않습니다</li>
+    <li>광고 추적을 위한 제3자 쿠키</li>
+  </ul>
+
+  <h3>이용자 기기(브라우저)에만 저장되는 것</h3>
+  <ul>
+    <li>접속 토큰 · 문진 답변 (localStorage)</li>
+    <li>촬영 사진 최대 24장 (IndexedDB) — 오래된 것부터 자동 정리</li>
+  </ul>
+
+  <h2>3. 제3자 제공 및 처리 위탁</h2>
+  <table>
+    <tr><th>받는 곳</th><th>전달되는 것</th><th>시점</th></tr>
+    <tr><td>판매처<br><span class="updated">(쿠팡·올리브영·네이버 등)</span></td><td>제휴 추적 파라미터(익명 클릭 식별자). <b>진단 결과나 사진은 전달되지 않습니다</b></td><td>이용자가 구매 버튼을 눌러 이동할 때</td></tr>
+    <tr><td>결제대행사<br><span class="updated">[[토스페이먼츠 등]]</span></td><td>주문번호·금액. 결제수단 정보는 해당 업체가 직접 수집·보관합니다</td><td>유료 결제 시</td></tr>
+    <tr><td>Anthropic<br><span class="updated">(상담 문장 다듬기 기능을 켠 경우에만)</span></td><td>진단 수치와 문진 선택지. <b>사진·이름·연락처는 포함되지 않습니다</b>. 이 기능이 꺼져 있으면 전송이 없습니다</td><td>상담문 생성 시</td></tr>
+    <tr><td>서버 호스팅<br><span class="updated">[[Render 등]]</span></td><td>위 저장 항목이 해당 인프라에 보관됩니다</td><td>상시</td></tr>
+  </table>
+  <p>위 외에 개인정보를 판매하거나 광고 목적으로 제공하지 않습니다.</p>
+
+  <h2>4. 보관 기간과 파기</h2>
+  <ul>
+    <li>진단 기록·이용 기록: 이용자가 삭제를 요청할 때까지 보관합니다.</li>
+    <li>결제 기록: 관련 법령이 정한 기간(전자상거래법상 대금결제 기록 5년 등) 동안 보관하며,
+      이 경우 <b>이용자와의 연결을 끊은 상태</b>로 금액·시각만 남깁니다.</li>
+    <li>기기에 저장된 사진: 이용자가 브라우저에서 삭제하면 즉시 사라집니다.</li>
+  </ul>
+
+  <h2>5. 이용자의 권리</h2>
+  <p>앱 <b>기록 화면 → 내 데이터</b>에서 언제든 <b>전체 삭제</b>를 실행할 수 있습니다.
+  삭제하면 진단 기록·문진·복구 코드가 즉시 지워지고, 결제 기록은 사람과의 연결이 끊깁니다. <b>되돌릴 수 없습니다.</b></p>
+  <p>열람·정정·처리정지 요청은 아래 연락처로 접수하며, 접수일로부터 10일 이내에 조치합니다.</p>
+
+  <h2>6. 안전조치</h2>
+  <ul>
+    <li>모든 통신은 HTTPS로 암호화됩니다.</li>
+    <li>얼굴 사진은 애초에 서버로 전송되지 않아, 서버가 침해되어도 유출될 사진이 없습니다.</li>
+    <li>복구 코드는 해시로만 보관하고, 입력 시도 횟수를 제한합니다.</li>
+    <li>관리자 지표 화면은 별도 토큰으로 보호됩니다.</li>
+  </ul>
+
+  <h2>7. 문의처</h2>
+  <p>개인정보 보호책임자: <span class="fill">[[이름]]</span> · 이메일 <span class="fill">[[연락 이메일]]</span></p>
+  <p>본 방침이 변경되면 시행 7일 전부터 이 페이지에 공지합니다.</p>
+
+  <!-- ══════════ 이용약관 ══════════ -->
+  <h1 id="terms" style="margin-top:48px">이용약관</h1>
+
+  <h2>제1조 (목적과 성격)</h2>
+  <p>본 약관은 SkinLab AI(이하 “서비스”)의 이용 조건을 정합니다.
+  서비스는 카메라 영상의 광학 정보를 계산해 피부 상태를 <b>참고용으로 안내</b>하고,
+  이용자의 피부톤에 맞는 화장품을 추천하는 <b>정보 제공 서비스</b>입니다.</p>
+
+  <h2>제2조 (계정)</h2>
+  <p>회원가입 없이 이용할 수 있으며, 브라우저에 저장된 익명 토큰으로 이용자를 구분합니다.
+  브라우저 데이터를 삭제하거나 기기를 바꾸면 기록에 접근할 수 없게 되므로,
+  <b>복구 코드를 발급받아 보관</b>하시기 바랍니다. 복구 코드를 분실한 경우 운영자도 기록을 되찾아 드릴 수 없습니다.</p>
+
+  <h2>제3조 (서비스의 한계)</h2>
+  <ul>
+    <li>분석 결과는 촬영 환경(조명·각도·화장 여부)에 따라 달라질 수 있습니다.</li>
+    <li>제품 추천은 참고 정보이며, 개인에 따라 반응이 다를 수 있습니다. 새 제품은 소량으로 시험한 뒤 사용하세요.</li>
+    <li>표시되는 가격·재고는 수집 시점 기준이며 실제와 다를 수 있습니다. 최종 정보는 판매처에서 확인해야 합니다.</li>
+  </ul>
+
+  <h2>제4조 (유료 서비스)</h2>
+  <p><span class="updated">※ 무료로 운영 중이라면 이 조항은 삭제하세요.</span></p>
+  <ul>
+    <li>1회 이용권은 결제한 리포트에 한해 7일간 열람할 수 있습니다.</li>
+    <li>멤버십은 이용 기간 동안 모든 리포트를 열람할 수 있으며 언제든 해지할 수 있습니다.</li>
+    <li>청약철회는 전자상거래법에 따릅니다. 다만 <b>디지털 콘텐츠는 열람을 시작하면 철회가 제한</b>될 수 있으며,
+      이 경우 결제 전에 그 사실을 고지합니다.</li>
+  </ul>
+
+  <h2>제5조 (금지 행위)</h2>
+  <ul>
+    <li>타인의 얼굴을 동의 없이 촬영·업로드하는 행위</li>
+    <li>자동화된 방법으로 서비스에 과도한 부하를 주는 행위</li>
+    <li>진단 결과를 의학적 판단인 것처럼 제3자에게 제공하는 행위</li>
+  </ul>
+
+  <h2>제6조 (책임의 한계)</h2>
+  <p>서비스는 참고 정보를 제공할 뿐이며, 이용자가 이를 근거로 한 제품 구매나 관리 행위의 결과에 대해
+  법령이 허용하는 범위에서 책임을 지지 않습니다. 다만 운영자의 고의 또는 중대한 과실이 있는 경우에는 그러하지 않습니다.</p>
+
+  <!-- ══════════ 고지 ══════════ -->
+  <h1 id="medical" style="margin-top:48px">의료 관련 고지</h1>
+  <div class="callout">
+    <p><b>이 서비스는 의료기기가 아니며, 제공하는 정보는 의학적 진단·처방·치료가 아닙니다.</b>
+    카메라 영상의 광학적 특성을 계산한 참고용 정보이며, 질병의 진단·예방·치료를 목적으로 하지 않습니다.
+    피부 질환이 의심되거나 증상이 지속되면 반드시 피부과 전문의의 진료를 받으시기 바랍니다.</p>
+  </div>
+  <p>서비스에 등장하는 상담 캐릭터 “닥터 세라”는 <b>AI가 생성한 가상의 캐릭터</b>이며 실존하는 의료인이 아닙니다.
+  상담 형식의 안내는 관리 방법에 대한 일반적 정보 제공이며 의료 행위가 아닙니다.</p>
+
+  <h1 id="affiliate" style="margin-top:48px">제휴 수수료 고지</h1>
+  <p>서비스의 상품 추천에는 <b>제휴 링크</b>가 포함됩니다. 이용자가 해당 링크를 통해 구매하면
+  운영자가 판매처로부터 <b>일정 비율의 수수료를 받을 수 있습니다.</b> 이용자가 추가로 부담하는 금액은 없습니다.</p>
+  <p>추천 순위는 <b>피부 적합도 55% · 이용자 평가와 배송 30% · 제휴 수익 15%</b>를 합산해 계산하며,
+  제휴 수익 항목은 적합도에 따라 감쇠되어 <b>내 피부에 맞지 않는 제품이 수수료 때문에 상위에 오르지 않도록</b> 설계돼 있습니다.
+  각 상품 카드에 추천 근거를 함께 표시합니다.</p>
+
+  <p style="margin-top:40px"><a href="/" style="color:var(--accent-2)">← 서비스로 돌아가기</a></p>
+</div>
+</body>
+</html>
