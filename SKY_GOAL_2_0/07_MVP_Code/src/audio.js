@@ -231,18 +231,6 @@
         hit({ at: t + 0.02, filter: 'highpass', cutoff: 5200, dur: 0.06, gain: 0.18 });
       },
 
-      // 헤딩 성공 — 이마에 맞는 둔탁한 타격 + 짧은 함성
-      header: function () {
-        var t = now();
-        tone({ at: t, type: 'sine', from: 300, to: 90, dur: 0.16, gain: 0.75 });
-        hit({ at: t, filter: 'lowpass', cutoff: 900, dur: 0.10, gain: 0.35 });
-        [0, 3, 5].forEach(function (i, k) {
-          tone({ at: t + 0.05 + k * 0.05, type: 'triangle', from: SCALE[i] * 3, to: SCALE[i] * 3,
-                 dur: 0.18, gain: 0.20 });
-        });
-        hit({ at: t + 0.04, filter: 'bandpass', cutoff: 1100, sweepTo: 2400, dur: 0.7, gain: 0.16 });
-      },
-
       tap: function () {
         tone({ type: 'triangle', from: 680, to: 340, dur: 0.09, gain: 0.30 });
         hit({ filter: 'highpass', cutoff: 3200, dur: 0.04, gain: 0.10 });

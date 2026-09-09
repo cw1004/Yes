@@ -426,12 +426,6 @@
     return Math.round(10 + 2 * Math.max(0, combo) + perfectBonus(error, gap));
   }
 
-  // 헤딩 보너스: 낮게 날아 위험을 감수한 대가. 콤보가 쌓일수록 커진다.
-  var HEADER_BASE = 40;
-  function headerBonus(combo) {
-    return Math.round(HEADER_BASE + 4 * clamp(combo || 0, 0, 30));
-  }
-
   function coinReward(score) {
     return Math.round(10 + 25 * Math.log(Math.max(0, score) + 1));
   }
@@ -499,7 +493,6 @@
     var duration = Math.max(0, run.duration || 0);
     var perfect = Math.max(0, Math.round(run.perfectCount || 0));
     var passes = Math.max(0, Math.round(run.passCount || 0));
-    var headers = Math.max(0, Math.round(run.headerCount || 0));
     var success = score >= 10 ? 1 : 0;
     var earlyDeath = duration < 3 || passes === 0;
 
@@ -550,7 +543,6 @@
       score: score,
       combo: combo,
       perfectCount: perfect,
-      headerCount: headers,
       coins: coins,
       xp: xp,
       loot: loot,
@@ -641,8 +633,6 @@
     BALL_FINE_MIN: BALL_FINE_MIN,
     SPEED_MIN: SPEED_MIN,
     perfectBonus: perfectBonus,
-    headerBonus: headerBonus,
-    HEADER_BASE: HEADER_BASE,
     passScore: passScore,
     coinReward: coinReward,
     xpReward: xpReward,

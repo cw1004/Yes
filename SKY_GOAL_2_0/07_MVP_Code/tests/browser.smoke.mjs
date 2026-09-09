@@ -312,36 +312,36 @@ try {
     }));
   await page.evaluate(() => window.SkyGoal.home());
 
-  // 헤딩 보너스
+  // 사이드라인 응원단 (배경 연출 — 플레이에 관여하지 않는다)
   await page.evaluate(() => {
     window.SkyGoal.home();
     window.SkyGoal.start();
     window.SkyGoal.flap();                 // 킥오프 통과
-    window.SkyGoal.debugClearGates();      // 골문 없이 헤딩만 검증
-    window.SkyGoal.debugSpawnHeader();
-    // 낮게 호버링하며 헤딩 지점으로 들어간다
-    window.__hover = setInterval(() => {
-      const d = window.SkyGoal.debug();
-      if (!d.ball) return;
-      if (d.ball.y > d.size.groundY - 130) window.SkyGoal.flap();
-      window.SkyGoal.debugClearGates();
-    }, 30);
   });
-  const headerResult = await page.waitForFunction(() => {
+  const squad = await page.evaluate(() => {
     const d = window.SkyGoal.debug();
+    return { cheer: d.cheer, ground: d.size.groundY, h: d.size.h };
+  });
+  check('응원단이 배치된다', !!squad.cheer && squad.cheer.count >= 3,
+    squad.cheer ? squad.cheer.count + '명' : 'none');
+  check('응원단은 플레이 영역 밖(잔디)에 선다',
+    !!squad.cheer && squad.cheer.baseY > squad.ground && squad.cheer.baseY <= squad.h,
+    squad.cheer ? '기준선 ' + squad.cheer.baseY.toFixed(0) + ' / 잔디선 ' + squad.ground.toFixed(0) : 'none');
+
+  // 킥오프 임팩트에서 실제로 응원이 터지는지 (게임 내 실제 경로)
+  await page.evaluate(() => { window.SkyGoal.home(); window.SkyGoal.start(); });
+  const quiet = await page.evaluate(() => window.SkyGoal.debug().cheer.excite);
+  await page.waitForFunction(() => window.SkyGoal.getState() === 'playing', null, { timeout: 5000 });
+  const loud = await page.evaluate(() => {
     const r = window.SkyGoal.getRun();
-    if (d.header && d.header.hit) return { score: r.score, headers: r.headerCount, vy: d.ball.vy };
-    return false;
-  }, null, { timeout: 15000 }).then((h) => h.jsonValue()).catch(() => null);
-  await page.evaluate(() => clearInterval(window.__hover));
-  check('낮게 날면 선수가 점프해 헤딩으로 넘겨준다',
-    !!headerResult && headerResult.headers === 1 && headerResult.score >= 40,
-    JSON.stringify(headerResult));
-  check('헤딩은 공을 강하게 띄운다', !!headerResult && headerResult.vy < -400,
-    headerResult ? 'vy=' + headerResult.vy.toFixed(0) : 'none');
+    const d = window.SkyGoal.debug();
+    return { excite: d.cheer.excite, bits: d.cheer.bits, score: r.score };
+  });
+  check('킥오프 순간 응원이 터진다', loud.excite > quiet && loud.bits > 0,
+    quiet + ' → ' + loud.excite + ' (색종이 ' + loud.bits + '개)');
+  check('응원해도 점수는 오르지 않는다', loud.score === 0, 'score=' + loud.score);
+
   await page.evaluate(() => window.SkyGoal.forceEnd());
-  check('결과 화면에 헤딩 횟수가 표시된다',
-    (await page.textContent('#r-line')).includes('헤딩'), (await page.textContent('#r-line')).trim());
 
   // 킥오프 건너뛰기
   await page.evaluate(() => { window.SkyGoal.home(); window.SkyGoal.start(); });

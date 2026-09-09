@@ -719,12 +719,6 @@ if ('serviceWorker' in navigator) {
     return Math.round(10 + 2 * Math.max(0, combo) + perfectBonus(error, gap));
   }
 
-  // 헤딩 보너스: 낮게 날아 위험을 감수한 대가. 콤보가 쌓일수록 커진다.
-  var HEADER_BASE = 40;
-  function headerBonus(combo) {
-    return Math.round(HEADER_BASE + 4 * clamp(combo || 0, 0, 30));
-  }
-
   function coinReward(score) {
     return Math.round(10 + 25 * Math.log(Math.max(0, score) + 1));
   }
@@ -792,7 +786,6 @@ if ('serviceWorker' in navigator) {
     var duration = Math.max(0, run.duration || 0);
     var perfect = Math.max(0, Math.round(run.perfectCount || 0));
     var passes = Math.max(0, Math.round(run.passCount || 0));
-    var headers = Math.max(0, Math.round(run.headerCount || 0));
     var success = score >= 10 ? 1 : 0;
     var earlyDeath = duration < 3 || passes === 0;
 
@@ -843,7 +836,6 @@ if ('serviceWorker' in navigator) {
       score: score,
       combo: combo,
       perfectCount: perfect,
-      headerCount: headers,
       coins: coins,
       xp: xp,
       loot: loot,
@@ -934,8 +926,6 @@ if ('serviceWorker' in navigator) {
     BALL_FINE_MIN: BALL_FINE_MIN,
     SPEED_MIN: SPEED_MIN,
     perfectBonus: perfectBonus,
-    headerBonus: headerBonus,
-    HEADER_BASE: HEADER_BASE,
     passScore: passScore,
     coinReward: coinReward,
     xpReward: xpReward,
@@ -1182,18 +1172,6 @@ if ('serviceWorker' in navigator) {
         tone({ at: t, type: 'triangle', from: 620, to: 180, dur: 0.12, gain: 0.35 });
         hit({ at: t, filter: 'bandpass', cutoff: 1800, sweepTo: 400, dur: 0.18, gain: 0.45 });
         hit({ at: t + 0.02, filter: 'highpass', cutoff: 5200, dur: 0.06, gain: 0.18 });
-      },
-
-      // 헤딩 성공 — 이마에 맞는 둔탁한 타격 + 짧은 함성
-      header: function () {
-        var t = now();
-        tone({ at: t, type: 'sine', from: 300, to: 90, dur: 0.16, gain: 0.75 });
-        hit({ at: t, filter: 'lowpass', cutoff: 900, dur: 0.10, gain: 0.35 });
-        [0, 3, 5].forEach(function (i, k) {
-          tone({ at: t + 0.05 + k * 0.05, type: 'triangle', from: SCALE[i] * 3, to: SCALE[i] * 3,
-                 dur: 0.18, gain: 0.20 });
-        });
-        hit({ at: t + 0.04, filter: 'bandpass', cutoff: 1100, sweepTo: 2400, dur: 0.7, gain: 0.16 });
       },
 
       tap: function () {
@@ -1612,8 +1590,7 @@ if ('serviceWorker' in navigator) {
   var audio = AudioLib ? AudioLib.create({ muted: profile.settings.muted }) : null;
 
   var kick = null;                   // 킥오프 연출 상태
-  var header = null;                 // 헤딩 보너스 선수
-  var nextHeaderAt = 0;              // 몇 번째 골문 통과 후 등장할지
+  var cheer = null;                  // 사이드라인 응원단 (배경 연출)
   var popups = [];                   // 화면에 떠오르는 점수 문구
   var usedContinue = false;          // 한 판에 이어하기는 1회
   var rewardProvider = null;         // 보상형 광고 제공자 (네이티브 앱에서 주입)
@@ -1633,6 +1610,7 @@ if ('serviceWorker' in navigator) {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     groundY = H * 0.9;
     if (scenery) scenery.resize(W, H, groundY);
+    createCheerSquad();
     if (ball) ball.x = Math.min(ball.x, W * 0.45);
   }
   window.addEventListener('resize', resize);
@@ -1848,7 +1826,6 @@ if ('serviceWorker' in navigator) {
       perfectCount: 0,
       duration: 0,
       tapIntervals: [],
-      headerCount: 0,
       difficulty: profile.difficulty,
       stage: stage.key
     };
@@ -1867,9 +1844,7 @@ if ('serviceWorker' in navigator) {
     gates = [];
     sparks = [];
     for (var i = 0; i < 4; i++) gates.push(makeGate(W + 220 + i * GATE_SPACING));
-    header = null;
     popups = [];
-    nextHeaderAt = 4 + Math.floor(Math.random() * 3);
     usedContinue = false;
     elapsed = 0;
     scroll = 0;
@@ -1906,6 +1881,7 @@ if ('serviceWorker' in navigator) {
       var T = kick.flight;
       ball.vx = (kick.targetX - ball.x) / T;
       ball.vy = ((kick.targetY - ball.y) - 0.5 * g * T * T) / T;
+      cheerUp(1.2);                                            // 킥오프 환호
       addSparks(ball.x - 6, groundY - 6, 16, '190,220,160');   // 잔디 파편
       addSparks(ball.x, ball.y, 10, '255,215,0');
       if (audio) { audio.kick(); audio.startMusic(musicLevel()); }
@@ -1975,6 +1951,7 @@ if ('serviceWorker' in navigator) {
       stage = next;
       arena = E.arenaParams(run.difficulty, stage, profile.stats, profile.settings, E.selectedBall(profile));
       run.stage = stage.key;
+      cheerUp(1.4);                        // 스테이지 전환 — 최고조
       if (audio) { audio.stage(); audio.setIntensity(musicLevel()); }
     }
   }
@@ -2027,9 +2004,11 @@ if ('serviceWorker' in navigator) {
         if (error <= g.gap * arena.perfectWindow) {
           run.perfectCount += 1;
           addSparks(ball.x, ball.y, 14, '255,215,0');
+          cheerUp(1.0);                      // 퍼펙트 — 응원이 터진다
           if (audio) audio.perfect();
         } else {
           addSparks(g.x + GATE_W, g.mid, 6, '255,255,255');
+          cheerUp(0.5);
           if (audio) audio.pass(run.combo);
         }
         refreshStage();
@@ -2050,7 +2029,7 @@ if ('serviceWorker' in navigator) {
       }
     }
 
-    updateHeader(dt);
+    updateCheer(dt);
     updatePopups(dt);
 
     // 천장 / 바닥
@@ -2071,71 +2050,200 @@ if ('serviceWorker' in navigator) {
     }
   }
 
-  /* ------------------------------------------------------- 헤딩 보너스 */
+  /* ------------------------------------------------------ 사이드라인 응원단 */
 
-  var HEADER_JUMP_T = 0.62;
+  // 경기장 앞쪽 잔디(플레이 영역 아래)에서 응원하는 치어리더들.
+  // 충돌·점수·물리에 전혀 관여하지 않는 순수 배경 연출이다.
+  var CHEER = {
+    top: '#ffffff', topShade: '#e3e9f1',
+    skirt: '#ff9933', skirtShade: '#e07d1f',
+    skin: '#c98a5b', hair: '#1b2230',
+    pom: '#ffd75a', pomAlt: '#ffffff', shoe: '#f4f7fb'
+  };
 
-  function playerScale() {
-    return Math.max(1, Math.min(1.6, H / 700));
-  }
-
-  // 점프 중 머리 중심의 화면상 y 좌표
-  function headerHeadY(lift) {
-    return (groundY + 2) - (117 + lift) * playerScale();
-  }
-
-  function updateHeader(dt) {
-    // 등장 예약
-    if (!header && run.passCount >= nextHeaderAt) {
-      header = { x: W + 200, state: 'wait', t: 0, jumpH: 0, lift: 0, hit: false, bob: 0 };
-      nextHeaderAt = run.passCount + 7 + Math.floor(Math.random() * 4);
+  function createCheerSquad() {
+    var span = Math.max(360, W);
+    var count = Math.max(3, Math.min(6, Math.round(W / 130)));
+    var girls = [];
+    for (var i = 0; i < count; i++) {
+      girls.push({
+        x: (span / count) * i + 30 + Math.random() * 40,
+        phase: Math.random() * Math.PI * 2,
+        scale: 0.92 + Math.random() * 0.22,
+        flip: Math.random() < 0.35
+      });
     }
-    if (!header) return;
+    cheer = { span: span, girls: girls, excite: 0, bits: [] };
+  }
 
-    header.x -= arena.speed * dt;
-    header.bob += dt;
-
-    if (header.state === 'wait') {
-      // 공이 낮게 다가오면 점프 준비 — 위험을 감수하고 낮게 날아야 만난다
-      var near = ball.x > header.x - 170 && ball.x < header.x + 40;
-      var low = ball.y > groundY - 215;
-      if (near && low && ball.vy > -80) {
-        header.state = 'jump';
-        header.t = 0;
-        header.jumpH = E.clamp(groundY - ball.y - 78, 24, 190);
+  // 통과·퍼펙트·스테이지 변경 때 응원이 뜨거워진다.
+  function cheerUp(strength) {
+    if (!cheer) return;
+    cheer.excite = Math.min(1.6, cheer.excite + strength);
+    if (strength >= 0.8) {
+      for (var i = 0; i < 8; i++) {
+        cheer.bits.push({
+          x: Math.random() * W,
+          y: groundY + 6 + Math.random() * 20,
+          vx: (Math.random() - 0.5) * 40,
+          vy: -60 - Math.random() * 70,
+          life: 0.7 + Math.random() * 0.5,
+          age: 0,
+          c: Math.random() < 0.5 ? '255,215,90' : (Math.random() < 0.5 ? '255,255,255' : '90,200,120')
+        });
       }
-    } else if (header.state === 'jump') {
-      header.t += dt;
-      header.lift = header.jumpH * Math.sin(Math.PI * Math.min(1, header.t / HEADER_JUMP_T));
+      if (cheer.bits.length > 60) cheer.bits.splice(0, cheer.bits.length - 60);
+    }
+  }
 
-      if (!header.hit) {
-        var hy = headerHeadY(header.lift);
-        var dx = Math.abs(ball.x - (header.x + 6));
-        if (dx < 40 && Math.abs(ball.y - hy) < 36) connectHeader(hy);
-      }
-      if (header.t >= HEADER_JUMP_T) { header.state = 'done'; header.lift = 0; }
+  function updateCheer(dt) {
+    if (!cheer) return;
+    cheer.excite = Math.max(0, cheer.excite - dt * 0.85);
+    for (var i = cheer.bits.length - 1; i >= 0; i--) {
+      var b = cheer.bits[i];
+      b.age += dt;
+      if (b.age >= b.life) { cheer.bits.splice(i, 1); continue; }
+      b.x += b.vx * dt;
+      b.y += b.vy * dt;
+      b.vy += 190 * dt;
+    }
+  }
+
+  function drawPom(x, y, r, shake) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(shake);
+    for (var i = 0; i < 6; i++) {
+      var a = (Math.PI * 2 * i) / 6;
+      ctx.fillStyle = i % 2 ? CHEER.pom : CHEER.pomAlt;
+      ctx.beginPath();
+      ctx.arc(Math.cos(a) * r * 0.55, Math.sin(a) * r * 0.55, r * 0.62, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.fillStyle = CHEER.pom;
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 0.6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // 치어리더 한 명. 발끝이 원점, 위쪽이 음수.
+  function drawCheerleader(px, baseY, scale, t, phase, excite, flip) {
+    var rad = Math.PI / 180;
+    var sway = Math.sin(t * 2.2 + phase) * 3;
+    var beat = Math.sin(t * (7 + excite * 9) + phase);
+    var lift = excite > 0 ? Math.max(0, beat) * 12 * Math.min(1, excite) : 0;
+    var armA = -38 - excite * 34 + beat * 9;
+    var armB = -30 - excite * 30 - beat * 9;
+
+    ctx.save();
+    ctx.translate(px, baseY - lift);
+    ctx.scale(flip ? -scale : scale, scale);
+
+    // 그림자
+    ctx.globalAlpha = 0.22;
+    ctx.fillStyle = '#000';
+    ctx.beginPath();
+    ctx.ellipse(0, lift + 2, 16, 4, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
+    // 다리
+    ctx.strokeStyle = CHEER.skin;
+    ctx.lineWidth = 5.5;
+    ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(-4, -26); ctx.lineTo(-5 + sway * 0.2, -3); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(4, -26); ctx.lineTo(6 + sway * 0.2, -3); ctx.stroke();
+    ctx.fillStyle = CHEER.shoe;
+    ctx.beginPath(); ctx.ellipse(-5, -2, 5, 2.6, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(6, -2, 5, 2.6, 0, 0, Math.PI * 2); ctx.fill();
+
+    // 치마
+    ctx.fillStyle = CHEER.skirt;
+    ctx.beginPath();
+    ctx.moveTo(-8, -42);
+    ctx.lineTo(8, -42);
+    ctx.lineTo(12 + sway * 0.3, -24);
+    ctx.lineTo(-12 + sway * 0.3, -24);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = CHEER.skirtShade;
+    ctx.fillRect(-2, -42, 3, 18);
+
+    // 상의
+    ctx.fillStyle = CHEER.top;
+    ctx.beginPath();
+    ctx.moveTo(-7, -41);
+    ctx.lineTo(7, -41);
+    ctx.lineTo(6 + sway * 0.2, -62);
+    ctx.lineTo(-6 + sway * 0.2, -62);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#138808';
+    ctx.fillRect(-7 + sway * 0.2, -56, 14, 2.4);
+
+    // 팔 + 폼폼
+    var shx = sway * 0.2;
+    ctx.strokeStyle = CHEER.skin;
+    ctx.lineWidth = 4.6;
+    var ax = Math.sin(armA * rad) * 17, ay = -Math.cos(armA * rad) * 17;
+    var bx = Math.sin(armB * rad) * 17, by = -Math.cos(armB * rad) * 17;
+    ctx.beginPath(); ctx.moveTo(shx - 4, -60); ctx.lineTo(shx - 4 - ax, -60 + ay); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(shx + 4, -60); ctx.lineTo(shx + 4 + bx, -60 + by); ctx.stroke();
+    drawPom(shx - 4 - ax, -60 + ay, 7, beat * 0.8);
+    drawPom(shx + 4 + bx, -60 + by, 7, -beat * 0.8);
+
+    // 머리 + 포니테일
+    var hx = shx + 1, hy = -71;
+    ctx.fillStyle = CHEER.hair;
+    ctx.beginPath();
+    ctx.ellipse(hx - 9, hy + 2 + beat * 1.5, 4.5, 8, 0.4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = CHEER.skin;
+    ctx.beginPath();
+    ctx.arc(hx, hy, 8.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = CHEER.hair;
+    ctx.beginPath();
+    ctx.arc(hx, hy - 1.5, 8.5, Math.PI * 1.02, Math.PI * 2.1);
+    ctx.lineTo(hx - 7, hy + 2);
+    ctx.quadraticCurveTo(hx - 10, hy - 5, hx - 3, hy - 8);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  // 응원단이 서는 높이 — 반드시 잔디(플레이 영역 아래)여야 한다
+  function cheerBaseY() {
+    return groundY + (H - groundY) * 0.72;
+  }
+
+  function drawCheerSquad() {
+    if (!cheer) return;
+    var t = clock;
+    var base = cheerBaseY();                        // 잔디 위, 플레이 영역 바깥
+    var scale = Math.max(0.55, Math.min(1, (H - groundY) / 100));
+    var off = (scroll * 0.9) % cheer.span;
+
+    for (var i = 0; i < cheer.girls.length; i++) {
+      var g = cheer.girls[i];
+      var x = g.x - off;
+      if (x < -60) x += cheer.span;
+      if (x > W + 60 || x < -60) continue;
+      drawCheerleader(x, base, scale * g.scale, t, g.phase, cheer.excite, g.flip);
     }
 
-    if (header.x < -90) header = null;
+    // 색종이
+    for (var b = 0; b < cheer.bits.length; b++) {
+      var bit = cheer.bits[b];
+      var a = 1 - bit.age / bit.life;
+      ctx.fillStyle = 'rgba(' + bit.c + ',' + Math.max(0, a).toFixed(3) + ')';
+      ctx.fillRect(bit.x - 2, bit.y - 2, 4, 4);
+    }
   }
 
-  // 헤딩 성공 — 보너스 점수와 강한 상승
-  function connectHeader(headY) {
-    header.hit = true;
-    var bonus = E.headerBonus(run.combo);
-    run.score += bonus;
-    run.combo += 1;
-    run.headerCount += 1;
-    ball.y = headY - 22;
-    ball.vy = arena.flap * 1.9;
-    ball.spin -= 1.2;
-    addSparks(ball.x, ball.y, 20, '255,215,0');
-    addSparks(header.x + 6, headY, 10, '255,255,255');
-    popups.push({ x: ball.x, y: ball.y - 26, text: 'HEADER! +' + bonus, age: 0, life: 1.1 });
-    if (audio) audio.header();
-    refreshStage();
-    updateHud();
-  }
+  /* -------------------------------------------------------- 점수 팝업 */
 
   function updatePopups(dt) {
     for (var i = popups.length - 1; i >= 0; i--) {
@@ -2145,57 +2253,8 @@ if ('serviceWorker' in navigator) {
     }
   }
 
-  function headerPose() {
-    var sc = playerScale();
-    if (header.state === 'wait') {
-      var idle = Math.sin(header.bob * 2.4) * 3;
-      return {
-        frontLeg: 6, frontBend: 8, backLeg: -8, backBend: 12,
-        lean: 2, armF: 14, armB: -12, crouch: idle, headTilt: 0
-      };
-    }
-    var k = Math.min(1, header.t / HEADER_JUMP_T);
-    var tuck = Math.sin(Math.PI * k);
-    return {
-      frontLeg: -18 - tuck * 26, frontBend: 20 + tuck * 46,
-      backLeg: 16 + tuck * 34, backBend: 10 + tuck * 30,
-      lean: -6 - tuck * 10, armF: -50 - tuck * 40, armB: 40 + tuck * 30,
-      crouch: header.lift / sc, headTilt: -14 - tuck * 10
-    };
-  }
-
-  function drawHeaderPlayer() {
-    if (!header || header.x < -60 || header.x > W + 60) return;
-    var sc = playerScale();
-
-    // 대기 중에는 "여기로 낮게 오라"는 표시를 보여준다
-    if (header.state === 'wait' && header.x < W + 30) {
-      var zoneTop = groundY - 215;
-      ctx.save();
-      ctx.globalAlpha = 0.5 + 0.2 * Math.sin(header.bob * 4);
-      ctx.strokeStyle = 'rgba(255,215,0,0.85)';
-      ctx.setLineDash([6, 6]);
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(header.x - 52, zoneTop);
-      ctx.lineTo(header.x + 62, zoneTop);
-      ctx.stroke();
-      ctx.setLineDash([]);
-      ctx.fillStyle = 'rgba(255,215,0,0.09)';
-      ctx.fillRect(header.x - 52, zoneTop, 114, groundY - zoneTop);
-      ctx.fillStyle = '#ffd75a';
-      ctx.font = '700 13px system-ui, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('HEADER ↓', header.x + 5, zoneTop - 10);
-      ctx.textAlign = 'start';
-      ctx.restore();
-    }
-
-    var baseY = groundY + 2;
-    drawPlayer(header.x, baseY, sc, headerPose(), 1);
-  }
-
   function drawPopups() {
+    if (!popups.length) return;
     ctx.save();
     ctx.textAlign = 'center';
     for (var i = 0; i < popups.length; i++) {
@@ -2284,8 +2343,7 @@ if ('serviceWorker' in navigator) {
     $('r-stage').textContent = stage.label;
     $('r-title').textContent = sum.score >= profile.bestScore && sum.score > 0 ? 'NEW BEST!' : 'GAME OVER';
     $('r-line').textContent = '점수 ' + sum.score + ' · 콤보 ' + sum.combo +
-      ' · 퍼펙트 ' + sum.perfectCount +
-      (sum.headerCount ? ' · 헤딩 ' + sum.headerCount : '');
+      ' · 퍼펙트 ' + sum.perfectCount;
     $('r-coin').textContent = '+' + sum.coins;
     $('r-xp').textContent = '+' + Math.round(sum.xp);
     $('r-loot').textContent = sum.loot.toUpperCase();
@@ -2340,6 +2398,7 @@ if ('serviceWorker' in navigator) {
     }
     drawWeather();
     drawField();
+    drawCheerSquad();
   }
 
   function drawWeather() {
@@ -2893,7 +2952,6 @@ if ('serviceWorker' in navigator) {
     drawBackground();
     for (var i = 0; i < gates.length; i++) drawGate(gates[i]);
     if (state === 'kickoff') drawKicker();
-    if (header) drawHeaderPlayer();
     drawSparks();
     if (ball) drawBall();
     drawPopups();
@@ -2920,6 +2978,7 @@ if ('serviceWorker' in navigator) {
     dt = Math.min(dt, 1 / 30);             // 탭 전환 후 큰 점프 방지
     clock += dt;
     tickLightning(dt);
+    if (state !== 'playing') updateCheer(dt);
     if (state === 'kickoff' || state === 'ready' || state === 'playing') update(dt);
     if (state !== 'idle') render();
     else drawBackground();
@@ -3081,14 +3140,17 @@ if ('serviceWorker' in navigator) {
         gateWidth: GATE_W,
         endReason: lastEndReason,
         kick: kick ? { t: kick.t, launched: kick.launched } : null,
-        header: header ? { x: header.x, state: header.state, hit: header.hit, lift: header.lift } : null,
-        nextHeaderAt: nextHeaderAt,
+        cheer: cheer ? {
+          count: cheer.girls.length,
+          excite: +cheer.excite.toFixed(2),
+          baseY: cheerBaseY(),
+          bits: cheer.bits.length
+        } : null,
         size: { w: W, h: H, groundY: groundY }
       };
     },
-    // 자동화 테스트용: 골문을 비우고 헤딩 선수를 즉시 부른다
+    // 자동화 테스트용
     debugClearGates: function () { gates = []; },
-    debugSpawnHeader: function () { nextHeaderAt = 0; header = null; },
     // 아트 확인용: 특정 스테이지 연출을 즉시 적용한다
     previewStage: function (key) {
       for (var i = 0; i < E.STAGES.length; i++) {
