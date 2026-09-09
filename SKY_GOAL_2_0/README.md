@@ -48,7 +48,7 @@ cd 11_App_Android && ./sync_assets.sh && gradle bundleRelease   # 스토어 업�
 ./test.sh                   # 빌드 + 엔진 테스트 15개 + 브라우저 스모크 테스트 15개
 ```
 
-- 단위 테스트 42개(엔진 24 · 사운드 5 · 배경 6 · 광고판 7): Node 만 있으면 실행된다 (`node --test`)
+- 단위 테스트 45개(엔진 24 · 사운드 5 · 배경 6 · 광고판 10): Node 만 있으면 실행된다 (`node --test`)
 - 브라우저 스모크 테스트: Playwright 가 있으면 실제 Chromium 에서 한 판을 자동 플레이하고,
   없으면 자동으로 건너뛴다 (56개 항목)
 
@@ -69,7 +69,7 @@ SKY_GOAL_2_0/
 │   ├── src/engine.js           난이도·보상 로직 (DOM 없음, Node 에서도 실행)
 │   ├── src/audio.js            WebAudio 합성 BGM·효과음 (음원 파일 없음)
 │   ├── src/scenery.js          산·강·하늘 패럴랙스 배경
-│   ├── src/sponsor.js          경기장 광고판 (스폰서가 붙으면 여기만 수정)
+│   ├── src/sponsor.js          경기장 광고판 13종 (스폰서가 붙으면 여기만 수정)
 │   ├── src/game.js             렌더링·입력·화면 전환
 │   ├── src/style.css, template.html
 │   └── tests/                  엔진 단위 테스트 + 브라우저 스모크 테스트

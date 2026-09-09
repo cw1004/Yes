@@ -1546,28 +1546,187 @@ p { margin: 8px 0; line-height: 1.55; color: #dbe7f7; font-size: 14px; }
 
   var CLICKABLE = false;          // 절대 true 로 바꾸지 말 것 (조작과 충돌)
 
-  // house: 자체 홍보 / sponsor: 판매된 지면
+  /*
+   * kind
+   *   house    자체 홍보 (게임 기능·브랜드 메시지)
+   *   sponsor  광고 지면. 지금은 전부 **가상 브랜드**다.
+   *            실존 상표를 쓰지 않고, 이 프로젝트의 자체 IP(GAJU/GABE 등)와
+   *            일반 명사를 조합해 만들었다. 실제 스폰서가 붙으면 이 항목을 교체한다.
+   *   campaign 공익 캠페인. 광고와 광고 사이에 끼워 넣어 화면이 상업적으로만
+   *            보이지 않게 하고, 브랜드 톤도 지킨다.
+   * mark  배너 상단에 그려지는 로고 마크 (ball/boot/leaf/drop/star/shield/cup)
+   */
   var BOARDS = [
-    { id: 'india2030', kind: 'house', text: 'INDIA 2030',
+    // ── 자체 홍보 ────────────────────────────────────────────────
+    { id: 'india2030', kind: 'house', mark: 'star', text: 'INDIA 2030',
       sub: 'ONE DREAM · ONE NATION', bg: '#12233f', fg: '#ffffff', accent: '#ff9933' },
-    { id: 'dream', kind: 'house', text: 'DREAM · BELIEVE · QUALIFY',
-      sub: 'हर सपना एक फुटबॉल से', bg: '#123a2a', fg: '#ffffff', accent: '#5ad07a' },
-    { id: 'shop', kind: 'house', text: '새 공 만나기',
+    { id: 'shop', kind: 'house', mark: 'ball', text: '새 공 만나기',
       sub: 'BALL SHOP', bg: '#2a1a3f', fg: '#ffffff', accent: '#ffd75a' },
-    { id: 'follow', kind: 'house', text: 'FOLLOW THE DREAM',
+    { id: 'follow', kind: 'house', mark: 'shield', text: 'FOLLOW THE DREAM',
       sub: '2030', bg: '#3a1f14', fg: '#ffffff', accent: '#ff9933' },
-    { id: 'slot', kind: 'sponsor', text: 'YOUR BRAND HERE',
-      sub: 'sponsor@skygoal', bg: '#1b2431', fg: '#c9d6e6', accent: '#8fa6c0' }
+
+    // ── 가상 브랜드 광고 (실존 상표 아님) ────────────────────────
+    { id: 'gaju', kind: 'sponsor', fictional: true, mark: 'boot', text: 'GAJU SPORTS',
+      sub: 'FOOTBALL GEAR', bg: '#14304a', fg: '#ffffff', accent: '#4db3ff' },
+    { id: 'gabe', kind: 'sponsor', fictional: true, mark: 'cup', text: 'GABE ENERGY',
+      sub: 'PLAY LONGER', bg: '#3d1030', fg: '#ffffff', accent: '#ff5fa2' },
+    { id: 'academy', kind: 'sponsor', fictional: true, mark: 'shield', text: 'SKY GOAL ACADEMY',
+      sub: 'JOIN THE CLASS', bg: '#10303a', fg: '#ffffff', accent: '#5ad0c0' },
+    { id: 'dreamboots', kind: 'sponsor', fictional: true, mark: 'boot', text: 'DREAM BOOTS',
+      sub: 'MADE FOR MUD', bg: '#31240f', fg: '#ffffff', accent: '#ffc44d' },
+    { id: 'slot', kind: 'sponsor', text: 'YOUR BRAND HERE', mark: 'shield',
+      sub: 'sponsor@skygoal', bg: '#1b2431', fg: '#c9d6e6', accent: '#8fa6c0' },
+
+    // ── 공익 캠페인 ──────────────────────────────────────────────
+    { id: 'nature', kind: 'campaign', mark: 'leaf', text: '자연을 지켜요',
+      sub: 'PROTECT NATURE', bg: '#123a2a', fg: '#ffffff', accent: '#7ee08a' },
+    { id: 'eco', kind: 'campaign', mark: 'leaf', text: '생태를 지키자',
+      sub: 'SAVE OUR ECOSYSTEM', bg: '#0f3324', fg: '#ffffff', accent: '#5ad07a' },
+    { id: 'creation', kind: 'campaign', mark: 'shield', text: '창조 질서 보전',
+      sub: 'CARE FOR CREATION', bg: '#1a2c46', fg: '#ffffff', accent: '#9fd8ff' },
+    { id: 'water', kind: 'campaign', mark: 'drop', text: '물을 아껴요',
+      sub: 'SAVE WATER', bg: '#0e2b3d', fg: '#ffffff', accent: '#6fd0ff' },
+    { id: 'tree', kind: 'campaign', mark: 'leaf', text: '나무 한 그루',
+      sub: 'PLANT A TREE', bg: '#1c3312', fg: '#ffffff', accent: '#a5e05a' }
   ];
 
-  function count() { return BOARDS.length; }
+  // 광고만 줄줄이 나오지 않도록 종류를 섞은 순서를 만든다.
+  // 대략 광고 2개마다 캠페인 1개, 그 사이에 자체 홍보가 들어간다.
+  function buildOrder(list) {
+    var by = { house: [], sponsor: [], campaign: [] };
+    for (var i = 0; i < list.length; i++) {
+      (by[list[i].kind] || by.house).push(list[i]);
+    }
+    var order = [];
+    var idx = { house: 0, sponsor: 0, campaign: 0 };
+    var pattern = ['sponsor', 'campaign', 'sponsor', 'house', 'campaign', 'sponsor', 'house'];
+    var guard = 0;
+    while (order.length < list.length && guard++ < 200) {
+      for (var p = 0; p < pattern.length && order.length < list.length; p++) {
+        var kind = pattern[p];
+        var pool = by[kind];
+        if (!pool.length) continue;
+        var item = pool[idx[kind] % pool.length];
+        idx[kind]++;
+        if (order.indexOf(item) < 0) order.push(item);
+      }
+      // 남은 것이 있으면 채운다
+      for (var r = 0; r < list.length; r++) {
+        if (order.length >= list.length) break;
+        if (order.indexOf(list[r]) < 0 && idx.sponsor + idx.campaign + idx.house > list.length * 2) {
+          order.push(list[r]);
+        }
+      }
+    }
+    return order;
+  }
 
-  // 골문마다 다른 보드가 걸리도록 순서대로 돌린다.
+  var ORDER = buildOrder(BOARDS);
+
+  function count() { return ORDER.length; }
+
+  // 골문마다 다른 보드가 걸리도록 섞인 순서대로 돌린다.
   function pick(index) {
-    var n = BOARDS.length;
+    var n = ORDER.length;
     if (!n) return null;
     var i = Math.floor(Math.abs(index || 0)) % n;
-    return BOARDS[i];
+    return ORDER[i];
+  }
+
+  function boardsOfKind(kind) {
+    return BOARDS.filter(function (b) { return b.kind === kind; });
+  }
+
+  /**
+   * 배너 상단 로고 마크. 전부 자체 제작 도형이며 실존 상표를 본뜨지 않는다.
+   * type: ball / boot / leaf / drop / star / shield / cup
+   */
+  function drawMark(ctx, type, cx, cy, r, color, bg) {
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.fillStyle = color;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = Math.max(1.4, r * 0.16);
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+
+    if (type === 'ball') {
+      ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath();
+      for (var i = 0; i < 5; i++) {
+        var a = (Math.PI * 2 * i) / 5 - Math.PI / 2;
+        ctx.lineTo(Math.cos(a) * r * 0.45, Math.sin(a) * r * 0.45);
+      }
+      ctx.closePath(); ctx.fill();
+    } else if (type === 'boot') {
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.7, -r * 0.7);
+      ctx.lineTo(-r * 0.15, -r * 0.7);
+      ctx.lineTo(-r * 0.05, r * 0.1);
+      ctx.lineTo(r * 0.85, r * 0.35);
+      ctx.lineTo(r * 0.85, r * 0.7);
+      ctx.lineTo(-r * 0.7, r * 0.7);
+      ctx.closePath(); ctx.fill();
+      if (bg) {
+        ctx.fillStyle = bg;
+        for (var st = 0; st < 3; st++) {
+          ctx.fillRect(-r * 0.1 + st * r * 0.3, r * 0.72, r * 0.12, r * 0.2);
+        }
+      }
+    } else if (type === 'leaf') {
+      ctx.beginPath();
+      ctx.moveTo(0, r);
+      ctx.quadraticCurveTo(-r, r * 0.2, 0, -r);
+      ctx.quadraticCurveTo(r, r * 0.2, 0, r);
+      ctx.closePath(); ctx.fill();
+      if (bg) {
+        ctx.strokeStyle = bg;
+        ctx.lineWidth = Math.max(1, r * 0.14);
+        ctx.beginPath(); ctx.moveTo(0, r * 0.8); ctx.lineTo(0, -r * 0.7); ctx.stroke();
+      }
+    } else if (type === 'drop') {
+      ctx.beginPath();
+      ctx.moveTo(0, -r);
+      ctx.quadraticCurveTo(r, r * 0.1, 0, r);
+      ctx.quadraticCurveTo(-r, r * 0.1, 0, -r);
+      ctx.closePath(); ctx.fill();
+      if (bg) {
+        ctx.fillStyle = bg;
+        ctx.beginPath(); ctx.arc(-r * 0.25, r * 0.25, r * 0.18, 0, Math.PI * 2); ctx.fill();
+      }
+    } else if (type === 'star') {
+      ctx.beginPath();
+      for (var k = 0; k < 10; k++) {
+        var ang = (Math.PI / 5) * k - Math.PI / 2;
+        var rad2 = k % 2 === 0 ? r : r * 0.44;
+        ctx.lineTo(Math.cos(ang) * rad2, Math.sin(ang) * rad2);
+      }
+      ctx.closePath(); ctx.fill();
+    } else if (type === 'cup') {
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.55, -r * 0.8);
+      ctx.lineTo(r * 0.55, -r * 0.8);
+      ctx.lineTo(r * 0.35, r * 0.25);
+      ctx.lineTo(-r * 0.35, r * 0.25);
+      ctx.closePath(); ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(0, r * 0.25); ctx.lineTo(0, r * 0.6); ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.5, r * 0.85); ctx.lineTo(r * 0.5, r * 0.85); ctx.stroke();
+    } else {                                   // shield (기본)
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.8, -r * 0.8);
+      ctx.lineTo(r * 0.8, -r * 0.8);
+      ctx.lineTo(r * 0.8, r * 0.15);
+      ctx.quadraticCurveTo(r * 0.8, r, 0, r);
+      ctx.quadraticCurveTo(-r * 0.8, r, -r * 0.8, r * 0.15);
+      ctx.closePath(); ctx.fill();
+      if (bg) {
+        ctx.fillStyle = bg;
+        ctx.beginPath(); ctx.arc(0, -r * 0.1, r * 0.3, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+    ctx.restore();
   }
 
   var HANGUL = /[\u1100-\u11FF\u3130-\u318F\uAC00-\uD7AF]/;
@@ -1609,14 +1768,24 @@ p { margin: 8px 0; line-height: 1.55; color: #dbe7f7; font-size: 14px; }
     ctx.fillRect(x + 3, y + 4, w - 6, 3);
     ctx.fillRect(x + 3, y + h - 7, w - 6, 3);
 
+    // 로고 마크
+    var markR = Math.min((w - 14) / 2, 12);
+    var markH = 0;
+    if (board.mark && h > 100) {
+      markH = markR * 2 + 8;
+      drawMark(ctx, board.mark, x + w / 2, y + 12 + markR, markR, board.accent, board.bg);
+    }
+    var ty = y + markH;
+    var th = h - markH;
+
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
     if (hasHangul(board.text)) {
       // 한글은 눕히면 읽기 어렵다 — 글자를 세로로 쌓는다 (세로쓰기)
       var chars = board.text.replace(/\s+/g, '').split('');
-      var step = Math.min(17, (h - 26) / Math.max(1, chars.length));
-      var startY = y + h / 2 - (step * (chars.length - 1)) / 2;
+      var step = Math.min(17, (th - 26) / Math.max(1, chars.length));
+      var startY = ty + th / 2 - (step * (chars.length - 1)) / 2;
       ctx.fillStyle = board.fg;
       ctx.font = '700 ' + Math.min(14, step - 2).toFixed(0) + 'px system-ui, sans-serif';
       for (var c = 0; c < chars.length; c++) {
@@ -1624,23 +1793,23 @@ p { margin: 8px 0; line-height: 1.55; color: #dbe7f7; font-size: 14px; }
       }
       if (board.sub) {                       // 부제는 눕혀서 옆에
         ctx.save();
-        ctx.translate(x + w - 8, y + h / 2);
+        ctx.translate(x + w - 8, ty + th / 2);
         ctx.rotate(-Math.PI / 2);
         ctx.fillStyle = board.accent;
         ctx.font = '600 8px system-ui, sans-serif';
-        ctx.fillText(board.sub, 0, 0, h - 20);
+        ctx.fillText(board.sub, 0, 0, th - 20);
         ctx.restore();
       }
     } else {
-      ctx.translate(x + w / 2, y + h / 2);
+      ctx.translate(x + w / 2, ty + th / 2);
       ctx.rotate(-Math.PI / 2);
       ctx.fillStyle = board.fg;
       ctx.font = '700 13px system-ui, sans-serif';
-      ctx.fillText(board.text, 0, -5, h - 18);
+      ctx.fillText(board.text, 0, -5, th - 18);
       if (board.sub) {
         ctx.fillStyle = board.accent;
         ctx.font = '600 9px system-ui, sans-serif';
-        ctx.fillText(board.sub, 0, 9, h - 18);
+        ctx.fillText(board.sub, 0, 9, th - 18);
       }
     }
     ctx.restore();
@@ -1669,11 +1838,12 @@ p { margin: 8px 0; line-height: 1.55; color: #dbe7f7; font-size: 14px; }
       ctx.fill();
       ctx.fillStyle = board.accent;
       ctx.fillRect(px, y + h - 3, panelW, 3);
+      if (board.mark) drawMark(ctx, board.mark, px + 14, y + h / 2, 5.5, board.accent, board.bg);
       ctx.fillStyle = board.fg;
       ctx.font = '700 11px system-ui, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(board.text, px + panelW / 2, y + h / 2, panelW - 16);
+      ctx.fillText(board.text, px + panelW / 2 + 8, y + h / 2, panelW - 34);
     }
     ctx.restore();
     ctx.textAlign = 'start';
@@ -1683,8 +1853,11 @@ p { margin: 8px 0; line-height: 1.55; color: #dbe7f7; font-size: 14px; }
   return {
     BOARDS: BOARDS,
     CLICKABLE: CLICKABLE,
+    ORDER: ORDER,
     count: count,
     pick: pick,
+    boardsOfKind: boardsOfKind,
+    drawMark: drawMark,
     hasHangul: hasHangul,
     drawPostBanner: drawPostBanner,
     drawPerimeter: drawPerimeter
@@ -1970,7 +2143,7 @@ p { margin: 8px 0; line-height: 1.55; color: #dbe7f7; font-size: 14px; }
       phase: Math.random() * Math.PI * 2,
       flagPhase: Math.random() * Math.PI * 2,           // 깃발이 각자 다르게 나부낀다
       banner: Math.floor(Math.random() * 3),            // 상단 장식 종류
-      board: boardSeq++,                                // 기둥 광고판 순번
+      board: (boardSeq += 2) - 2,                       // 위/아래 기둥에 서로 다른 보드
       passed: false
     };
   }
@@ -2717,18 +2890,19 @@ p { margin: 8px 0; line-height: 1.55; color: #dbe7f7; font-size: 14px; }
     drawFlag(g.x + GATE_W / 2, top - 15, -1, g.flagPhase, '#ff9933');
     drawFlag(g.x + GATE_W / 2, bottom + 15, 1, g.flagPhase + 2, '#138808');
 
-    // 기둥 광고판 — 긴 쪽 기둥에, 골문 틈에서 충분히 떨어뜨려 건다
+    // 기둥 광고판 — 위/아래 기둥 모두. 골문 틈에서 46px 이상 떨어뜨려 시야를 막지 않는다
     if (Sponsor) {
-      var board = Sponsor.pick(g.board);
-      var upper = top - 46;                    // 위 기둥에서 쓸 수 있는 길이
-      var lower = groundY - (bottom + 46);
       var bw = GATE_W - 12;
       var bx = g.x + 6;
-      if (lower >= upper && lower > 90) {
-        Sponsor.drawPostBanner(ctx, board, bx, bottom + 46, bw, Math.min(150, lower - 12), 0.92);
-      } else if (upper > 90) {
-        var bh = Math.min(150, upper - 12);
-        Sponsor.drawPostBanner(ctx, board, bx, top - 46 - bh, bw, bh, 0.92);
+      var upper = top - 46;
+      var lower = groundY - (bottom + 46);
+      if (upper > 90) {
+        var bhU = Math.min(150, upper - 12);
+        Sponsor.drawPostBanner(ctx, Sponsor.pick(g.board), bx, top - 46 - bhU, bw, bhU, 0.92);
+      }
+      if (lower > 90) {
+        var bhL = Math.min(150, lower - 12);
+        Sponsor.drawPostBanner(ctx, Sponsor.pick(g.board + 1), bx, bottom + 46, bw, bhL, 0.92);
       }
     }
 

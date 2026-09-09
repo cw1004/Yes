@@ -5,7 +5,7 @@ const S = require('../src/sponsor.js');
 
 // Canvas 2D 스텁
 function fakeCtx() {
-  const calls = { text: [], fills: 0, rects: 0, rotate: 0, clip: 0 };
+  const calls = { text: [], fills: 0, rects: 0, rotate: 0, clip: 0, arcs: 0 };
   return {
     calls,
     globalAlpha: 1, fillStyle: '', strokeStyle: '', lineWidth: 1,
@@ -13,6 +13,8 @@ function fakeCtx() {
     save() {}, restore() {}, translate() {}, rotate() { calls.rotate++; },
     beginPath() {}, moveTo() {}, lineTo() {}, quadraticCurveTo() {}, closePath() {},
     rect() {}, clip() { calls.clip++; },
+    arc() { calls.arcs = (calls.arcs || 0) + 1; },
+    ellipse() { calls.arcs = (calls.arcs || 0) + 1; },
     fill() { calls.fills++; }, stroke() {},
     fillRect() { calls.rects++; },
     fillText(t) { calls.text.push(String(t)); }
@@ -25,12 +27,59 @@ test('광고판 목록이 유효하다', () => {
   for (const b of S.BOARDS) {
     assert.ok(b.id && !ids.has(b.id), 'id 중복: ' + b.id);
     ids.add(b.id);
-    assert.ok(['house', 'sponsor'].includes(b.kind), b.id + ' kind');
+    assert.ok(['house', 'sponsor', 'campaign'].includes(b.kind), b.id + ' kind');
     assert.ok(b.text && b.text.length <= 26, b.id + ' 문구가 너무 길다');
     assert.ok(/^#[0-9a-f]{6}$/i.test(b.bg) && /^#[0-9a-f]{6}$/i.test(b.fg), b.id + ' 색상');
     assert.ok(/^#[0-9a-f]{6}$/i.test(b.accent));
   }
   assert.ok(S.BOARDS.some((b) => b.kind === 'sponsor'), '판매용 지면이 최소 하나는 있어야 한다');
+  assert.ok(S.boardsOfKind('campaign').length >= 3, '공익 캠페인이 충분히 있어야 한다');
+});
+
+test('광고 브랜드는 전부 가상이며 실존 상표를 쓰지 않는다', () => {
+  const sponsors = S.boardsOfKind('sponsor');
+  const named = sponsors.filter((b) => b.id !== 'slot');
+  assert.ok(named.length >= 3, '가상 브랜드가 여러 개 있어야 광고판이 자연스럽다');
+  for (const b of named) {
+    assert.strictEqual(b.fictional, true, b.id + ' 는 가상 브랜드로 표시되어야 한다');
+  }
+  // 비어 있는 판매 지면은 가상 브랜드가 아니라 안내 문구다
+  const slot = sponsors.find((b) => b.id === 'slot');
+  assert.ok(slot && !slot.fictional);
+});
+
+test('로고 마크는 정의된 종류만 쓰고 그리기가 실패하지 않는다', () => {
+  const types = ['ball', 'boot', 'leaf', 'drop', 'star', 'shield', 'cup'];
+  for (const b of S.BOARDS) {
+    if (b.mark) assert.ok(types.includes(b.mark), b.id + ' 마크: ' + b.mark);
+  }
+  for (const t of types.concat(['알수없는종류'])) {
+    const ctx = fakeCtx();
+    S.drawMark(ctx, t, 20, 20, 10, '#fff', '#000');
+    assert.ok(ctx.calls.fills > 0 || ctx.calls.arcs > 0, t + ' 마크가 그려진다');
+  }
+});
+
+test('광고만 연달아 나오지 않도록 종류를 섞는다', () => {
+  assert.strictEqual(S.ORDER.length, S.BOARDS.length, '모든 보드가 순서에 들어간다');
+  for (const b of S.BOARDS) {
+    assert.strictEqual(S.ORDER.filter((o) => o.id === b.id).length, 1, b.id + ' 중복/누락');
+  }
+  // 광고가 3연속으로 나오지 않는다 (순환이므로 끝에서 처음으로 넘어가는 구간도 검사)
+  const n = S.ORDER.length;
+  for (let i = 0; i < n; i++) {
+    const three = [0, 1, 2].map((k) => S.ORDER[(i + k) % n].kind);
+    assert.ok(!three.every((k) => k === 'sponsor'),
+      i + '번째부터 광고가 3연속: ' + three.join(','));
+  }
+  // 캠페인이 골고루 퍼져 있는지 — 최대 간격이 전체의 절반을 넘지 않아야 한다
+  const gaps = [];
+  let last = -1;
+  S.ORDER.forEach((b, i) => {
+    if (b.kind === 'campaign') { if (last >= 0) gaps.push(i - last); last = i; }
+  });
+  assert.ok(Math.max.apply(null, gaps) <= Math.ceil(n / 2),
+    '캠페인 간격이 너무 벌어짐: ' + gaps.join(','));
 });
 
 test('탭 조작과 충돌하지 않도록 광고는 클릭 불가여야 한다', () => {
@@ -38,13 +87,13 @@ test('탭 조작과 충돌하지 않도록 광고는 클릭 불가여야 한다'
   assert.strictEqual(S.CLICKABLE, false);
 });
 
-test('보드는 순서대로 순환한다', () => {
+test('보드는 섞인 순서대로 순환한다', () => {
   const n = S.count();
-  assert.strictEqual(S.pick(0).id, S.BOARDS[0].id);
-  assert.strictEqual(S.pick(n).id, S.BOARDS[0].id);
-  assert.strictEqual(S.pick(n + 1).id, S.BOARDS[1].id);
-  assert.strictEqual(S.pick(-1).id, S.BOARDS[1].id, '음수도 안전하게 처리');
-  assert.strictEqual(S.pick(2.7).id, S.BOARDS[2].id);
+  assert.strictEqual(S.pick(0).id, S.ORDER[0].id);
+  assert.strictEqual(S.pick(n).id, S.ORDER[0].id, '한 바퀴 돌면 처음으로');
+  assert.strictEqual(S.pick(n + 1).id, S.ORDER[1].id);
+  assert.strictEqual(S.pick(-1).id, S.ORDER[1].id, '음수도 안전하게 처리');
+  assert.strictEqual(S.pick(2.7).id, S.ORDER[2].id);
   assert.ok(S.pick(undefined));
 });
 

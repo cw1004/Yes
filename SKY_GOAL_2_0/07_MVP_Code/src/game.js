@@ -275,7 +275,7 @@
       phase: Math.random() * Math.PI * 2,
       flagPhase: Math.random() * Math.PI * 2,           // 깃발이 각자 다르게 나부낀다
       banner: Math.floor(Math.random() * 3),            // 상단 장식 종류
-      board: boardSeq++,                                // 기둥 광고판 순번
+      board: (boardSeq += 2) - 2,                       // 위/아래 기둥에 서로 다른 보드
       passed: false
     };
   }
@@ -1022,18 +1022,19 @@
     drawFlag(g.x + GATE_W / 2, top - 15, -1, g.flagPhase, '#ff9933');
     drawFlag(g.x + GATE_W / 2, bottom + 15, 1, g.flagPhase + 2, '#138808');
 
-    // 기둥 광고판 — 긴 쪽 기둥에, 골문 틈에서 충분히 떨어뜨려 건다
+    // 기둥 광고판 — 위/아래 기둥 모두. 골문 틈에서 46px 이상 떨어뜨려 시야를 막지 않는다
     if (Sponsor) {
-      var board = Sponsor.pick(g.board);
-      var upper = top - 46;                    // 위 기둥에서 쓸 수 있는 길이
-      var lower = groundY - (bottom + 46);
       var bw = GATE_W - 12;
       var bx = g.x + 6;
-      if (lower >= upper && lower > 90) {
-        Sponsor.drawPostBanner(ctx, board, bx, bottom + 46, bw, Math.min(150, lower - 12), 0.92);
-      } else if (upper > 90) {
-        var bh = Math.min(150, upper - 12);
-        Sponsor.drawPostBanner(ctx, board, bx, top - 46 - bh, bw, bh, 0.92);
+      var upper = top - 46;
+      var lower = groundY - (bottom + 46);
+      if (upper > 90) {
+        var bhU = Math.min(150, upper - 12);
+        Sponsor.drawPostBanner(ctx, Sponsor.pick(g.board), bx, top - 46 - bhU, bw, bhU, 0.92);
+      }
+      if (lower > 90) {
+        var bhL = Math.min(150, lower - 12);
+        Sponsor.drawPostBanner(ctx, Sponsor.pick(g.board + 1), bx, bottom + 46, bw, bhL, 0.92);
       }
     }
 
