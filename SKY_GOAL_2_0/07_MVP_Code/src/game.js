@@ -50,6 +50,7 @@
   var scenery = Scenery ? Scenery.create(20300101) : null;
   var audio = AudioLib ? AudioLib.create({ muted: profile.settings.muted }) : null;
 
+  var kick = null;                   // 킥오프 연출 상태
   var usedContinue = false;          // 한 판에 이어하기는 1회
   var rewardProvider = null;         // 보상형 광고 제공자 (네이티브 앱에서 주입)
   var pendingReward = null;          // 광고 결과를 기다리는 콜백
@@ -286,8 +287,18 @@
       difficulty: profile.difficulty,
       stage: stage.key
     };
-    ball = { x: W * 0.26, y: groundY * 0.5, vy: 0, vx: 0, spin: 0 };
-    lastMid = ball.y;                 // 첫 골문은 공 높이 근처에서 시작한다
+    // 킥오프: 공은 잔디 위에 놓여 있고, 선수가 달려와 차 올린다.
+    ball = { x: W * 0.21, y: groundY - 15, vy: 0, vx: 0, spin: 0 };
+    kick = {
+      t: 0,
+      impactAt: 0.85,                 // 달려오기 → 백스윙 → 임팩트
+      flight: 0.62,                   // 차인 공이 플레이 위치까지 날아가는 시간
+      launched: false,
+      startX: -70,
+      targetX: W * 0.26,
+      targetY: groundY * 0.5
+    };
+    lastMid = kick.targetY;           // 첫 골문은 플레이 시작 높이 근처에서
     gates = [];
     sparks = [];
     for (var i = 0; i < 4; i++) gates.push(makeGate(W + 220 + i * GATE_SPACING));
@@ -297,13 +308,59 @@
     flash = 0;
     flashAt = 3;
     lastTapAt = 0;
-    state = 'ready';                  // 첫 입력 전까지 공이 떠 있는 준비 상태
+    state = 'kickoff';
+    if (audio) {
+      audio.unlock();                 // 시작 버튼 클릭이 사용자 제스처라 여기서 열린다
+      audio.whistle();
+    }
     panel.classList.add('hidden');
     hud.classList.remove('hidden');
     updateHud();
   }
 
+  // 킥오프 연출을 끝내고 실제 플레이로 넘긴다.
+  function beginPlay() {
+    ball.x = kick.targetX;
+    ball.vx = 0;
+    state = 'playing';
+    elapsed = 0;
+    lastTapAt = performance.now();
+    if (audio && !audio.isPlaying()) audio.startMusic(musicLevel());
+  }
+
+  function updateKickoff(dt) {
+    kick.t += dt;
+
+    if (!kick.launched && kick.t >= kick.impactAt) {
+      kick.launched = true;
+      // 임팩트: 목표 지점에 flight 초 뒤 도착하도록 초기 속도를 역산한다
+      var g = arena.gravity;
+      var T = kick.flight;
+      ball.vx = (kick.targetX - ball.x) / T;
+      ball.vy = ((kick.targetY - ball.y) - 0.5 * g * T * T) / T;
+      addSparks(ball.x - 6, groundY - 6, 16, '190,220,160');   // 잔디 파편
+      addSparks(ball.x, ball.y, 10, '255,215,0');
+      if (audio) { audio.kick(); audio.startMusic(musicLevel()); }
+    }
+
+    if (kick.launched) {
+      ball.vy += arena.gravity * dt;
+      ball.y += ball.vy * dt;
+      ball.x += ball.vx * dt;
+      ball.spin += 7 * dt;
+      if (kick.t >= kick.impactAt + kick.flight) beginPlay();
+    }
+    updateSparks(dt);
+  }
+
   function flap() {
+    if (state === 'kickoff') {        // 연출 건너뛰기
+      ball.y = kick.targetY;
+      ball.vy = arena.flap;
+      beginPlay();
+      if (audio) audio.tap();
+      return;
+    }
     if (state === 'ready') {
       state = 'playing';
       lastTapAt = performance.now();
@@ -355,6 +412,7 @@
   }
 
   function update(dt) {
+    if (state === 'kickoff') { updateKickoff(dt); return; }
     if (state === 'ready') {
       // 준비 상태: 공이 살짝 위아래로 떠 있고 게이트는 멈춰 있다.
       ball.y += Math.sin(performance.now() / 300) * 18 * dt;
@@ -428,7 +486,10 @@
     if (ball.y - 15 <= 0) return endRun('ceiling');
     if (ball.y + 15 >= groundY) return endRun('ground');
 
-    // 파티클
+    updateSparks(dt);
+  }
+
+  function updateSparks(dt) {
     for (var s = sparks.length - 1; s >= 0; s--) {
       var p = sparks[s];
       p.age += dt;
@@ -843,6 +904,152 @@
     ctx.restore();
   }
 
+  /* ------------------------------------------------------------ 킥오프 */
+
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function easeOut(t) { return 1 - Math.pow(1 - t, 3); }
+
+  // 이름 없는 실루엣 선수. 실존 인물을 묘사하지 않는다.
+  // 좌표는 "발이 땅에 닿은 지점"을 원점으로 두고 그린다 (위쪽이 음수).
+  function drawKicker() {
+    var t = kick.t;
+    var scale = Math.max(1, Math.min(1.6, H / 700));
+    var standX = ball.x - 58 * scale;
+    var runT = 0.55;
+    var px = t < runT ? lerp(kick.startX, standX, easeOut(t / runT)) : standX;
+    var bob = t < runT ? Math.abs(Math.sin(t * 17)) * 4 : 0;
+
+    var A, bend, lean, arm;
+    if (t < runT) {                                   // 달려오기
+      var r = Math.sin(t * 17);
+      A = r * 40; bend = 26 + Math.max(0, -r) * 26; lean = 6; arm = -r * 34;
+    } else if (t < kick.impactAt) {                   // 백스윙
+      var k = (t - runT) / (kick.impactAt - runT);
+      A = lerp(40, -66, easeOut(k)); bend = lerp(26, 56, k);
+      lean = lerp(6, -10, k); arm = lerp(-32, 36, k);
+    } else {                                          // 임팩트 → 팔로스루
+      var f = Math.min(1, (t - kick.impactAt) / 0.30);
+      A = lerp(-66, 78, easeOut(f)); bend = lerp(56, 4, easeOut(f));
+      lean = lerp(-10, 12, f); arm = lerp(36, -28, f);
+    }
+
+    var fade = 1;
+    if (kick.launched) fade = Math.max(0, 1 - (t - kick.impactAt - 0.25) / 0.45);
+    if (fade <= 0) return;
+
+    var rad = Math.PI / 180;
+    ctx.save();
+    ctx.globalAlpha = fade;
+
+    // 발밑 그림자
+    ctx.fillStyle = 'rgba(0,0,0,0.30)';
+    ctx.beginPath();
+    ctx.ellipse(px + 6, groundY + 2, 30 * scale, 7, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.translate(px, groundY + 2 - bob);
+    ctx.scale(scale, scale);
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = '#0c1726';
+    ctx.fillStyle = '#0c1726';
+
+    var hipY = -62;
+    var shoulderY = hipY - 36;
+    var sx = lean * 0.6;
+
+    // 지지 다리
+    ctx.lineWidth = 12;
+    ctx.beginPath();
+    ctx.moveTo(0, hipY);
+    ctx.lineTo(-5, -14);
+    ctx.lineTo(3, -2);
+    ctx.stroke();
+
+    // 킥 다리 (허벅지 → 정강이 → 축구화)
+    ctx.save();
+    ctx.translate(0, hipY);
+    ctx.rotate(A * rad);
+    ctx.lineWidth = 13;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(0, 32);
+    ctx.stroke();
+    ctx.translate(0, 32);
+    ctx.rotate(-bend * rad);
+    ctx.lineWidth = 11;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(0, 30);
+    ctx.stroke();
+    ctx.translate(0, 30);
+    ctx.fillStyle = '#ff9933';
+    ctx.beginPath();
+    ctx.ellipse(4, 2, 12, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    // 몸통
+    ctx.strokeStyle = '#0c1726';
+    ctx.lineWidth = 17;
+    ctx.beginPath();
+    ctx.moveTo(0, hipY);
+    ctx.lineTo(sx, shoulderY);
+    ctx.stroke();
+
+    // 유니폼 띠 — 국기색, 팀·번호·이름 없음
+    ctx.strokeStyle = '#ff9933';
+    ctx.lineWidth = 4.5;
+    ctx.beginPath();
+    ctx.moveTo(-1, hipY - 12);
+    ctx.lineTo(sx - 1, shoulderY + 11);
+    ctx.stroke();
+
+    // 팔
+    ctx.strokeStyle = '#0c1726';
+    ctx.lineWidth = 9;
+    ctx.beginPath();
+    ctx.moveTo(sx, shoulderY + 5);
+    ctx.lineTo(sx + arm * 0.5, shoulderY + 24);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(sx, shoulderY + 5);
+    ctx.lineTo(sx - arm * 0.42, shoulderY + 26);
+    ctx.stroke();
+
+    // 머리
+    ctx.fillStyle = '#0c1726';
+    ctx.beginPath();
+    ctx.arc(sx + 2, shoulderY - 13, 11, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  function drawKickoffText() {
+    var t = kick.t;
+    var pop = kick.launched ? Math.max(0, 1 - (t - kick.impactAt) / 0.5) : 1;
+    if (pop <= 0) return;
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, pop * 1.4);
+    ctx.textAlign = 'center';
+    var scale = kick.launched ? 1 + (1 - pop) * 0.25 : 1;
+    ctx.translate(W / 2, H * 0.22);
+    ctx.scale(scale, scale);
+    ctx.font = '800 34px system-ui, sans-serif';
+    ctx.lineWidth = 6;
+    ctx.strokeStyle = 'rgba(7,17,31,0.75)';
+    ctx.strokeText('KICK OFF!', 0, 0);
+    ctx.fillStyle = '#ff9933';
+    ctx.fillText('KICK OFF!', 0, 0);
+    if (!kick.launched) {
+      ctx.font = '13px system-ui, sans-serif';
+      ctx.fillStyle = 'rgba(255,255,255,0.85)';
+      ctx.fillText('탭하면 바로 시작', 0, 26);
+    }
+    ctx.restore();
+    ctx.textAlign = 'start';
+  }
+
   function drawSparks() {
     for (var i = 0; i < sparks.length; i++) {
       var p = sparks[i];
@@ -868,9 +1075,11 @@
   function render() {
     drawBackground();
     for (var i = 0; i < gates.length; i++) drawGate(gates[i]);
+    if (state === 'kickoff') drawKicker();
     drawSparks();
     if (ball) drawBall();
     if (state === 'ready') drawReadyHint();
+    if (state === 'kickoff') drawKickoffText();
   }
 
   /* ------------------------------------------------------------ 루프 */
@@ -892,7 +1101,7 @@
     dt = Math.min(dt, 1 / 30);             // 탭 전환 후 큰 점프 방지
     clock += dt;
     tickLightning(dt);
-    if (state === 'ready' || state === 'playing') update(dt);
+    if (state === 'kickoff' || state === 'ready' || state === 'playing') update(dt);
     if (state !== 'idle') render();
     else drawBackground();
     requestAnimationFrame(frame);
@@ -1022,7 +1231,11 @@
     getRun: function () { return run; },
     start: startRun,
     flap: flap,
-    forceEnd: function () { if (state === 'ready') state = 'playing'; endRun(); },
+    forceEnd: function () {
+      if (state === 'kickoff') beginPlay();
+      if (state === 'ready') state = 'playing';
+      endRun();
+    },
     home: showStart,
     settings: showSettings,
     balls: showBalls,
@@ -1048,6 +1261,7 @@
         stage: stage.key,
         gateWidth: GATE_W,
         endReason: lastEndReason,
+        kick: kick ? { t: kick.t, launched: kick.launched } : null,
         size: { w: W, h: H, groundY: groundY }
       };
     },

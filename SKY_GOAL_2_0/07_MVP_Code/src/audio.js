@@ -212,6 +212,25 @@
       },
       toggleMute: function () { return api.setMuted(!muted); },
 
+      // 킥오프 심판 휘슬 — 두 음이 살짝 어긋나며 떨리는 소리
+      whistle: function () {
+        var t = now();
+        [2450, 2620].forEach(function (f, i) {
+          tone({ at: t + i * 0.004, type: 'square', from: f, to: f * 0.97,
+                 dur: 0.42, gain: 0.13, attack: 0.02 });
+        });
+        hit({ at: t, filter: 'bandpass', cutoff: 2600, dur: 0.42, gain: 0.06 });
+      },
+
+      // 공을 차는 임팩트 — 저역 텅 + 가죽 마찰음
+      kick: function () {
+        var t = now();
+        tone({ at: t, type: 'sine', from: 240, to: 55, dur: 0.26, gain: 0.95 });
+        tone({ at: t, type: 'triangle', from: 620, to: 180, dur: 0.12, gain: 0.35 });
+        hit({ at: t, filter: 'bandpass', cutoff: 1800, sweepTo: 400, dur: 0.18, gain: 0.45 });
+        hit({ at: t + 0.02, filter: 'highpass', cutoff: 5200, dur: 0.06, gain: 0.18 });
+      },
+
       tap: function () {
         tone({ type: 'triangle', from: 680, to: 340, dur: 0.09, gain: 0.30 });
         hit({ filter: 'highpass', cutoff: 3200, dur: 0.04, gain: 0.10 });

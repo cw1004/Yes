@@ -81,8 +81,24 @@ try {
   }
 
   await page.click('#btn-start');
-  check('경기 시작 → ready 상태', (await page.evaluate(() => window.SkyGoal.getState())) === 'ready');
+  check('경기 시작 → 킥오프 연출', (await page.evaluate(() => window.SkyGoal.getState())) === 'kickoff');
   check('HUD 가 표시된다', await page.isVisible('#hud'));
+
+  // 킥오프: 공이 잔디에서 출발해 차인 뒤 플레이 위치로 올라온다
+  const atRest = await page.evaluate(() => {
+    const d = window.SkyGoal.debug();
+    return { y: d.ball.y, ground: d.size.groundY };
+  });
+  check('킥오프 시작 시 공은 잔디 위에 있다', atRest.ground - atRest.y < 40,
+    '공 ' + atRest.y.toFixed(0) + ' / 잔디 ' + atRest.ground.toFixed(0));
+  await page.waitForFunction(() => window.SkyGoal.getState() === 'playing', null, { timeout: 5000 });
+  const afterKick = await page.evaluate(() => {
+    const d = window.SkyGoal.debug();
+    return { y: d.ball.y, x: d.ball.x, ground: d.size.groundY, w: d.size.w };
+  });
+  check('킥이 끝나면 공이 떠오른 채 플레이가 시작된다',
+    afterKick.y < afterKick.ground * 0.7 && Math.abs(afterKick.x - afterKick.w * 0.26) < 2,
+    JSON.stringify(afterKick));
 
   // 실제 클릭(사용자 제스처)으로 오디오가 열리고 BGM 이 도는지
   await page.mouse.click(210, 500);
@@ -102,7 +118,9 @@ try {
       const t0 = performance.now();
       const step = () => {
         const s = window.SkyGoal.getState();
-        if (s === 'ready') {
+        if (s === 'kickoff') {
+          /* 킥오프 연출이 끝날 때까지 기다린다 */
+        } else if (s === 'ready') {
           window.SkyGoal.flap();
         } else if (s === 'playing') {
           const d = window.SkyGoal.debug();
@@ -172,7 +190,8 @@ try {
   await page.evaluate(() => window.SkyGoal.forceEnd());
   await page.waitForSelector('#screen-result:not(.hidden)', { timeout: 5000 });
   await page.click('#btn-retry');
-  check('결과 화면에서 재시작된다', (await page.evaluate(() => window.SkyGoal.getState())) === 'ready');
+  check('결과 화면에서 재시작된다',
+    (await page.evaluate(() => window.SkyGoal.getState())) === 'kickoff');
 
   // 회전/리사이즈
   await page.setViewportSize({ width: 900, height: 500 });
@@ -293,11 +312,20 @@ try {
     }));
   await page.evaluate(() => window.SkyGoal.home());
 
+  // 킥오프 건너뛰기
+  await page.evaluate(() => { window.SkyGoal.home(); window.SkyGoal.start(); });
+  check('킥오프 상태로 시작한다', (await page.evaluate(() => window.SkyGoal.getState())) === 'kickoff');
+  await page.evaluate(() => window.SkyGoal.flap());
+  check('탭하면 킥오프를 건너뛰고 바로 플레이한다',
+    (await page.evaluate(() => window.SkyGoal.getState())) === 'playing');
+  await page.evaluate(() => window.SkyGoal.forceEnd());
+
   // 보상형 광고 이어하기 흐름
   await page.evaluate(() => {
     window.SkyGoal.home();
     window.SkyGoal.setRewardProvider((cb) => cb(true));
     window.SkyGoal.start();
+    window.SkyGoal.flap();                              // 킥오프 건너뛰기
     const r = window.SkyGoal.getRun();
     r.score = 50; r.passCount = 4; r.combo = 4;      // 이어하기 조건(30점) 충족
     window.SkyGoal.forceEnd();
@@ -326,6 +354,7 @@ try {
     window.SkyGoal.home();
     window.SkyGoal.setRewardProvider((cb) => cb(false));
     window.SkyGoal.start();
+    window.SkyGoal.flap();
     const r = window.SkyGoal.getRun();
     r.score = 40; r.passCount = 3;
     window.SkyGoal.forceEnd();
