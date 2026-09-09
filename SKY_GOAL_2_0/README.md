@@ -48,7 +48,7 @@ cd 11_App_Android && ./sync_assets.sh && gradle bundleRelease   # 스토어 업�
 ./test.sh                   # 빌드 + 엔진 테스트 15개 + 브라우저 스모크 테스트 15개
 ```
 
-- 단위 테스트 47개(엔진 26 · 사운드 5 · 배경 6 · 광고판 10): Node 만 있으면 실행된다 (`node --test`)
+- 단위 테스트 48개(엔진 26 · 사운드 5 · 배경 6 · 광고판 11): Node 만 있으면 실행된다 (`node --test`)
 - 브라우저 스모크 테스트: Playwright 가 있으면 실제 Chromium 에서 한 판을 자동 플레이하고,
   없으면 자동으로 건너뛴다 (62개 항목)
 

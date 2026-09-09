@@ -292,6 +292,78 @@
   }
 
   /**
+   * 대형 광고판 — 강 건너 둑에 세워진 옥외 간판.
+   * 배경 레이어에 그리므로 골문·공보다 항상 뒤에 있고 플레이를 가리지 않는다.
+   * x,baseY 는 기둥이 땅에 닿는 지점(왼쪽 기준), w/h 는 패널 크기.
+   */
+  function drawBillboard(ctx, board, x, baseY, w, h, alpha) {
+    if (!board || w < 90) return false;
+    var legH = Math.max(16, h * 0.34);
+    var top = baseY - legH - h;
+
+    ctx.save();
+    ctx.globalAlpha = alpha === undefined ? 1 : alpha;
+
+    // 지지 기둥
+    ctx.fillStyle = 'rgba(30,40,54,0.85)';
+    ctx.fillRect(x + w * 0.18, baseY - legH, Math.max(3, w * 0.035), legH);
+    ctx.fillRect(x + w * 0.78, baseY - legH, Math.max(3, w * 0.035), legH);
+    ctx.fillRect(x + w * 0.18, baseY - legH * 0.55, w * 0.63, Math.max(2, w * 0.014));
+
+    // 패널
+    ctx.fillStyle = board.bg;
+    roundRect(ctx, x, top, w, h, 6);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.fillStyle = board.accent;
+    ctx.fillRect(x + 6, top + 5, w - 12, 4);
+    ctx.fillRect(x + 6, top + h - 9, w - 12, 4);
+
+    // 로고 + 문구 (가로 배치)
+    var markR = Math.min(h * 0.26, w * 0.12);
+    drawMark(ctx, board.mark || 'shield', x + 14 + markR, top + h * 0.5, markR,
+             board.accent, board.bg);
+    var tx = x + 22 + markR * 2;
+    var tw = w - (tx - x) - 14;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = board.fg;
+    ctx.font = '800 ' + Math.round(h * 0.24) + 'px system-ui, sans-serif';
+    ctx.fillText(board.text, tx, top + h * (board.sub ? 0.42 : 0.5), tw);
+    if (board.sub) {
+      ctx.fillStyle = board.accent;
+      ctx.font = '600 ' + Math.round(h * 0.15) + 'px system-ui, sans-serif';
+      ctx.fillText(board.sub, tx, top + h * 0.68, tw);
+    }
+
+    // 조명 — 위쪽 램프와 옅은 빛
+    ctx.fillStyle = 'rgba(255,240,200,0.85)';
+    for (var i = 0; i < 3; i++) {
+      var lx = x + w * (0.24 + i * 0.26);
+      ctx.fillRect(lx - 3, top - 7, 6, 5);
+      var glow = ctx.createLinearGradient(0, top - 6, 0, top + h * 0.55);
+      glow.addColorStop(0, 'rgba(255,240,200,0.22)');
+      glow.addColorStop(1, 'rgba(255,240,200,0)');
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.moveTo(lx - 4, top - 4);
+      ctx.lineTo(lx + 4, top - 4);
+      ctx.lineTo(lx + w * 0.12, top + h * 0.55);
+      ctx.lineTo(lx - w * 0.12, top + h * 0.55);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255,240,200,0.85)';
+    }
+
+    ctx.restore();
+    ctx.textAlign = 'start';
+    ctx.textBaseline = 'alphabetic';
+    return true;
+  }
+
+  /**
    * 그라운드 광고판 (경기장 앞 롤링 보드).
    * x 부터 오른쪽으로 패널을 이어 그린다.
    */
@@ -335,6 +407,7 @@
     drawMark: drawMark,
     hasHangul: hasHangul,
     drawPostBanner: drawPostBanner,
+    drawBillboard: drawBillboard,
     drawPerimeter: drawPerimeter
   };
 });

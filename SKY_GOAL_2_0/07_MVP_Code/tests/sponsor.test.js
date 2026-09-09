@@ -5,9 +5,11 @@ const S = require('../src/sponsor.js');
 
 // Canvas 2D 스텁
 function fakeCtx() {
-  const calls = { text: [], fills: 0, rects: 0, rotate: 0, clip: 0, arcs: 0 };
+  const calls = { text: [], fills: 0, rects: 0, rotate: 0, clip: 0, arcs: 0, gradients: 0 };
+  const grad = { addColorStop() {} };
   return {
     calls,
+    createLinearGradient() { calls.gradients++; return grad; },
     globalAlpha: 1, fillStyle: '', strokeStyle: '', lineWidth: 1,
     font: '', textAlign: '', textBaseline: '',
     save() {}, restore() {}, translate() {}, rotate() { calls.rotate++; },
@@ -128,6 +130,25 @@ test('한글 배너는 눕히지 않고 세로로 쌓는다', () => {
   S.drawPostBanner(ctx2, latin, 0, 0, 42, 150);
   assert.ok(ctx2.calls.rotate > 0, '영문은 눕혀서 한 번에 그린다');
   assert.ok(ctx2.calls.text.includes(latin.text));
+});
+
+test('대형 광고판은 크기가 확보될 때만 그려진다', () => {
+  const small = fakeCtx();
+  assert.strictEqual(S.drawBillboard(small, S.pick(0), 0, 200, 60, 40), false, '작으면 생략');
+  assert.strictEqual(small.calls.fills + small.calls.rects, 0);
+  assert.strictEqual(S.drawBillboard(small, null, 0, 200, 200, 90), false);
+
+  const ctx = fakeCtx();
+  assert.strictEqual(S.drawBillboard(ctx, S.pick(0), 10, 300, 220, 100), true);
+  assert.ok(ctx.calls.rects > 0, '기둥과 액센트 바가 그려진다');
+  assert.ok(ctx.calls.text.length >= 1, '문구가 들어간다');
+  assert.ok(ctx.calls.gradients > 0, '조명 빛이 그려진다');
+
+  // 마크가 없는 보드도 기본 마크로 안전하게 그려진다
+  const noMark = fakeCtx();
+  assert.strictEqual(
+    S.drawBillboard(noMark, { text: 'X', bg: '#000000', fg: '#ffffff', accent: '#ff0000' },
+                    0, 300, 200, 90), true);
 });
 
 test('그라운드 보드는 화면을 채우도록 반복된다', () => {

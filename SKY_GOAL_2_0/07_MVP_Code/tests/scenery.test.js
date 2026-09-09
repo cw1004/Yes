@@ -5,11 +5,13 @@ const S = require('../src/scenery.js');
 
 // Canvas 2D 스텁 — 호출만 기록한다.
 function fakeCtx() {
-  const calls = { fill: 0, stroke: 0, rect: 0, gradients: 0, arcs: 0, ellipses: 0 };
+  const calls = { fill: 0, stroke: 0, rect: 0, gradients: 0, arcs: 0, ellipses: 0, clip: 0 };
   const grad = { addColorStop() {} };
   return {
     calls,
     globalAlpha: 1, fillStyle: '', strokeStyle: '', lineWidth: 1,
+    save() {}, restore() {}, translate() {}, scale() {}, rotate() {},
+    rect() {}, clip() { calls.clip++; },
     createLinearGradient() { calls.gradients++; return grad; },
     createRadialGradient() { calls.gradients++; return grad; },
     fillRect() { calls.rect++; },

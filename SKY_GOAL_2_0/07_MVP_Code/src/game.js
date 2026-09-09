@@ -986,10 +986,31 @@
       ctx.fillStyle = g0;
       ctx.fillRect(0, 0, W, H);
     }
+    drawBillboards();
     drawWeather();
     drawField();
     if (Sponsor) Sponsor.drawPerimeter(ctx, 0, groundY + 3, W, 17, scroll * 0.9, 0.9);
     drawCheerSquad();
+  }
+
+  // 대형 광고판 — 강 건너 둑에 일정 간격으로 세워진다 (배경 레이어)
+  function drawBillboards() {
+    if (!Sponsor || !scenery || !Sponsor.drawBillboard) return;
+    var L = scenery.layout();
+    if (!L) return;
+    var par = 0.22;                       // 숲과 같은 속도로 흐른다
+    var spacing = 1500;
+    var bw = Math.max(150, Math.min(250, W * 0.58));
+    var bh = bw * 0.46;
+    var baseY = L.riverTop + 2;
+    var travelled = scroll * par;
+    var start = Math.floor((travelled - bw) / spacing);
+    var end = Math.ceil((travelled + W) / spacing);
+    for (var n = start; n <= end; n++) {
+      var sx = n * spacing - travelled;
+      if (sx > W + 10 || sx + bw < -10) continue;
+      Sponsor.drawBillboard(ctx, Sponsor.pick(n * 2 + 1), sx, baseY, bw, bh, 0.94);
+    }
   }
 
   function drawWeather() {
