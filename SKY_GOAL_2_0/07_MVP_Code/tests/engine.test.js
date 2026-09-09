@@ -242,6 +242,101 @@ test('골든볼은 코인을 15% 더 준다', () => {
   assert.strictEqual(b.coins, Math.round(a.coins * 1.15));
 });
 
+test('프로 모드는 좁고 빠르고 보상이 크다', () => {
+  const p = E.createProfile();
+  const stage = E.stageFor(0, 50);
+  const am = E.arenaParams(50, stage, p.stats, {}, null, 'amateur');
+  const pro = E.arenaParams(50, stage, p.stats, {}, null, 'pro');
+
+  assert.ok(pro.gap < am.gap * 0.85, '골문이 확실히 좁다: ' + pro.gap + ' vs ' + am.gap);
+  assert.ok(pro.speed > am.speed * 1.2, '더 빠르다: ' + pro.speed + ' vs ' + am.speed);
+  assert.ok(pro.movement > am.movement * 1.5, '더 흔들린다');
+  assert.ok(pro.perfectWindow < am.perfectWindow, '퍼펙트 판정이 좁다');
+  assert.strictEqual(pro.mode, 'pro');
+  assert.strictEqual(E.modeParams('없는모드').id, 'amateur', '모르는 모드는 아마추어로');
+
+  // 난이도 하한도 올라간다
+  const amLow = E.arenaParams(10, stage, p.stats, {}, null, 'amateur');
+  const proLow = E.arenaParams(10, stage, p.stats, {}, null, 'pro');
+  assert.ok(proLow.gap < amLow.gap, '가장 쉬운 설정에서도 프로가 어렵다');
+});
+
+test('프로 모드는 조건을 만족해야 열린다', () => {
+  const p = E.createProfile();
+  assert.strictEqual(E.isModeUnlocked(p, 'amateur'), true);
+  assert.strictEqual(E.isModeUnlocked(p, 'pro'), false);
+  assert.strictEqual(E.setMode(p, 'pro'), false, '잠겨 있으면 전환 실패');
+  assert.strictEqual(p.mode, 'amateur');
+
+  p.modes.amateur.bestScore = E.PRO_UNLOCK.bestScore;
+  assert.strictEqual(E.isModeUnlocked(p, 'pro'), true, '최고 점수로 해금');
+
+  const q = E.createProfile();
+  q.metrics.clears = 1;
+  assert.strictEqual(E.isModeUnlocked(q, 'pro'), true, '완주로도 해금');
+});
+
+test('최고 점수는 모드 전환으로 내려가지 않는다', () => {
+  const p = E.createProfile();
+  p.modes.amateur.bestScore = 777;          // 저장된 기록만 있고 미러는 아직 0
+  p.modes.amateur.difficulty = 60;
+  E.saveModeState(p);
+  assert.strictEqual(p.modes.amateur.bestScore, 777, '미러가 0이어도 기록을 덮지 않는다');
+  assert.strictEqual(p.bestScore, 777, '미러도 기록에 맞춰 올라온다');
+});
+
+test('모드별로 난이도와 최고 점수를 따로 보관한다', () => {
+  const p = E.createProfile();
+  p.modes.amateur.bestScore = 300;
+  E.loadModeState(p);
+  p.difficulty = 71;
+  p.bestScore = 300;
+
+  assert.strictEqual(E.setMode(p, 'pro'), true);
+  assert.strictEqual(p.modes.amateur.difficulty, 71, '아마추어 난이도가 보관된다');
+  assert.strictEqual(p.difficulty, E.MODES.pro.startDifficulty, '프로는 자기 난이도로 시작');
+  assert.strictEqual(p.bestScore, 0, '프로 최고 점수는 따로 센다');
+
+  p.difficulty = 88;
+  E.setMode(p, 'amateur');
+  assert.strictEqual(p.difficulty, 71, '아마추어로 돌아오면 원래 난이도');
+  assert.strictEqual(p.bestScore, 300);
+  assert.strictEqual(p.modes.pro.difficulty, 88, '프로 난이도도 보관된다');
+});
+
+test('구버전 프로필은 아마추어 모드로 이어받는다', () => {
+  const legacy = E.normalizeProfile({
+    skill: 71, difficulty: 78, bestScore: 540,
+    metrics: { games: 40, recentScores: [100, 200], recentSuccesses: [1, 1], winStreak: 3 }
+  });
+  assert.strictEqual(legacy.mode, 'amateur');
+  assert.strictEqual(legacy.modes.amateur.bestScore, 540, '최고 점수를 잃지 않는다');
+  assert.strictEqual(legacy.modes.amateur.difficulty, 78, '학습된 난이도도 유지');
+  assert.strictEqual(legacy.modes.amateur.skill, 71);
+  assert.deepStrictEqual(legacy.modes.amateur.recentScores, [100, 200]);
+  assert.strictEqual(legacy.modes.pro.bestScore, 0, '프로는 새로 시작');
+});
+
+test('프로 모드는 코인과 XP 를 1.6배 준다', () => {
+  const run = { score: 100, combo: 5, passCount: 5, perfectCount: 2, duration: 20,
+                tapIntervals: [250, 250, 250], difficulty: 50 };
+  const a = E.createProfile();
+  const b = E.createProfile();
+  b.modes.amateur.bestScore = 999;
+  E.setMode(b, 'pro');
+
+  const ra = E.commitRun(a, Object.assign({}, run), () => 0.5);
+  const rb = E.commitRun(b, Object.assign({}, run), () => 0.5);
+  assert.strictEqual(ra.mode, 'amateur');
+  assert.strictEqual(rb.mode, 'pro');
+  assert.strictEqual(rb.coins, Math.round(ra.coins * E.MODES.pro.reward));
+  assert.ok(Math.abs(rb.xp - ra.xp * E.MODES.pro.reward) < 0.001);
+  assert.strictEqual(b.modes.pro.bestScore, 100, '프로 최고 점수에 기록된다');
+  assert.strictEqual(b.modes.amateur.bestScore, 999, '아마추어 기록은 그대로');
+  assert.strictEqual(E.setMode(b, 'amateur'), true);
+  assert.strictEqual(b.bestScore, 999, '돌아오면 기록이 살아 있다');
+});
+
 test('완주 보상 — 처음엔 골든볼, 다음부터는 코인', () => {
   const p = E.createProfile();
   assert.strictEqual(p.metrics.clears, 0);

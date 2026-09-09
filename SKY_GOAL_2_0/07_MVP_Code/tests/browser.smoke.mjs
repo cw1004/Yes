@@ -217,6 +217,44 @@ try {
   check('가로 스크롤이 생기지 않는다',
     await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
 
+  // 모드 (아마추어 / 프로)
+  await page.evaluate(() => window.SkyGoal.home());
+  const locked = await page.evaluate(() => ({
+    mode: window.SkyGoal.getProfile().mode,
+    proLocked: document.getElementById('mode-pro').classList.contains('locked')
+  }));
+  check('처음에는 아마추어이고 프로는 잠겨 있다',
+    locked.mode === 'amateur' && locked.proLocked, JSON.stringify(locked));
+  await page.click('#mode-pro');
+  check('잠긴 모드는 눌러도 바뀌지 않는다',
+    (await page.evaluate(() => window.SkyGoal.getProfile().mode)) === 'amateur');
+
+  // 조건을 채우면 열린다
+  await page.evaluate(() => {
+    const p = window.SkyGoal.getProfile();
+    p.bestScore = 260;
+    p.modes.amateur.bestScore = 260;
+    window.SkyGoal.home();
+  });
+  const amateurArena = await page.evaluate(() => window.SkyGoal.getArena().gap);
+  await page.click('#mode-pro');
+  const proState = await page.evaluate(() => ({
+    mode: window.SkyGoal.getProfile().mode,
+    gap: window.SkyGoal.getArena().gap,
+    diff: Math.round(window.SkyGoal.getProfile().difficulty),
+    on: document.getElementById('mode-pro').classList.contains('on')
+  }));
+  check('조건을 채우면 프로 모드로 전환된다',
+    proState.mode === 'pro' && proState.on, JSON.stringify(proState));
+  check('프로 모드는 골문이 더 좁다', proState.gap < amateurArena * 0.9,
+    amateurArena.toFixed(0) + ' → ' + proState.gap.toFixed(0));
+  check('프로 모드는 난이도 하한이 높다', proState.diff >= 60, 'D=' + proState.diff);
+  check('아마추어 기록은 그대로 남는다',
+    (await page.evaluate(() => window.SkyGoal.getProfile().modes.amateur.bestScore)) === 260);
+  await page.click('#mode-amateur');
+  check('아마추어로 되돌릴 수 있다',
+    (await page.evaluate(() => window.SkyGoal.getProfile().mode)) === 'amateur');
+
   // 공 선택 · 상점
   // 앞 단계(완주 선물 등)의 영향을 받지 않도록 알려진 상태에서 시작한다
   await page.evaluate(() => {

@@ -94,6 +94,21 @@ p { margin: 8px 0; line-height: 1.55; color: #dbe7f7; font-size: 14px; }
 }
 .statpick button:disabled { opacity: 0.35; cursor: default; }
 .reasons { margin: 8px 0 0; padding-left: 18px; color: var(--sub); font-size: 12px; }
+.modes { display: flex; gap: 8px; margin: 14px 0 6px; }
+.modes .mode {
+  flex: 1 1 50%; padding: 11px 8px; border-radius: 14px; cursor: pointer;
+  background: rgba(255, 255, 255, 0.06); border: 1px solid var(--line); color: var(--ink);
+  display: flex; flex-direction: column; gap: 3px; align-items: center;
+}
+.modes .mode b { font-size: 15px; }
+.modes .mode span { font-size: 11px; color: var(--sub); }
+.modes .mode.on {
+  border-color: var(--accent); background: rgba(255, 153, 51, 0.16);
+  box-shadow: 0 0 0 1px var(--accent) inset;
+}
+.modes .mode.locked { opacity: 0.5; cursor: default; }
+.modes .mode.locked b::after { content: ' 🔒'; font-size: 12px; }
+
 .ballrow {
   display: flex; gap: 12px; align-items: center; text-align: left;
   padding: 10px; margin: 8px 0; border-radius: 14px;
@@ -197,6 +212,16 @@ if ('serviceWorker' in navigator) {
     <h1>SKY GOAL 2.0</h1>
     <p>탭 / 클릭 / 스페이스로 공을 띄워 움직이는 골문을 통과하세요.<br>
     플레이 데이터를 분석해 <b>난이도 · 경기장 환경 · 보상</b>이 자동으로 조정됩니다.</p>
+    <div class="modes">
+      <button class="mode" id="mode-amateur" type="button" data-mode="amateur">
+        <b>아마추어</b><span id="mode-amateur-best">최고 0</span>
+      </button>
+      <button class="mode" id="mode-pro" type="button" data-mode="pro">
+        <b>프로</b><span id="mode-pro-best">최고 0</span>
+      </button>
+    </div>
+    <p class="small" id="mode-desc">기본 모드. AI 가 당신에게 맞춰 난이도를 조절합니다.</p>
+
     <div class="grid">
       <div class="stat">숙련도 S<b id="s-skill">50</b></div>
       <div class="stat">난이도 D<b id="s-diff">50</b></div>
@@ -347,6 +372,96 @@ if ('serviceWorker' in navigator) {
     return list;
   }
 
+  /* ------------------------------------------------------------------ 모드 */
+
+  /**
+   * 두 가지 모드. AI 난이도 엔진은 그대로 쓰고, 그 위에 모드 보정을 곱한다.
+   * 학습된 난이도(D)는 모드별로 따로 보관해서 서로 오염되지 않는다.
+   */
+  var MODES = {
+    amateur: {
+      id: 'amateur', label: '아마추어', tag: 'AMATEUR',
+      desc: '기본 모드. AI 가 당신에게 맞춰 난이도를 조절합니다.',
+      dOffset: 0, dMin: 10, dMax: 95,
+      gap: 1.00, speed: 1.00, movement: 1.00, perfect: 1.00,
+      reward: 1.00, startDifficulty: 50
+    },
+    pro: {
+      id: 'pro', label: '프로', tag: 'PRO',
+      desc: '골문은 좁고 빠르고 더 흔들립니다. 보상은 1.6배.',
+      dOffset: 22, dMin: 35, dMax: 99,
+      gap: 0.88, speed: 1.15, movement: 1.30, perfect: 0.72,
+      reward: 1.60, startDifficulty: 62
+    }
+  };
+
+  var DEFAULT_MODE = 'amateur';
+  // 프로 모드 해금 조건 — 아마추어에서 실력을 보여야 열린다
+  var PRO_UNLOCK = { bestScore: 200, clears: 1 };
+
+  function modeParams(mode) {
+    return MODES[mode] || MODES[DEFAULT_MODE];
+  }
+
+  function isModeUnlocked(profile, mode) {
+    if (mode !== 'pro') return true;
+    if (!profile) return false;
+    var am = profile.modes && profile.modes.amateur;
+    var best = am ? am.bestScore : 0;
+    return best >= PRO_UNLOCK.bestScore || (profile.metrics.clears || 0) >= PRO_UNLOCK.clears;
+  }
+
+  function makeModeState(mode) {
+    var m = modeParams(mode);
+    return {
+      skill: 50,
+      difficulty: m.startDifficulty,
+      bestScore: 0,
+      recentScores: [],
+      recentSuccesses: [],
+      winStreak: 0,
+      loseStreak: 0
+    };
+  }
+
+  // 현재 모드의 상태를 프로필 최상위 필드로 꺼내 둔다(엔진·UI 가 그대로 쓰도록).
+  function loadModeState(profile) {
+    var st = profile.modes[profile.mode] || (profile.modes[profile.mode] = makeModeState(profile.mode));
+    profile.skill = st.skill;
+    profile.difficulty = st.difficulty;
+    profile.bestScore = st.bestScore;
+    profile.metrics.recentScores = st.recentScores.slice();
+    profile.metrics.recentSuccesses = st.recentSuccesses.slice();
+    profile.metrics.winStreak = st.winStreak;
+    profile.metrics.loseStreak = st.loseStreak;
+    return st;
+  }
+
+  function saveModeState(profile) {
+    var st = profile.modes[profile.mode] || (profile.modes[profile.mode] = makeModeState(profile.mode));
+    st.skill = profile.skill;
+    st.difficulty = profile.difficulty;
+    // 최고 점수는 절대 내려가지 않는다 (미러링 실수로 기록이 사라지지 않게)
+    st.bestScore = Math.max(profile.bestScore || 0, st.bestScore || 0);
+    profile.bestScore = st.bestScore;
+    st.recentScores = profile.metrics.recentScores.slice();
+    st.recentSuccesses = profile.metrics.recentSuccesses.slice();
+    st.winStreak = profile.metrics.winStreak;
+    st.loseStreak = profile.metrics.loseStreak;
+    return st;
+  }
+
+  /** 모드 전환. 현재 진행 상태를 저장하고 새 모드 상태를 불러온다. */
+  function setMode(profile, mode) {
+    if (!MODES[mode]) return false;
+    if (!isModeUnlocked(profile, mode)) return false;
+    if (profile.mode === mode) return true;
+    saveModeState(profile);
+    profile.mode = mode;
+    loadModeState(profile);
+    return true;
+  }
+
   /* ---------------------------------------------------------------- 공 종류 */
 
   /**
@@ -429,6 +544,8 @@ if ('serviceWorker' in navigator) {
     return {
       version: VERSION,
       playerId: 'local-player',
+      mode: DEFAULT_MODE,
+      modes: { amateur: makeModeState('amateur'), pro: makeModeState('pro') },
       skill: 50,
       difficulty: 50,
       level: 1,
@@ -490,7 +607,7 @@ if ('serviceWorker' in navigator) {
     var inv = raw.inventory && typeof raw.inventory === 'object' ? raw.inventory : {};
     var lr = raw.lastRun && typeof raw.lastRun === 'object' ? raw.lastRun : {};
     var settings = raw.settings && typeof raw.settings === 'object' ? raw.settings : {};
-    var balls = raw.balls && typeof raw.balls === 'object' ? raw.balls : {};
+    var rawModes = raw.modes && typeof raw.modes === 'object' ? raw.modes : {};
 
     function numList(v, cap) {
       if (!Array.isArray(v)) return [];
@@ -501,10 +618,42 @@ if ('serviceWorker' in navigator) {
       }
       return out.slice(-cap);
     }
+    var balls = raw.balls && typeof raw.balls === 'object' ? raw.balls : {};
+
+    // 구버전 프로필(모드 개념이 없던 시절)은 최상위 값을 아마추어 모드로 이어받는다.
+    // 이 처리가 없으면 기존 플레이어의 최고 점수와 학습된 난이도가 초기화된다.
+    var legacy = !rawModes.amateur && !rawModes.pro;
+
+    function modeState(key) {
+      var src = rawModes[key] && typeof rawModes[key] === 'object' ? rawModes[key] : {};
+      if (legacy && key === 'amateur') {
+        src = {
+          skill: raw.skill,
+          difficulty: raw.difficulty,
+          bestScore: raw.bestScore,
+          recentScores: m.recentScores,
+          recentSuccesses: m.recentSuccesses,
+          winStreak: m.winStreak,
+          loseStreak: m.loseStreak
+        };
+      }
+      var def = makeModeState(key);
+      return {
+        skill: num(src.skill, def.skill, 0, 100),
+        difficulty: num(src.difficulty, def.difficulty, 10, 99),
+        bestScore: Math.max(0, Math.floor(num(src.bestScore, 0, 0, 1e9))),
+        recentScores: numList(src.recentScores, 10),
+        recentSuccesses: numList(src.recentSuccesses, 10),
+        winStreak: Math.max(0, Math.floor(num(src.winStreak, 0, 0, 1e6))),
+        loseStreak: Math.max(0, Math.floor(num(src.loseStreak, 0, 0, 1e6)))
+      };
+    }
 
     return {
       version: VERSION,
       playerId: typeof raw.playerId === 'string' ? raw.playerId : base.playerId,
+      mode: MODES[raw.mode] ? raw.mode : DEFAULT_MODE,
+      modes: { amateur: modeState('amateur'), pro: modeState('pro') },
       skill: num(raw.skill, 50, 0, 100),
       difficulty: num(raw.difficulty, 50, 10, 95),
       level: Math.max(1, Math.floor(num(raw.level, 1, 1, 9999))),
@@ -666,16 +815,18 @@ if ('serviceWorker' in navigator) {
   }
 
   // 문서 5장 + 성장 스탯 보정
-  function arenaParams(difficulty, stage, stats, settings, ball) {
+  function arenaParams(difficulty, stage, stats, settings, ball, mode) {
     var d = clamp(difficulty, 10, 95);
     var s = stats || { control: 50, power: 50, speed: 50, luck: 50, stamina: 50 };
     var st = stage || STAGES[0];
     var tune = tuningFactors(settings);
     var b = ball && ball.weight ? ball : BALLS[0];
+    var M = modeParams(mode);
+    d = clamp(d + M.dOffset, M.dMin, M.dMax);         // 모드가 난이도 밴드를 올린다
 
-    var gap = Math.max(145, 220 - 0.9 * d);
-    var speed = 210 + 2.8 * d;
-    var movement = 0.05 * d * st.movement;
+    var gap = Math.max(145, 220 - 0.9 * d) * M.gap;
+    var speed = (210 + 2.8 * d) * M.speed;
+    var movement = 0.05 * d * st.movement * M.movement;
     var wind = Math.max(0, (d - 35) / 60) * st.wind;
 
     // 스탯 보정: 과도한 이지 모드가 되지 않도록 전부 소폭(±10~20%)으로 제한한다.
@@ -694,7 +845,7 @@ if ('serviceWorker' in navigator) {
     var bob = clamp(movement * 12, 8, 34);
 
     return {
-      gap: clamp(gap, 130, 260),
+      gap: clamp(gap, M.id === 'pro' ? 118 : 130, 260),
       speed: clamp(speed, 140, 660),
       movement: Math.max(0, movement),
       bob: bob,
@@ -702,9 +853,10 @@ if ('serviceWorker' in navigator) {
       rain: st.rain,
       gravity: gravity,
       flap: flap,
-      perfectWindow: 0.12 + (s.control - 50) / 1000 + (b.perfectBonus || 0),
+      perfectWindow: (0.12 + (s.control - 50) / 1000 + (b.perfectBonus || 0)) * M.perfect,
       tuning: tune,
-      ball: b
+      ball: b,
+      mode: M.id
     };
   }
 
@@ -839,8 +991,10 @@ if ('serviceWorker' in navigator) {
     profile.bestScore = Math.max(profile.bestScore, score);
 
     var ballKind = selectedBall(profile);
-    var coins = Math.round(coinReward(score) * (ballKind.coinBonus || 1));
-    var xp = xpReward(score, perfect, run.difficulty !== undefined ? run.difficulty : profile.difficulty);
+    var modeM = modeParams(profile.mode);
+    var coins = Math.round(coinReward(score) * (ballKind.coinBonus || 1) * modeM.reward);
+    var xp = xpReward(score, perfect, run.difficulty !== undefined ? run.difficulty : profile.difficulty)
+      * modeM.reward;
     profile.coins += coins;
     profile.xp += xp;
     var levelsGained = applyLevelUps(profile);
@@ -858,7 +1012,10 @@ if ('serviceWorker' in navigator) {
     var previousDifficulty = profile.difficulty;
     profile.difficulty = diff.difficulty;
 
+    saveModeState(profile);                    // 모드별 난이도·최고점 보관
+
     profile.lastRun = {
+      mode: profile.mode,
       score: score,
       combo: combo,
       difficulty: previousDifficulty,
@@ -874,6 +1031,8 @@ if ('serviceWorker' in navigator) {
       xp: xp,
       loot: loot,
       ballId: ballKind.id,
+      mode: profile.mode,
+      modeLabel: modeM.label,
       levelsGained: levelsGained,
       previousDifficulty: previousDifficulty,
       difficulty: profile.difficulty,
@@ -941,6 +1100,14 @@ if ('serviceWorker' in navigator) {
     norm: norm,
     mean: mean,
     coefficientOfVariation: coefficientOfVariation,
+    MODES: MODES,
+    DEFAULT_MODE: DEFAULT_MODE,
+    PRO_UNLOCK: PRO_UNLOCK,
+    modeParams: modeParams,
+    isModeUnlocked: isModeUnlocked,
+    setMode: setMode,
+    loadModeState: loadModeState,
+    saveModeState: saveModeState,
     BALLS: BALLS,
     DEFAULT_BALL: DEFAULT_BALL,
     ballById: ballById,
@@ -2117,6 +2284,96 @@ if ('serviceWorker' in navigator) {
   }
 
   /**
+   * 대형 세로 광고판 — 타워형 간판. 좁고 높아서 하늘 쪽으로 뻗는다.
+   * 한글은 세로쓰기, 영문은 눕혀서 표시한다(기둥 배너와 같은 규칙).
+   */
+  function drawTowerBillboard(ctx, board, x, baseY, w, h, alpha) {
+    if (!board || h < 110) return false;
+    var legH = Math.max(14, h * 0.10);
+    var top = baseY - legH - h;
+
+    ctx.save();
+    ctx.globalAlpha = alpha === undefined ? 1 : alpha;
+
+    // 지지대 (가운데 기둥 + 버팀대)
+    ctx.fillStyle = 'rgba(30,40,54,0.85)';
+    ctx.fillRect(x + w / 2 - Math.max(3, w * 0.06), baseY - legH, Math.max(6, w * 0.12), legH);
+    ctx.beginPath();
+    ctx.moveTo(x + w * 0.1, baseY);
+    ctx.lineTo(x + w / 2, baseY - legH);
+    ctx.lineTo(x + w * 0.9, baseY);
+    ctx.lineTo(x + w * 0.78, baseY);
+    ctx.lineTo(x + w / 2, baseY - legH * 0.55);
+    ctx.lineTo(x + w * 0.22, baseY);
+    ctx.closePath();
+    ctx.fill();
+
+    // 패널
+    ctx.fillStyle = board.bg;
+    roundRect(ctx, x, top, w, h, 7);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.fillStyle = board.accent;
+    ctx.fillRect(x + 5, top + 6, w - 10, 4);
+    ctx.fillRect(x + 5, top + h - 10, w - 10, 4);
+
+    // 로고 (위쪽) + 문구 (아래 영역)
+    var markR = Math.min(w * 0.30, 22);
+    drawMark(ctx, board.mark || 'shield', x + w / 2, top + 18 + markR, markR,
+             board.accent, board.bg);
+    var ty = top + 26 + markR * 2;
+    var th = h - (ty - top) - 16;
+
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    if (hasHangul(board.text)) {
+      var chars = board.text.replace(/\s+/g, '').split('');
+      var step = Math.min(w * 0.72, th / Math.max(1, chars.length));
+      var startY = ty + th / 2 - (step * (chars.length - 1)) / 2;
+      ctx.fillStyle = board.fg;
+      ctx.font = '800 ' + Math.min(w * 0.62, step - 3).toFixed(0) + 'px system-ui, sans-serif';
+      for (var c = 0; c < chars.length; c++) {
+        ctx.fillText(chars[c], x + w / 2, startY + step * c, w - 8);
+      }
+    } else {
+      ctx.save();
+      ctx.translate(x + w / 2, ty + th / 2);
+      ctx.rotate(-Math.PI / 2);
+      ctx.fillStyle = board.fg;
+      ctx.font = '800 ' + Math.round(w * 0.34) + 'px system-ui, sans-serif';
+      ctx.fillText(board.text, 0, board.sub ? -w * 0.16 : 0, th - 12);
+      if (board.sub) {
+        ctx.fillStyle = board.accent;
+        ctx.font = '600 ' + Math.round(w * 0.19) + 'px system-ui, sans-serif';
+        ctx.fillText(board.sub, 0, w * 0.20, th - 12);
+      }
+      ctx.restore();
+    }
+
+    // 상단 조명
+    ctx.fillStyle = 'rgba(255,240,200,0.85)';
+    ctx.fillRect(x + w / 2 - 4, top - 7, 8, 5);
+    var glow = ctx.createLinearGradient(0, top - 6, 0, top + h * 0.45);
+    glow.addColorStop(0, 'rgba(255,240,200,0.20)');
+    glow.addColorStop(1, 'rgba(255,240,200,0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.moveTo(x + w / 2 - 5, top - 4);
+    ctx.lineTo(x + w / 2 + 5, top - 4);
+    ctx.lineTo(x + w * 0.95, top + h * 0.45);
+    ctx.lineTo(x + w * 0.05, top + h * 0.45);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.restore();
+    ctx.textAlign = 'start';
+    ctx.textBaseline = 'alphabetic';
+    return true;
+  }
+
+  /**
    * 그라운드 광고판 (경기장 앞 롤링 보드).
    * x 부터 오른쪽으로 패널을 이어 그린다.
    */
@@ -2161,6 +2418,7 @@ if ('serviceWorker' in navigator) {
     hasHangul: hasHangul,
     drawPostBanner: drawPostBanner,
     drawBillboard: drawBillboard,
+    drawTowerBillboard: drawTowerBillboard,
     drawPerimeter: drawPerimeter
   };
 });
@@ -2260,8 +2518,10 @@ if ('serviceWorker' in navigator) {
     gates = [];
     sparks = [];
     stage = E.stageFor(0, profile.difficulty);
-    arena = E.arenaParams(profile.difficulty, stage, profile.stats, profile.settings, E.selectedBall(profile));
+    arena = E.arenaParams(profile.difficulty, stage, profile.stats, profile.settings,
+                          E.selectedBall(profile), profile.mode);
     refreshStartScreen();
+    refreshModes();
     screenBalls.classList.add('hidden');
     screenSettings.classList.add('hidden');
     screenResult.classList.add('hidden');
@@ -2369,7 +2629,7 @@ if ('serviceWorker' in navigator) {
 
   function refreshArena() {
     arena = E.arenaParams(run ? run.difficulty : profile.difficulty, stage,
-                          profile.stats, profile.settings, E.selectedBall(profile));
+                          profile.stats, profile.settings, E.selectedBall(profile), profile.mode);
   }
 
   function applySettings(save) {
@@ -2396,6 +2656,38 @@ if ('serviceWorker' in navigator) {
     hud.classList.add('hidden');
   }
 
+  /* ------------------------------------------------------------ 모드 선택 */
+
+  function refreshModes() {
+    ['amateur', 'pro'].forEach(function (id) {
+      var btn = $('mode-' + id);
+      if (!btn) return;
+      var unlocked = E.isModeUnlocked(profile, id);
+      var st = profile.modes[id] || { bestScore: 0 };
+      btn.classList.toggle('on', profile.mode === id);
+      btn.classList.toggle('locked', !unlocked);
+      $('mode-' + id + '-best').textContent = unlocked
+        ? '최고 ' + st.bestScore
+        : '최고 ' + E.PRO_UNLOCK.bestScore + '점 또는 완주 시 해금';
+    });
+    $('mode-desc').textContent = E.modeParams(profile.mode).desc;
+  }
+
+  function chooseMode(id) {
+    if (!E.isModeUnlocked(profile, id)) {
+      $('mode-desc').textContent =
+        '프로 모드는 아마추어에서 ' + E.PRO_UNLOCK.bestScore + '점을 넘거나 한 번 완주하면 열립니다.';
+      return;
+    }
+    if (!E.setMode(profile, id)) return;
+    storage.save(profile);
+    stage = E.stageFor(0, profile.difficulty);
+    refreshArena();
+    refreshModes();
+    refreshStartScreen();
+    if (audio) audio.tap();
+  }
+
   function refreshStartScreen() {
     $('s-skill').textContent = Math.round(profile.skill);
     $('s-diff').textContent = Math.round(profile.difficulty);
@@ -2415,7 +2707,7 @@ if ('serviceWorker' in navigator) {
     $('hud-coin').textContent = profile.coins;
     $('hud-level').textContent = profile.level;
     $('hud-diff').textContent = Math.round(run ? run.difficulty : profile.difficulty);
-    $('hud-stage').textContent = stage.label;
+    $('hud-stage').textContent = E.modeParams(profile.mode).tag + ' · ' + stage.label;
     $('hud-combo').textContent = run ? run.combo : 0;
   }
 
@@ -2453,7 +2745,8 @@ if ('serviceWorker' in navigator) {
 
   function startRun() {
     stage = E.stageFor(0, profile.difficulty);
-    arena = E.arenaParams(profile.difficulty, stage, profile.stats, profile.settings, E.selectedBall(profile));
+    arena = E.arenaParams(profile.difficulty, stage, profile.stats, profile.settings,
+                          E.selectedBall(profile), profile.mode);
     run = {
       score: 0,
       combo: 0,
@@ -2590,7 +2883,8 @@ if ('serviceWorker' in navigator) {
     var next = E.stageFor(run.passCount, run.difficulty);
     if (next.key !== stage.key) {
       stage = next;
-      arena = E.arenaParams(run.difficulty, stage, profile.stats, profile.settings, E.selectedBall(profile));
+      arena = E.arenaParams(run.difficulty, stage, profile.stats, profile.settings,
+                            E.selectedBall(profile), profile.mode);
       run.stage = stage.key;
       cheerUp(1.4);                        // 스테이지 전환 — 최고조
       if (audio) { audio.stage(); audio.setIntensity(musicLevel()); }
@@ -3099,7 +3393,7 @@ if ('serviceWorker' in navigator) {
   /* ---------------------------------------------------------- 결과 화면 */
 
   function showResult(sum) {
-    $('r-stage').textContent = stage.label;
+    $('r-stage').textContent = E.modeParams(profile.mode).tag + ' · ' + stage.label;
     $('r-title').textContent = sum.score >= profile.bestScore && sum.score > 0 ? 'NEW BEST!' : 'GAME OVER';
     $('r-line').textContent = '점수 ' + sum.score + ' · 콤보 ' + sum.combo +
       ' · 퍼펙트 ' + sum.perfectCount + (sum.cleared ? ' · 🏆 완주' : '');
@@ -3168,17 +3462,27 @@ if ('serviceWorker' in navigator) {
     var L = scenery.layout();
     if (!L) return;
     var par = 0.22;                       // 숲과 같은 속도로 흐른다
-    var spacing = 1500;
+    // 간판 사이 간격(패럴랙스 좌표). 700 이면 실제 이동 거리로 약 3,200px,
+    // 기본 속도에서 10초에 한 번꼴로 새 간판이 지나간다.
+    var spacing = 700;
     var bw = Math.max(150, Math.min(250, W * 0.58));
     var bh = bw * 0.46;
     var baseY = L.riverTop + 2;
+    var tw = Math.max(52, Math.min(84, W * 0.19));      // 세로형 폭
+    var th = tw * 3.1;
     var travelled = scroll * par;
     var start = Math.floor((travelled - bw) / spacing);
     var end = Math.ceil((travelled + W) / spacing);
     for (var n = start; n <= end; n++) {
       var sx = n * spacing - travelled;
-      if (sx > W + 10 || sx + bw < -10) continue;
-      Sponsor.drawBillboard(ctx, Sponsor.pick(n * 2 + 1), sx, baseY, bw, bh, 0.94);
+      // 가로형과 세로형을 번갈아 세운다
+      if (n % 2 === 0) {
+        if (sx <= W + 10 && sx + bw >= -10) {
+          Sponsor.drawBillboard(ctx, Sponsor.pick(n * 2 + 1), sx, baseY, bw, bh, 0.94);
+        }
+      } else if (sx <= W + 10 && sx + tw >= -10) {
+        Sponsor.drawTowerBillboard(ctx, Sponsor.pick(n * 2 + 1), sx, baseY, tw, th, 0.94);
+      }
     }
   }
 
@@ -3826,6 +4130,8 @@ if ('serviceWorker' in navigator) {
   });
   if (!AudioLib) muteBtn.classList.add('hidden');
 
+  $('mode-amateur').addEventListener('click', function () { chooseMode('amateur'); });
+  $('mode-pro').addEventListener('click', function () { chooseMode('pro'); });
   $('btn-balls').addEventListener('click', showBalls);
   $('btn-balls-close').addEventListener('click', showStart);
   $('btn-settings').addEventListener('click', showSettings);
@@ -3886,6 +4192,7 @@ if ('serviceWorker' in navigator) {
 
   resize();
   refreshMute();
+  E.loadModeState(profile);        // 저장된 모드 상태를 최상위 필드로 꺼낸다
   applySettings(false);
   showStart();
   requestAnimationFrame(frame);
@@ -3964,7 +4271,8 @@ if ('serviceWorker' in navigator) {
       for (var i = 0; i < E.STAGES.length; i++) {
         if (E.STAGES[i].key === key) stage = E.STAGES[i];
       }
-      arena = E.arenaParams(run ? run.difficulty : profile.difficulty, stage, profile.stats, profile.settings, E.selectedBall(profile));
+      arena = E.arenaParams(run ? run.difficulty : profile.difficulty, stage, profile.stats,
+                            profile.settings, E.selectedBall(profile), profile.mode);
       if (run) run.stage = stage.key;
       if (audio) audio.setIntensity(musicLevel());
       updateHud();

@@ -91,8 +91,10 @@
     gates = [];
     sparks = [];
     stage = E.stageFor(0, profile.difficulty);
-    arena = E.arenaParams(profile.difficulty, stage, profile.stats, profile.settings, E.selectedBall(profile));
+    arena = E.arenaParams(profile.difficulty, stage, profile.stats, profile.settings,
+                          E.selectedBall(profile), profile.mode);
     refreshStartScreen();
+    refreshModes();
     screenBalls.classList.add('hidden');
     screenSettings.classList.add('hidden');
     screenResult.classList.add('hidden');
@@ -200,7 +202,7 @@
 
   function refreshArena() {
     arena = E.arenaParams(run ? run.difficulty : profile.difficulty, stage,
-                          profile.stats, profile.settings, E.selectedBall(profile));
+                          profile.stats, profile.settings, E.selectedBall(profile), profile.mode);
   }
 
   function applySettings(save) {
@@ -227,6 +229,38 @@
     hud.classList.add('hidden');
   }
 
+  /* ------------------------------------------------------------ 모드 선택 */
+
+  function refreshModes() {
+    ['amateur', 'pro'].forEach(function (id) {
+      var btn = $('mode-' + id);
+      if (!btn) return;
+      var unlocked = E.isModeUnlocked(profile, id);
+      var st = profile.modes[id] || { bestScore: 0 };
+      btn.classList.toggle('on', profile.mode === id);
+      btn.classList.toggle('locked', !unlocked);
+      $('mode-' + id + '-best').textContent = unlocked
+        ? '최고 ' + st.bestScore
+        : '최고 ' + E.PRO_UNLOCK.bestScore + '점 또는 완주 시 해금';
+    });
+    $('mode-desc').textContent = E.modeParams(profile.mode).desc;
+  }
+
+  function chooseMode(id) {
+    if (!E.isModeUnlocked(profile, id)) {
+      $('mode-desc').textContent =
+        '프로 모드는 아마추어에서 ' + E.PRO_UNLOCK.bestScore + '점을 넘거나 한 번 완주하면 열립니다.';
+      return;
+    }
+    if (!E.setMode(profile, id)) return;
+    storage.save(profile);
+    stage = E.stageFor(0, profile.difficulty);
+    refreshArena();
+    refreshModes();
+    refreshStartScreen();
+    if (audio) audio.tap();
+  }
+
   function refreshStartScreen() {
     $('s-skill').textContent = Math.round(profile.skill);
     $('s-diff').textContent = Math.round(profile.difficulty);
@@ -246,7 +280,7 @@
     $('hud-coin').textContent = profile.coins;
     $('hud-level').textContent = profile.level;
     $('hud-diff').textContent = Math.round(run ? run.difficulty : profile.difficulty);
-    $('hud-stage').textContent = stage.label;
+    $('hud-stage').textContent = E.modeParams(profile.mode).tag + ' · ' + stage.label;
     $('hud-combo').textContent = run ? run.combo : 0;
   }
 
@@ -284,7 +318,8 @@
 
   function startRun() {
     stage = E.stageFor(0, profile.difficulty);
-    arena = E.arenaParams(profile.difficulty, stage, profile.stats, profile.settings, E.selectedBall(profile));
+    arena = E.arenaParams(profile.difficulty, stage, profile.stats, profile.settings,
+                          E.selectedBall(profile), profile.mode);
     run = {
       score: 0,
       combo: 0,
@@ -421,7 +456,8 @@
     var next = E.stageFor(run.passCount, run.difficulty);
     if (next.key !== stage.key) {
       stage = next;
-      arena = E.arenaParams(run.difficulty, stage, profile.stats, profile.settings, E.selectedBall(profile));
+      arena = E.arenaParams(run.difficulty, stage, profile.stats, profile.settings,
+                            E.selectedBall(profile), profile.mode);
       run.stage = stage.key;
       cheerUp(1.4);                        // 스테이지 전환 — 최고조
       if (audio) { audio.stage(); audio.setIntensity(musicLevel()); }
@@ -930,7 +966,7 @@
   /* ---------------------------------------------------------- 결과 화면 */
 
   function showResult(sum) {
-    $('r-stage').textContent = stage.label;
+    $('r-stage').textContent = E.modeParams(profile.mode).tag + ' · ' + stage.label;
     $('r-title').textContent = sum.score >= profile.bestScore && sum.score > 0 ? 'NEW BEST!' : 'GAME OVER';
     $('r-line').textContent = '점수 ' + sum.score + ' · 콤보 ' + sum.combo +
       ' · 퍼펙트 ' + sum.perfectCount + (sum.cleared ? ' · 🏆 완주' : '');
@@ -999,17 +1035,27 @@
     var L = scenery.layout();
     if (!L) return;
     var par = 0.22;                       // 숲과 같은 속도로 흐른다
-    var spacing = 1500;
+    // 간판 사이 간격(패럴랙스 좌표). 700 이면 실제 이동 거리로 약 3,200px,
+    // 기본 속도에서 10초에 한 번꼴로 새 간판이 지나간다.
+    var spacing = 700;
     var bw = Math.max(150, Math.min(250, W * 0.58));
     var bh = bw * 0.46;
     var baseY = L.riverTop + 2;
+    var tw = Math.max(52, Math.min(84, W * 0.19));      // 세로형 폭
+    var th = tw * 3.1;
     var travelled = scroll * par;
     var start = Math.floor((travelled - bw) / spacing);
     var end = Math.ceil((travelled + W) / spacing);
     for (var n = start; n <= end; n++) {
       var sx = n * spacing - travelled;
-      if (sx > W + 10 || sx + bw < -10) continue;
-      Sponsor.drawBillboard(ctx, Sponsor.pick(n * 2 + 1), sx, baseY, bw, bh, 0.94);
+      // 가로형과 세로형을 번갈아 세운다
+      if (n % 2 === 0) {
+        if (sx <= W + 10 && sx + bw >= -10) {
+          Sponsor.drawBillboard(ctx, Sponsor.pick(n * 2 + 1), sx, baseY, bw, bh, 0.94);
+        }
+      } else if (sx <= W + 10 && sx + tw >= -10) {
+        Sponsor.drawTowerBillboard(ctx, Sponsor.pick(n * 2 + 1), sx, baseY, tw, th, 0.94);
+      }
     }
   }
 
@@ -1657,6 +1703,8 @@
   });
   if (!AudioLib) muteBtn.classList.add('hidden');
 
+  $('mode-amateur').addEventListener('click', function () { chooseMode('amateur'); });
+  $('mode-pro').addEventListener('click', function () { chooseMode('pro'); });
   $('btn-balls').addEventListener('click', showBalls);
   $('btn-balls-close').addEventListener('click', showStart);
   $('btn-settings').addEventListener('click', showSettings);
@@ -1717,6 +1765,7 @@
 
   resize();
   refreshMute();
+  E.loadModeState(profile);        // 저장된 모드 상태를 최상위 필드로 꺼낸다
   applySettings(false);
   showStart();
   requestAnimationFrame(frame);
@@ -1795,7 +1844,8 @@
       for (var i = 0; i < E.STAGES.length; i++) {
         if (E.STAGES[i].key === key) stage = E.STAGES[i];
       }
-      arena = E.arenaParams(run ? run.difficulty : profile.difficulty, stage, profile.stats, profile.settings, E.selectedBall(profile));
+      arena = E.arenaParams(run ? run.difficulty : profile.difficulty, stage, profile.stats,
+                            profile.settings, E.selectedBall(profile), profile.mode);
       if (run) run.stage = stage.key;
       if (audio) audio.setIntensity(musicLevel());
       updateHud();

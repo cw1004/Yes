@@ -30,6 +30,16 @@
     <h1>SKY GOAL 2.0</h1>
     <p>탭 / 클릭 / 스페이스로 공을 띄워 움직이는 골문을 통과하세요.<br>
     플레이 데이터를 분석해 <b>난이도 · 경기장 환경 · 보상</b>이 자동으로 조정됩니다.</p>
+    <div class="modes">
+      <button class="mode" id="mode-amateur" type="button" data-mode="amateur">
+        <b>아마추어</b><span id="mode-amateur-best">최고 0</span>
+      </button>
+      <button class="mode" id="mode-pro" type="button" data-mode="pro">
+        <b>프로</b><span id="mode-pro-best">최고 0</span>
+      </button>
+    </div>
+    <p class="small" id="mode-desc">기본 모드. AI 가 당신에게 맞춰 난이도를 조절합니다.</p>
+
     <div class="grid">
       <div class="stat">숙련도 S<b id="s-skill">50</b></div>
       <div class="stat">난이도 D<b id="s-diff">50</b></div>

@@ -151,6 +151,25 @@ test('대형 광고판은 크기가 확보될 때만 그려진다', () => {
                     0, 300, 200, 90), true);
 });
 
+test('대형 세로 광고판', () => {
+  const small = fakeCtx();
+  assert.strictEqual(S.drawTowerBillboard(small, S.pick(0), 0, 300, 60, 80), false, '낮으면 생략');
+  assert.strictEqual(S.drawTowerBillboard(small, null, 0, 300, 60, 200), false);
+
+  const latin = S.BOARDS.find((b) => !S.hasHangul(b.text));
+  const ctxL = fakeCtx();
+  assert.strictEqual(S.drawTowerBillboard(ctxL, latin, 0, 400, 70, 220), true);
+  assert.ok(ctxL.calls.rotate > 0, '영문은 눕혀서 그린다');
+  assert.ok(ctxL.calls.text.includes(latin.text));
+
+  const korean = S.BOARDS.find((b) => S.hasHangul(b.text));
+  const ctxK = fakeCtx();
+  S.drawTowerBillboard(ctxK, korean, 0, 400, 70, 220);
+  const chars = korean.text.replace(/\s+/g, '').length;
+  assert.strictEqual(ctxK.calls.text.filter((t) => t.length === 1).length, chars,
+    '한글은 세로쓰기로 한 자씩');
+});
+
 test('그라운드 보드는 화면을 채우도록 반복된다', () => {
   const ctx = fakeCtx();
   S.drawPerimeter(ctx, 0, 100, 420, 18, 0, 1);

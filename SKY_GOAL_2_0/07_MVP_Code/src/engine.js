@@ -54,6 +54,96 @@
     return list;
   }
 
+  /* ------------------------------------------------------------------ 모드 */
+
+  /**
+   * 두 가지 모드. AI 난이도 엔진은 그대로 쓰고, 그 위에 모드 보정을 곱한다.
+   * 학습된 난이도(D)는 모드별로 따로 보관해서 서로 오염되지 않는다.
+   */
+  var MODES = {
+    amateur: {
+      id: 'amateur', label: '아마추어', tag: 'AMATEUR',
+      desc: '기본 모드. AI 가 당신에게 맞춰 난이도를 조절합니다.',
+      dOffset: 0, dMin: 10, dMax: 95,
+      gap: 1.00, speed: 1.00, movement: 1.00, perfect: 1.00,
+      reward: 1.00, startDifficulty: 50
+    },
+    pro: {
+      id: 'pro', label: '프로', tag: 'PRO',
+      desc: '골문은 좁고 빠르고 더 흔들립니다. 보상은 1.6배.',
+      dOffset: 22, dMin: 35, dMax: 99,
+      gap: 0.88, speed: 1.15, movement: 1.30, perfect: 0.72,
+      reward: 1.60, startDifficulty: 62
+    }
+  };
+
+  var DEFAULT_MODE = 'amateur';
+  // 프로 모드 해금 조건 — 아마추어에서 실력을 보여야 열린다
+  var PRO_UNLOCK = { bestScore: 200, clears: 1 };
+
+  function modeParams(mode) {
+    return MODES[mode] || MODES[DEFAULT_MODE];
+  }
+
+  function isModeUnlocked(profile, mode) {
+    if (mode !== 'pro') return true;
+    if (!profile) return false;
+    var am = profile.modes && profile.modes.amateur;
+    var best = am ? am.bestScore : 0;
+    return best >= PRO_UNLOCK.bestScore || (profile.metrics.clears || 0) >= PRO_UNLOCK.clears;
+  }
+
+  function makeModeState(mode) {
+    var m = modeParams(mode);
+    return {
+      skill: 50,
+      difficulty: m.startDifficulty,
+      bestScore: 0,
+      recentScores: [],
+      recentSuccesses: [],
+      winStreak: 0,
+      loseStreak: 0
+    };
+  }
+
+  // 현재 모드의 상태를 프로필 최상위 필드로 꺼내 둔다(엔진·UI 가 그대로 쓰도록).
+  function loadModeState(profile) {
+    var st = profile.modes[profile.mode] || (profile.modes[profile.mode] = makeModeState(profile.mode));
+    profile.skill = st.skill;
+    profile.difficulty = st.difficulty;
+    profile.bestScore = st.bestScore;
+    profile.metrics.recentScores = st.recentScores.slice();
+    profile.metrics.recentSuccesses = st.recentSuccesses.slice();
+    profile.metrics.winStreak = st.winStreak;
+    profile.metrics.loseStreak = st.loseStreak;
+    return st;
+  }
+
+  function saveModeState(profile) {
+    var st = profile.modes[profile.mode] || (profile.modes[profile.mode] = makeModeState(profile.mode));
+    st.skill = profile.skill;
+    st.difficulty = profile.difficulty;
+    // 최고 점수는 절대 내려가지 않는다 (미러링 실수로 기록이 사라지지 않게)
+    st.bestScore = Math.max(profile.bestScore || 0, st.bestScore || 0);
+    profile.bestScore = st.bestScore;
+    st.recentScores = profile.metrics.recentScores.slice();
+    st.recentSuccesses = profile.metrics.recentSuccesses.slice();
+    st.winStreak = profile.metrics.winStreak;
+    st.loseStreak = profile.metrics.loseStreak;
+    return st;
+  }
+
+  /** 모드 전환. 현재 진행 상태를 저장하고 새 모드 상태를 불러온다. */
+  function setMode(profile, mode) {
+    if (!MODES[mode]) return false;
+    if (!isModeUnlocked(profile, mode)) return false;
+    if (profile.mode === mode) return true;
+    saveModeState(profile);
+    profile.mode = mode;
+    loadModeState(profile);
+    return true;
+  }
+
   /* ---------------------------------------------------------------- 공 종류 */
 
   /**
@@ -136,6 +226,8 @@
     return {
       version: VERSION,
       playerId: 'local-player',
+      mode: DEFAULT_MODE,
+      modes: { amateur: makeModeState('amateur'), pro: makeModeState('pro') },
       skill: 50,
       difficulty: 50,
       level: 1,
@@ -197,7 +289,7 @@
     var inv = raw.inventory && typeof raw.inventory === 'object' ? raw.inventory : {};
     var lr = raw.lastRun && typeof raw.lastRun === 'object' ? raw.lastRun : {};
     var settings = raw.settings && typeof raw.settings === 'object' ? raw.settings : {};
-    var balls = raw.balls && typeof raw.balls === 'object' ? raw.balls : {};
+    var rawModes = raw.modes && typeof raw.modes === 'object' ? raw.modes : {};
 
     function numList(v, cap) {
       if (!Array.isArray(v)) return [];
@@ -208,10 +300,42 @@
       }
       return out.slice(-cap);
     }
+    var balls = raw.balls && typeof raw.balls === 'object' ? raw.balls : {};
+
+    // 구버전 프로필(모드 개념이 없던 시절)은 최상위 값을 아마추어 모드로 이어받는다.
+    // 이 처리가 없으면 기존 플레이어의 최고 점수와 학습된 난이도가 초기화된다.
+    var legacy = !rawModes.amateur && !rawModes.pro;
+
+    function modeState(key) {
+      var src = rawModes[key] && typeof rawModes[key] === 'object' ? rawModes[key] : {};
+      if (legacy && key === 'amateur') {
+        src = {
+          skill: raw.skill,
+          difficulty: raw.difficulty,
+          bestScore: raw.bestScore,
+          recentScores: m.recentScores,
+          recentSuccesses: m.recentSuccesses,
+          winStreak: m.winStreak,
+          loseStreak: m.loseStreak
+        };
+      }
+      var def = makeModeState(key);
+      return {
+        skill: num(src.skill, def.skill, 0, 100),
+        difficulty: num(src.difficulty, def.difficulty, 10, 99),
+        bestScore: Math.max(0, Math.floor(num(src.bestScore, 0, 0, 1e9))),
+        recentScores: numList(src.recentScores, 10),
+        recentSuccesses: numList(src.recentSuccesses, 10),
+        winStreak: Math.max(0, Math.floor(num(src.winStreak, 0, 0, 1e6))),
+        loseStreak: Math.max(0, Math.floor(num(src.loseStreak, 0, 0, 1e6)))
+      };
+    }
 
     return {
       version: VERSION,
       playerId: typeof raw.playerId === 'string' ? raw.playerId : base.playerId,
+      mode: MODES[raw.mode] ? raw.mode : DEFAULT_MODE,
+      modes: { amateur: modeState('amateur'), pro: modeState('pro') },
       skill: num(raw.skill, 50, 0, 100),
       difficulty: num(raw.difficulty, 50, 10, 95),
       level: Math.max(1, Math.floor(num(raw.level, 1, 1, 9999))),
@@ -373,16 +497,18 @@
   }
 
   // 문서 5장 + 성장 스탯 보정
-  function arenaParams(difficulty, stage, stats, settings, ball) {
+  function arenaParams(difficulty, stage, stats, settings, ball, mode) {
     var d = clamp(difficulty, 10, 95);
     var s = stats || { control: 50, power: 50, speed: 50, luck: 50, stamina: 50 };
     var st = stage || STAGES[0];
     var tune = tuningFactors(settings);
     var b = ball && ball.weight ? ball : BALLS[0];
+    var M = modeParams(mode);
+    d = clamp(d + M.dOffset, M.dMin, M.dMax);         // 모드가 난이도 밴드를 올린다
 
-    var gap = Math.max(145, 220 - 0.9 * d);
-    var speed = 210 + 2.8 * d;
-    var movement = 0.05 * d * st.movement;
+    var gap = Math.max(145, 220 - 0.9 * d) * M.gap;
+    var speed = (210 + 2.8 * d) * M.speed;
+    var movement = 0.05 * d * st.movement * M.movement;
     var wind = Math.max(0, (d - 35) / 60) * st.wind;
 
     // 스탯 보정: 과도한 이지 모드가 되지 않도록 전부 소폭(±10~20%)으로 제한한다.
@@ -401,7 +527,7 @@
     var bob = clamp(movement * 12, 8, 34);
 
     return {
-      gap: clamp(gap, 130, 260),
+      gap: clamp(gap, M.id === 'pro' ? 118 : 130, 260),
       speed: clamp(speed, 140, 660),
       movement: Math.max(0, movement),
       bob: bob,
@@ -409,9 +535,10 @@
       rain: st.rain,
       gravity: gravity,
       flap: flap,
-      perfectWindow: 0.12 + (s.control - 50) / 1000 + (b.perfectBonus || 0),
+      perfectWindow: (0.12 + (s.control - 50) / 1000 + (b.perfectBonus || 0)) * M.perfect,
       tuning: tune,
-      ball: b
+      ball: b,
+      mode: M.id
     };
   }
 
@@ -546,8 +673,10 @@
     profile.bestScore = Math.max(profile.bestScore, score);
 
     var ballKind = selectedBall(profile);
-    var coins = Math.round(coinReward(score) * (ballKind.coinBonus || 1));
-    var xp = xpReward(score, perfect, run.difficulty !== undefined ? run.difficulty : profile.difficulty);
+    var modeM = modeParams(profile.mode);
+    var coins = Math.round(coinReward(score) * (ballKind.coinBonus || 1) * modeM.reward);
+    var xp = xpReward(score, perfect, run.difficulty !== undefined ? run.difficulty : profile.difficulty)
+      * modeM.reward;
     profile.coins += coins;
     profile.xp += xp;
     var levelsGained = applyLevelUps(profile);
@@ -565,7 +694,10 @@
     var previousDifficulty = profile.difficulty;
     profile.difficulty = diff.difficulty;
 
+    saveModeState(profile);                    // 모드별 난이도·최고점 보관
+
     profile.lastRun = {
+      mode: profile.mode,
       score: score,
       combo: combo,
       difficulty: previousDifficulty,
@@ -581,6 +713,8 @@
       xp: xp,
       loot: loot,
       ballId: ballKind.id,
+      mode: profile.mode,
+      modeLabel: modeM.label,
       levelsGained: levelsGained,
       previousDifficulty: previousDifficulty,
       difficulty: profile.difficulty,
@@ -648,6 +782,14 @@
     norm: norm,
     mean: mean,
     coefficientOfVariation: coefficientOfVariation,
+    MODES: MODES,
+    DEFAULT_MODE: DEFAULT_MODE,
+    PRO_UNLOCK: PRO_UNLOCK,
+    modeParams: modeParams,
+    isModeUnlocked: isModeUnlocked,
+    setMode: setMode,
+    loadModeState: loadModeState,
+    saveModeState: saveModeState,
     BALLS: BALLS,
     DEFAULT_BALL: DEFAULT_BALL,
     ballById: ballById,

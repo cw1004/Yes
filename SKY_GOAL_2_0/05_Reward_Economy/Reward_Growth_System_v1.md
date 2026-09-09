@@ -12,13 +12,14 @@ PerfectBonus = clamp(10 * (1 - |error| / (gap/2)), 0, 10)
 
 ## 코인
 ```
-CoinReward = round(10 + 25 * ln(score + 1))
+CoinReward = round(10 + 25 * ln(score + 1)) × 공 보너스 × 모드 배율
+모드 배율: 아마추어 1.0 / 프로 1.6
 ```
 0점이어도 10코인은 지급해 실패한 판도 완전한 손실이 되지 않게 한다.
 
 ## XP / 레벨
 ```
-XPReward   = (20 + score*1.5 + perfectCount*5) * (1 + difficulty/200)
+XPReward   = (20 + score*1.5 + perfectCount*5) * (1 + difficulty/200) * 모드 배율
 XP_required(L) = 100 * L^1.5
 ```
 난이도가 높을수록 XP 가 최대 1.475배까지 늘어난다(고난도 플레이 보상).
