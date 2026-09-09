@@ -705,6 +705,12 @@ p { margin: 8px 0; line-height: 1.55; color: #dbe7f7; font-size: 14px; }
     return Math.round(10 + 2 * Math.max(0, combo) + perfectBonus(error, gap));
   }
 
+  // 헤딩 보너스: 낮게 날아 위험을 감수한 대가. 콤보가 쌓일수록 커진다.
+  var HEADER_BASE = 40;
+  function headerBonus(combo) {
+    return Math.round(HEADER_BASE + 4 * clamp(combo || 0, 0, 30));
+  }
+
   function coinReward(score) {
     return Math.round(10 + 25 * Math.log(Math.max(0, score) + 1));
   }
@@ -772,6 +778,7 @@ p { margin: 8px 0; line-height: 1.55; color: #dbe7f7; font-size: 14px; }
     var duration = Math.max(0, run.duration || 0);
     var perfect = Math.max(0, Math.round(run.perfectCount || 0));
     var passes = Math.max(0, Math.round(run.passCount || 0));
+    var headers = Math.max(0, Math.round(run.headerCount || 0));
     var success = score >= 10 ? 1 : 0;
     var earlyDeath = duration < 3 || passes === 0;
 
@@ -822,6 +829,7 @@ p { margin: 8px 0; line-height: 1.55; color: #dbe7f7; font-size: 14px; }
       score: score,
       combo: combo,
       perfectCount: perfect,
+      headerCount: headers,
       coins: coins,
       xp: xp,
       loot: loot,
@@ -912,6 +920,8 @@ p { margin: 8px 0; line-height: 1.55; color: #dbe7f7; font-size: 14px; }
     BALL_FINE_MIN: BALL_FINE_MIN,
     SPEED_MIN: SPEED_MIN,
     perfectBonus: perfectBonus,
+    headerBonus: headerBonus,
+    HEADER_BASE: HEADER_BASE,
     passScore: passScore,
     coinReward: coinReward,
     xpReward: xpReward,
@@ -1158,6 +1168,18 @@ p { margin: 8px 0; line-height: 1.55; color: #dbe7f7; font-size: 14px; }
         tone({ at: t, type: 'triangle', from: 620, to: 180, dur: 0.12, gain: 0.35 });
         hit({ at: t, filter: 'bandpass', cutoff: 1800, sweepTo: 400, dur: 0.18, gain: 0.45 });
         hit({ at: t + 0.02, filter: 'highpass', cutoff: 5200, dur: 0.06, gain: 0.18 });
+      },
+
+      // 헤딩 성공 — 이마에 맞는 둔탁한 타격 + 짧은 함성
+      header: function () {
+        var t = now();
+        tone({ at: t, type: 'sine', from: 300, to: 90, dur: 0.16, gain: 0.75 });
+        hit({ at: t, filter: 'lowpass', cutoff: 900, dur: 0.10, gain: 0.35 });
+        [0, 3, 5].forEach(function (i, k) {
+          tone({ at: t + 0.05 + k * 0.05, type: 'triangle', from: SCALE[i] * 3, to: SCALE[i] * 3,
+                 dur: 0.18, gain: 0.20 });
+        });
+        hit({ at: t + 0.04, filter: 'bandpass', cutoff: 1100, sweepTo: 2400, dur: 0.7, gain: 0.16 });
       },
 
       tap: function () {
@@ -1576,6 +1598,9 @@ p { margin: 8px 0; line-height: 1.55; color: #dbe7f7; font-size: 14px; }
   var audio = AudioLib ? AudioLib.create({ muted: profile.settings.muted }) : null;
 
   var kick = null;                   // 킥오프 연출 상태
+  var header = null;                 // 헤딩 보너스 선수
+  var nextHeaderAt = 0;              // 몇 번째 골문 통과 후 등장할지
+  var popups = [];                   // 화면에 떠오르는 점수 문구
   var usedContinue = false;          // 한 판에 이어하기는 1회
   var rewardProvider = null;         // 보상형 광고 제공자 (네이티브 앱에서 주입)
   var pendingReward = null;          // 광고 결과를 기다리는 콜백
@@ -1809,6 +1834,7 @@ p { margin: 8px 0; line-height: 1.55; color: #dbe7f7; font-size: 14px; }
       perfectCount: 0,
       duration: 0,
       tapIntervals: [],
+      headerCount: 0,
       difficulty: profile.difficulty,
       stage: stage.key
     };
@@ -1827,6 +1853,9 @@ p { margin: 8px 0; line-height: 1.55; color: #dbe7f7; font-size: 14px; }
     gates = [];
     sparks = [];
     for (var i = 0; i < 4; i++) gates.push(makeGate(W + 220 + i * GATE_SPACING));
+    header = null;
+    popups = [];
+    nextHeaderAt = 4 + Math.floor(Math.random() * 3);
     usedContinue = false;
     elapsed = 0;
     scroll = 0;
@@ -2007,6 +2036,9 @@ p { margin: 8px 0; line-height: 1.55; color: #dbe7f7; font-size: 14px; }
       }
     }
 
+    updateHeader(dt);
+    updatePopups(dt);
+
     // 천장 / 바닥
     if (ball.y - 15 <= 0) return endRun('ceiling');
     if (ball.y + 15 >= groundY) return endRun('ground');
@@ -2023,6 +2055,148 @@ p { margin: 8px 0; line-height: 1.55; color: #dbe7f7; font-size: 14px; }
       p.y += p.vy * dt;
       p.vy += 300 * dt;
     }
+  }
+
+  /* ------------------------------------------------------- 헤딩 보너스 */
+
+  var HEADER_JUMP_T = 0.62;
+
+  function playerScale() {
+    return Math.max(1, Math.min(1.6, H / 700));
+  }
+
+  // 점프 중 머리 중심의 화면상 y 좌표
+  function headerHeadY(lift) {
+    return (groundY + 2) - (117 + lift) * playerScale();
+  }
+
+  function updateHeader(dt) {
+    // 등장 예약
+    if (!header && run.passCount >= nextHeaderAt) {
+      header = { x: W + 200, state: 'wait', t: 0, jumpH: 0, lift: 0, hit: false, bob: 0 };
+      nextHeaderAt = run.passCount + 7 + Math.floor(Math.random() * 4);
+    }
+    if (!header) return;
+
+    header.x -= arena.speed * dt;
+    header.bob += dt;
+
+    if (header.state === 'wait') {
+      // 공이 낮게 다가오면 점프 준비 — 위험을 감수하고 낮게 날아야 만난다
+      var near = ball.x > header.x - 170 && ball.x < header.x + 40;
+      var low = ball.y > groundY - 215;
+      if (near && low && ball.vy > -80) {
+        header.state = 'jump';
+        header.t = 0;
+        header.jumpH = E.clamp(groundY - ball.y - 78, 24, 190);
+      }
+    } else if (header.state === 'jump') {
+      header.t += dt;
+      header.lift = header.jumpH * Math.sin(Math.PI * Math.min(1, header.t / HEADER_JUMP_T));
+
+      if (!header.hit) {
+        var hy = headerHeadY(header.lift);
+        var dx = Math.abs(ball.x - (header.x + 6));
+        if (dx < 40 && Math.abs(ball.y - hy) < 36) connectHeader(hy);
+      }
+      if (header.t >= HEADER_JUMP_T) { header.state = 'done'; header.lift = 0; }
+    }
+
+    if (header.x < -90) header = null;
+  }
+
+  // 헤딩 성공 — 보너스 점수와 강한 상승
+  function connectHeader(headY) {
+    header.hit = true;
+    var bonus = E.headerBonus(run.combo);
+    run.score += bonus;
+    run.combo += 1;
+    run.headerCount += 1;
+    ball.y = headY - 22;
+    ball.vy = arena.flap * 1.9;
+    ball.spin -= 1.2;
+    addSparks(ball.x, ball.y, 20, '255,215,0');
+    addSparks(header.x + 6, headY, 10, '255,255,255');
+    popups.push({ x: ball.x, y: ball.y - 26, text: 'HEADER! +' + bonus, age: 0, life: 1.1 });
+    if (audio) audio.header();
+    refreshStage();
+    updateHud();
+  }
+
+  function updatePopups(dt) {
+    for (var i = popups.length - 1; i >= 0; i--) {
+      popups[i].age += dt;
+      popups[i].y -= 34 * dt;
+      if (popups[i].age >= popups[i].life) popups.splice(i, 1);
+    }
+  }
+
+  function headerPose() {
+    var sc = playerScale();
+    if (header.state === 'wait') {
+      var idle = Math.sin(header.bob * 2.4) * 3;
+      return {
+        frontLeg: 6, frontBend: 8, backLeg: -8, backBend: 12,
+        lean: 2, armF: 14, armB: -12, crouch: idle, headTilt: 0
+      };
+    }
+    var k = Math.min(1, header.t / HEADER_JUMP_T);
+    var tuck = Math.sin(Math.PI * k);
+    return {
+      frontLeg: -18 - tuck * 26, frontBend: 20 + tuck * 46,
+      backLeg: 16 + tuck * 34, backBend: 10 + tuck * 30,
+      lean: -6 - tuck * 10, armF: -50 - tuck * 40, armB: 40 + tuck * 30,
+      crouch: header.lift / sc, headTilt: -14 - tuck * 10
+    };
+  }
+
+  function drawHeaderPlayer() {
+    if (!header || header.x < -60 || header.x > W + 60) return;
+    var sc = playerScale();
+
+    // 대기 중에는 "여기로 낮게 오라"는 표시를 보여준다
+    if (header.state === 'wait' && header.x < W + 30) {
+      var zoneTop = groundY - 215;
+      ctx.save();
+      ctx.globalAlpha = 0.5 + 0.2 * Math.sin(header.bob * 4);
+      ctx.strokeStyle = 'rgba(255,215,0,0.85)';
+      ctx.setLineDash([6, 6]);
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(header.x - 52, zoneTop);
+      ctx.lineTo(header.x + 62, zoneTop);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = 'rgba(255,215,0,0.09)';
+      ctx.fillRect(header.x - 52, zoneTop, 114, groundY - zoneTop);
+      ctx.fillStyle = '#ffd75a';
+      ctx.font = '700 13px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('HEADER ↓', header.x + 5, zoneTop - 10);
+      ctx.textAlign = 'start';
+      ctx.restore();
+    }
+
+    var baseY = groundY + 2;
+    drawPlayer(header.x, baseY, sc, headerPose(), 1);
+  }
+
+  function drawPopups() {
+    ctx.save();
+    ctx.textAlign = 'center';
+    for (var i = 0; i < popups.length; i++) {
+      var p = popups[i];
+      var a = 1 - p.age / p.life;
+      ctx.globalAlpha = Math.max(0, a);
+      ctx.font = '800 20px system-ui, sans-serif';
+      ctx.lineWidth = 5;
+      ctx.strokeStyle = 'rgba(7,17,31,0.8)';
+      ctx.strokeText(p.text, p.x, p.y);
+      ctx.fillStyle = '#ffd75a';
+      ctx.fillText(p.text, p.x, p.y);
+    }
+    ctx.restore();
+    ctx.textAlign = 'start';
   }
 
   function endRun(reason) {
@@ -2095,7 +2269,9 @@ p { margin: 8px 0; line-height: 1.55; color: #dbe7f7; font-size: 14px; }
   function showResult(sum) {
     $('r-stage').textContent = stage.label;
     $('r-title').textContent = sum.score >= profile.bestScore && sum.score > 0 ? 'NEW BEST!' : 'GAME OVER';
-    $('r-line').textContent = '점수 ' + sum.score + ' · 콤보 ' + sum.combo + ' · 퍼펙트 ' + sum.perfectCount;
+    $('r-line').textContent = '점수 ' + sum.score + ' · 콤보 ' + sum.combo +
+      ' · 퍼펙트 ' + sum.perfectCount +
+      (sum.headerCount ? ' · 헤딩 ' + sum.headerCount : '');
     $('r-coin').textContent = '+' + sum.coins;
     $('r-xp').textContent = '+' + Math.round(sum.xp);
     $('r-loot').textContent = sum.loot.toUpperCase();
@@ -2434,8 +2610,211 @@ p { margin: 8px 0; line-height: 1.55; color: #dbe7f7; font-size: 14px; }
   function lerp(a, b, t) { return a + (b - a) * t; }
   function easeOut(t) { return 1 - Math.pow(1 - t, 3); }
 
-  // 이름 없는 실루엣 선수. 실존 인물을 묘사하지 않는다.
-  // 좌표는 "발이 땅에 닿은 지점"을 원점으로 두고 그린다 (위쪽이 음수).
+  /* ---------------------------------------------------- 선수 (흰색 유니폼) */
+
+  // 우리 게임의 자체 엠블럼. 실제 구단·연맹·스폰서 로고는 쓰지 않는다.
+  var KIT = {
+    jersey: '#ffffff', jerseyShade: '#dbe3ec',
+    shorts: '#ffffff', shortsShade: '#cdd7e2',
+    skin: '#c98a5b', skinShade: '#a06a41',
+    hair: '#171d28', sock: '#f2f6fb', boot: '#ff9933',
+    trimA: '#ff9933', trimB: '#138808', line: '#16202c'
+  };
+
+  // SKY GOAL 크레스트 — 인도 국기색 방패 + 공
+  function drawCrest(x, y, sc) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(sc, sc);
+    ctx.beginPath();
+    ctx.moveTo(-5, -6);
+    ctx.lineTo(5, -6);
+    ctx.lineTo(5, 2);
+    ctx.quadraticCurveTo(5, 7, 0, 9);
+    ctx.quadraticCurveTo(-5, 7, -5, 2);
+    ctx.closePath();
+    ctx.save();
+    ctx.clip();
+    ctx.fillStyle = KIT.trimA; ctx.fillRect(-6, -7, 12, 5);
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(-6, -2, 12, 4);
+    ctx.fillStyle = KIT.trimB; ctx.fillRect(-6, 2, 12, 9);
+    ctx.restore();
+    ctx.strokeStyle = KIT.line;
+    ctx.lineWidth = 1.1;
+    ctx.stroke();
+    ctx.fillStyle = KIT.line;
+    ctx.beginPath();
+    ctx.arc(0, 0, 1.7, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawLeg(hipY, angle, bend, skin, rad) {
+    ctx.save();
+    ctx.translate(0, hipY);
+    ctx.rotate(angle * rad);
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = skin;                       // 허벅지
+    ctx.lineWidth = 12;
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, 32); ctx.stroke();
+    ctx.translate(0, 32);
+    ctx.rotate(-bend * rad);
+    ctx.strokeStyle = skin;                       // 정강이 위쪽(맨다리)
+    ctx.lineWidth = 10;
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, 13); ctx.stroke();
+    ctx.strokeStyle = KIT.sock;                   // 양말
+    ctx.lineWidth = 10.5;
+    ctx.beginPath(); ctx.moveTo(0, 12); ctx.lineTo(0, 30); ctx.stroke();
+    ctx.strokeStyle = KIT.trimA;                  // 양말 띠
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(0, 16); ctx.lineTo(0, 19); ctx.stroke();
+    ctx.translate(0, 30);
+    ctx.fillStyle = KIT.boot;                     // 축구화
+    ctx.beginPath(); ctx.ellipse(4, 2, 12, 6, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = KIT.line;
+    ctx.beginPath(); ctx.ellipse(4, 5, 12, 2.4, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawArm(sx, shoulderY, angle, skin, rad) {
+    ctx.save();
+    ctx.translate(sx, shoulderY + 4);
+    ctx.rotate(angle * rad);
+    ctx.strokeStyle = KIT.jersey;                 // 반팔 소매
+    ctx.lineWidth = 11;
+    ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, 12); ctx.stroke();
+    ctx.strokeStyle = KIT.trimB;
+    ctx.lineWidth = 2.6;
+    ctx.beginPath(); ctx.moveTo(-4, 12); ctx.lineTo(4, 12); ctx.stroke();
+    ctx.strokeStyle = skin;                       // 팔뚝
+    ctx.lineWidth = 8;
+    ctx.beginPath(); ctx.moveTo(0, 11); ctx.lineTo(0, 30); ctx.stroke();
+    ctx.restore();
+  }
+
+  /**
+   * 흰색 유니폼 선수. 이름·얼굴 특징·등번호가 없는 가상의 선수다.
+   * pose = { frontLeg, frontBend, backLeg, backBend, lean, armF, armB, crouch, headTilt }
+   */
+  function drawPlayer(px, baseY, scale, pose, alpha) {
+    var rad = Math.PI / 180;
+    ctx.save();
+    ctx.globalAlpha = alpha === undefined ? 1 : alpha;
+
+    // 발밑 그림자 (점프 높이에 따라 옅어진다)
+    var lift = Math.max(0, pose.crouch || 0);
+    ctx.fillStyle = 'rgba(0,0,0,' + (0.30 * Math.max(0.25, 1 - lift / 140)).toFixed(3) + ')';
+    ctx.beginPath();
+    ctx.ellipse(px + 6, groundY + 2, 30 * scale, 7, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.translate(px, baseY);
+    ctx.scale(scale, scale);
+
+    var hipY = -62 - (pose.crouch || 0);
+    var shoulderY = hipY - 40;
+    var sx = (pose.lean || 0) * 0.6;
+
+    drawLeg(hipY, pose.backLeg, pose.backBend, KIT.skinShade, rad);   // 뒷다리
+    drawArm(sx - 3, shoulderY, pose.armB, KIT.skinShade, rad);        // 뒷팔
+
+    // 반바지
+    ctx.fillStyle = KIT.shorts;
+    ctx.beginPath();
+    ctx.moveTo(-11, hipY - 4);
+    ctx.lineTo(11, hipY - 4);
+    ctx.lineTo(12, hipY + 15);
+    ctx.lineTo(-12, hipY + 15);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = KIT.trimB;
+    ctx.fillRect(9, hipY - 4, 3, 19);
+
+    // 상의
+    ctx.fillStyle = KIT.jersey;
+    ctx.beginPath();
+    ctx.moveTo(-10, hipY - 2);
+    ctx.lineTo(sx - 12, shoulderY + 2);
+    ctx.quadraticCurveTo(sx, shoulderY - 8, sx + 12, shoulderY + 2);
+    ctx.lineTo(10, hipY - 2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = KIT.jerseyShade;                 // 옆면 음영
+    ctx.beginPath();
+    ctx.moveTo(6, hipY - 2);
+    ctx.lineTo(sx + 8, shoulderY + 2);
+    ctx.lineTo(sx + 12, shoulderY + 2);
+    ctx.lineTo(10, hipY - 2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = KIT.trimA;                       // 어깨 라인
+    ctx.fillRect(sx - 12, shoulderY + 1, 24, 2.6);
+
+    drawCrest(sx - 5, shoulderY + 15, 0.95);         // 자체 엠블럼
+
+    drawLeg(hipY, pose.frontLeg, pose.frontBend, KIT.skin, rad);      // 앞다리
+    drawArm(sx + 3, shoulderY, pose.armF, KIT.skin, rad);             // 앞팔
+
+    // 목
+    ctx.strokeStyle = KIT.skinShade;
+    ctx.lineWidth = 7;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(sx + 1, shoulderY + 2);
+    ctx.lineTo(sx + 3, shoulderY - 6);
+    ctx.stroke();
+
+    // 머리
+    var hx = sx + 3 + (pose.headTilt || 0) * 0.25;
+    var hy = shoulderY - 15;
+    ctx.save();
+    ctx.translate(hx, hy);
+    ctx.rotate((pose.headTilt || 0) * rad * 0.5);
+    ctx.fillStyle = KIT.skin;
+    ctx.beginPath();
+    ctx.arc(0, 0, 11, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = KIT.hair;                        // 머리카락
+    ctx.beginPath();
+    ctx.arc(0, -1, 11, Math.PI * 1.02, Math.PI * 2.12);
+    ctx.lineTo(-9, 4);
+    ctx.quadraticCurveTo(-12, -6, -4, -10);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = KIT.skinShade;                   // 귀
+    ctx.beginPath();
+    ctx.arc(-2, 2, 2.4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    ctx.restore();
+  }
+
+  /* ------------------------------------------------------------ 킥오프 */
+
+  function kickerPose(t) {
+    var runT = 0.55;
+    var A, bend, lean, arm;
+    if (t < runT) {
+      var r = Math.sin(t * 17);
+      A = r * 40; bend = 26 + Math.max(0, -r) * 26; lean = 6; arm = -r * 34;
+    } else if (t < kick.impactAt) {
+      var k = (t - runT) / (kick.impactAt - runT);
+      A = lerp(40, -66, easeOut(k)); bend = lerp(26, 56, k);
+      lean = lerp(6, -10, k); arm = lerp(-32, 36, k);
+    } else {
+      var f = Math.min(1, (t - kick.impactAt) / 0.30);
+      A = lerp(-66, 78, easeOut(f)); bend = lerp(56, 4, easeOut(f));
+      lean = lerp(-10, 12, f); arm = lerp(36, -28, f);
+    }
+    return {
+      frontLeg: A, frontBend: bend,
+      backLeg: -A * 0.35, backBend: 12 + Math.max(0, A) * 0.15,
+      lean: lean, armF: arm, armB: -arm * 0.8, crouch: 0, headTilt: lean * 0.4
+    };
+  }
+
   function drawKicker() {
     var t = kick.t;
     var scale = Math.max(1, Math.min(1.6, H / 700));
@@ -2443,111 +2822,10 @@ p { margin: 8px 0; line-height: 1.55; color: #dbe7f7; font-size: 14px; }
     var runT = 0.55;
     var px = t < runT ? lerp(kick.startX, standX, easeOut(t / runT)) : standX;
     var bob = t < runT ? Math.abs(Math.sin(t * 17)) * 4 : 0;
-
-    var A, bend, lean, arm;
-    if (t < runT) {                                   // 달려오기
-      var r = Math.sin(t * 17);
-      A = r * 40; bend = 26 + Math.max(0, -r) * 26; lean = 6; arm = -r * 34;
-    } else if (t < kick.impactAt) {                   // 백스윙
-      var k = (t - runT) / (kick.impactAt - runT);
-      A = lerp(40, -66, easeOut(k)); bend = lerp(26, 56, k);
-      lean = lerp(6, -10, k); arm = lerp(-32, 36, k);
-    } else {                                          // 임팩트 → 팔로스루
-      var f = Math.min(1, (t - kick.impactAt) / 0.30);
-      A = lerp(-66, 78, easeOut(f)); bend = lerp(56, 4, easeOut(f));
-      lean = lerp(-10, 12, f); arm = lerp(36, -28, f);
-    }
-
     var fade = 1;
     if (kick.launched) fade = Math.max(0, 1 - (t - kick.impactAt - 0.25) / 0.45);
     if (fade <= 0) return;
-
-    var rad = Math.PI / 180;
-    ctx.save();
-    ctx.globalAlpha = fade;
-
-    // 발밑 그림자
-    ctx.fillStyle = 'rgba(0,0,0,0.30)';
-    ctx.beginPath();
-    ctx.ellipse(px + 6, groundY + 2, 30 * scale, 7, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.translate(px, groundY + 2 - bob);
-    ctx.scale(scale, scale);
-    ctx.lineCap = 'round';
-    ctx.strokeStyle = '#0c1726';
-    ctx.fillStyle = '#0c1726';
-
-    var hipY = -62;
-    var shoulderY = hipY - 36;
-    var sx = lean * 0.6;
-
-    // 지지 다리
-    ctx.lineWidth = 12;
-    ctx.beginPath();
-    ctx.moveTo(0, hipY);
-    ctx.lineTo(-5, -14);
-    ctx.lineTo(3, -2);
-    ctx.stroke();
-
-    // 킥 다리 (허벅지 → 정강이 → 축구화)
-    ctx.save();
-    ctx.translate(0, hipY);
-    ctx.rotate(A * rad);
-    ctx.lineWidth = 13;
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(0, 32);
-    ctx.stroke();
-    ctx.translate(0, 32);
-    ctx.rotate(-bend * rad);
-    ctx.lineWidth = 11;
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(0, 30);
-    ctx.stroke();
-    ctx.translate(0, 30);
-    ctx.fillStyle = '#ff9933';
-    ctx.beginPath();
-    ctx.ellipse(4, 2, 12, 6, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-
-    // 몸통
-    ctx.strokeStyle = '#0c1726';
-    ctx.lineWidth = 17;
-    ctx.beginPath();
-    ctx.moveTo(0, hipY);
-    ctx.lineTo(sx, shoulderY);
-    ctx.stroke();
-
-    // 유니폼 띠 — 국기색, 팀·번호·이름 없음
-    ctx.strokeStyle = '#ff9933';
-    ctx.lineWidth = 4.5;
-    ctx.beginPath();
-    ctx.moveTo(-1, hipY - 12);
-    ctx.lineTo(sx - 1, shoulderY + 11);
-    ctx.stroke();
-
-    // 팔
-    ctx.strokeStyle = '#0c1726';
-    ctx.lineWidth = 9;
-    ctx.beginPath();
-    ctx.moveTo(sx, shoulderY + 5);
-    ctx.lineTo(sx + arm * 0.5, shoulderY + 24);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(sx, shoulderY + 5);
-    ctx.lineTo(sx - arm * 0.42, shoulderY + 26);
-    ctx.stroke();
-
-    // 머리
-    ctx.fillStyle = '#0c1726';
-    ctx.beginPath();
-    ctx.arc(sx + 2, shoulderY - 13, 11, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.restore();
+    drawPlayer(px, groundY + 2 - bob, scale, kickerPose(t), fade);
   }
 
   function drawKickoffText() {
@@ -2601,8 +2879,10 @@ p { margin: 8px 0; line-height: 1.55; color: #dbe7f7; font-size: 14px; }
     drawBackground();
     for (var i = 0; i < gates.length; i++) drawGate(gates[i]);
     if (state === 'kickoff') drawKicker();
+    if (header) drawHeaderPlayer();
     drawSparks();
     if (ball) drawBall();
+    drawPopups();
     if (state === 'ready') drawReadyHint();
     if (state === 'kickoff') drawKickoffText();
   }
@@ -2787,9 +3067,14 @@ p { margin: 8px 0; line-height: 1.55; color: #dbe7f7; font-size: 14px; }
         gateWidth: GATE_W,
         endReason: lastEndReason,
         kick: kick ? { t: kick.t, launched: kick.launched } : null,
+        header: header ? { x: header.x, state: header.state, hit: header.hit, lift: header.lift } : null,
+        nextHeaderAt: nextHeaderAt,
         size: { w: W, h: H, groundY: groundY }
       };
     },
+    // 자동화 테스트용: 골문을 비우고 헤딩 선수를 즉시 부른다
+    debugClearGates: function () { gates = []; },
+    debugSpawnHeader: function () { nextHeaderAt = 0; header = null; },
     // 아트 확인용: 특정 스테이지 연출을 즉시 적용한다
     previewStage: function (key) {
       for (var i = 0; i < E.STAGES.length; i++) {

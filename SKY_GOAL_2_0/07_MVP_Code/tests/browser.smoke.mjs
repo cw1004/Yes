@@ -312,6 +312,37 @@ try {
     }));
   await page.evaluate(() => window.SkyGoal.home());
 
+  // 헤딩 보너스
+  await page.evaluate(() => {
+    window.SkyGoal.home();
+    window.SkyGoal.start();
+    window.SkyGoal.flap();                 // 킥오프 통과
+    window.SkyGoal.debugClearGates();      // 골문 없이 헤딩만 검증
+    window.SkyGoal.debugSpawnHeader();
+    // 낮게 호버링하며 헤딩 지점으로 들어간다
+    window.__hover = setInterval(() => {
+      const d = window.SkyGoal.debug();
+      if (!d.ball) return;
+      if (d.ball.y > d.size.groundY - 130) window.SkyGoal.flap();
+      window.SkyGoal.debugClearGates();
+    }, 30);
+  });
+  const headerResult = await page.waitForFunction(() => {
+    const d = window.SkyGoal.debug();
+    const r = window.SkyGoal.getRun();
+    if (d.header && d.header.hit) return { score: r.score, headers: r.headerCount, vy: d.ball.vy };
+    return false;
+  }, null, { timeout: 15000 }).then((h) => h.jsonValue()).catch(() => null);
+  await page.evaluate(() => clearInterval(window.__hover));
+  check('낮게 날면 선수가 점프해 헤딩으로 넘겨준다',
+    !!headerResult && headerResult.headers === 1 && headerResult.score >= 40,
+    JSON.stringify(headerResult));
+  check('헤딩은 공을 강하게 띄운다', !!headerResult && headerResult.vy < -400,
+    headerResult ? 'vy=' + headerResult.vy.toFixed(0) : 'none');
+  await page.evaluate(() => window.SkyGoal.forceEnd());
+  check('결과 화면에 헤딩 횟수가 표시된다',
+    (await page.textContent('#r-line')).includes('헤딩'), (await page.textContent('#r-line')).trim());
+
   // 킥오프 건너뛰기
   await page.evaluate(() => { window.SkyGoal.home(); window.SkyGoal.start(); });
   check('킥오프 상태로 시작한다', (await page.evaluate(() => window.SkyGoal.getState())) === 'kickoff');
