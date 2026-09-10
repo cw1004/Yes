@@ -11,28 +11,43 @@ import os, re, io, sys, cairosvg
 from pypdf import PdfWriter, PdfReader
 
 HERE=os.path.dirname(os.path.abspath(__file__))
-MULT=int(sys.argv[1]) if len(sys.argv)>1 else 1
-SHEETS=[("VC-100","General Assembly","VC-100_general-assembly.svg"),
+ARGS=[a for a in sys.argv[1:]]
+SET=next((a for a in ARGS if a in ("vc","cp")),"vc")
+MULT=next((int(a) for a in ARGS if a.isdigit()),1)
+VC_SHEETS=[("VC-100","General Assembly","VC-100_general-assembly.svg"),
         ("VC-101","Chamber Base","VC-101_chamber-base.svg"),
         ("VC-102","Chamber Lid","VC-102_chamber-lid.svg"),
         ("VC-103","Sintered Wick - Process Specification","VC-103_wick-sinter-spec.svg"),
         ("VC-201","Fin Stack - Two Configurations","VC-201_fin-stacks.svg"),
         ("VC-300","Process & Charging Specification","VC-300_process-charging.svg"),
         ("VC-400","Maxsorb III Reservoir - Test Coupon","VC-400_maxsorb-test-coupon.svg")]
+CP_SHEETS=[("CP-100","D2C Cold Plate - General Assembly","CP-100_general-assembly.svg"),
+        ("CP-101","Cold Plate Body","CP-101_body.svg"),
+        ("CP-102","Cover / Manifold","CP-102_cover.svg"),
+        ("CP-103","Thermal-Hydraulic Specification","CP-103_thermal-hydraulic.svg"),
+        ("CP-200","SXM5 Mounting Interface","CP-200_mounting.svg"),
+        ("CP-300","Process, Test & Coolant Specification","CP-300_process-coolant.svg")]
+SHEETS = VC_SHEETS if SET=="vc" else CP_SHEETS
+SRCDIR = "out" if SET=="vc" else "cp_out"
+MODNAME= "sheets" if SET=="vc" else "cp_sheets"
+SETNAME= ("VC-100 Vapour Chamber" if SET=="vc" else "CP-100 D2C Cold Plate")
+SETSUBJ= ("Cu-H2O vapour chamber 68 x 68 x 27 mm" if SET=="vc"
+          else "Direct-to-chip cold plate for H100 SXM5, 700 W, Cu C10200")
 
 if MULT!=1:                       # regenerate the sheets with multiplied scale labels
-    import draft; draft.SCALE_MULT=MULT
-    import sheets
-    sheets.OUT=os.path.join(HERE,f"out{MULT}x"); os.makedirs(sheets.OUT,exist_ok=True)
-    for fn in (sheets.sheet1,sheets.sheet2,sheets.sheet3,sheets.sheet4,
-               sheets.sheet5,sheets.sheet6,sheets.sheet7): fn()
-    SRC=sheets.OUT
+    import draft, importlib; draft.SCALE_MULT=MULT
+    mod=importlib.import_module(MODNAME)
+    mod.OUT=os.path.join(HERE,f"{SRCDIR}{MULT}x"); os.makedirs(mod.OUT,exist_ok=True)
+    fns=[getattr(mod,f"sheet{i}") for i in range(1,len(SHEETS)+1)]
+    for fn in fns: fn()
+    SRC=mod.OUT
 else:
-    SRC=os.path.join(HERE,"out")
+    SRC=os.path.join(HERE,SRCDIR)
 
 PDF=os.path.join(HERE,"pdf"); os.makedirs(PDF,exist_ok=True)
 PW,PH=420*MULT,297*MULT
 TAG="" if MULT==1 else f"_{MULT}x"
+PRE=SET.upper()
 
 def to_pdf_bytes(path):
     svg=open(path).read()
@@ -52,12 +67,12 @@ for i,(no,title,fn) in enumerate(SHEETS):
 
 size=f"ISO A3 420 x 297 mm" if MULT==1 else f"{PW} x {PH} mm ({MULT}x enlargement, scales restated)"
 writer.add_metadata({
- "/Title":f"VC-100 Vapour Chamber - Manufacturing Drawing Set, Rev A ({'A3' if MULT==1 else str(MULT)+'x'})",
- "/Subject":f"Cu-H2O vapour chamber 68 x 68 x 27 mm. 7 sheets, {size}.",
+ "/Title":f"{SETNAME} - Manufacturing Drawing Set, Rev A ({'A3' if MULT==1 else str(MULT)+'x'})",
+ "/Subject":f"{SETSUBJ}. {len(SHEETS)} sheets, {size}.",
  "/Author":"INDIA-VC Thermal Hardware",
- "/Keywords":"vapour chamber, heat pipe, sintered wick, ISO 128, ISO 2768-mK, Rev A, CHECKED PENDING",
- "/Creator":"drawings/sheets.py (parametric, from sim/design_spec.py)"})
+ "/Keywords":"ISO 128, ISO 2768-mK, Rev A, CHECKED PENDING",
+ "/Creator":f"drawings/{MODNAME}.py (parametric)"})
 writer.page_layout="/SinglePage"
-out=os.path.join(PDF,f"VC-100_drawing-set_RevA{TAG}.pdf")
+out=os.path.join(PDF,f"{PRE}-100_drawing-set_RevA{TAG}.pdf")
 with open(out,"wb") as f: writer.write(f)
 print(f"\nset: {out}  {os.path.getsize(out)/1024:.0f} KB, {len(writer.pages)} pages, {size}")

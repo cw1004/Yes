@@ -7,22 +7,25 @@ SPEC = dict(
     # --- service ---
     Q=700.0, die=28.5, Tw_in=45.0, Tdie_max=75.0,       # 45 C warm-water facility loop
     # --- CP-101 body, Cu C10200 ---
-    L=76.0, W=66.0, H_body=9.0, base_t=1.5,
+    L=76.0, W=72.0, H_body=6.0, base_t=1.5,
     fin_w=50.0, fin_L=40.0,                              # fin field: 50 across flow, 40 along
     fin_t=0.15, ch_w=0.25, fin_h=4.0,                    # skived
-    plenum=7.0, oring=2.0, oring_gr=2.6,
-    port_id=8.0, port="G1/4 BSPP",
-    # --- CP-102 cover ---
-    cover_t=8.0, bolt=12,                                # M3 perimeter bolts
+    plenum=7.0, pocket_d=4.5,                            # pocket = base_t..H_body
+    tip_clr=0.05,                                        # fin tip to cover, max
+    # --- CP-102 cover, vacuum brazed (no elastomer inside the loop) ---
+    cover_t=5.0, port_boss=6.0, port_id=8.0, port="G1/4 BSPP",
+    braze="BCuP-5 preform ring, perimeter only",
     # --- mount ---
-    mnt_screw="M3 x 0.5", mnt_n=4, belleville="2 x stacked, series",
+    mnt_screw="M3 x 0.5", mnt_n=4, mnt_edge=6.0, belleville="2 x stacked, series",
     # --- loop ---
     flow_lpm=1.5, dP_budget=50.0,                        # kPa per cold plate
 )
 S=SPEC
 S['ch_p']=S['fin_t']+S['ch_w']
 S['n_ch']=int(S['fin_w']/S['ch_p'])
-S['H_total']=S['H_body']+S['cover_t']
+S['pocket_L']=S['fin_L']+2*S['plenum']
+S['pocket_W']=S['fin_w']
+S['H_total']=S['H_body']+S['cover_t']+S['port_boss']
 
 class Fluid:
     def __init__(s,n,rho,cp,k,mu): s.name,s.rho,s.cp,s.k,s.mu=n,rho,cp,k,mu
