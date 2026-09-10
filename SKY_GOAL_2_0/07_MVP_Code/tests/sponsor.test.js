@@ -132,25 +132,6 @@ test('한글 배너는 눕히지 않고 세로로 쌓는다', () => {
   assert.ok(ctx2.calls.text.includes(latin.text));
 });
 
-test('대형 광고판은 크기가 확보될 때만 그려진다', () => {
-  const small = fakeCtx();
-  assert.strictEqual(S.drawBillboard(small, S.pick(0), 0, 200, 60, 40), false, '작으면 생략');
-  assert.strictEqual(small.calls.fills + small.calls.rects, 0);
-  assert.strictEqual(S.drawBillboard(small, null, 0, 200, 200, 90), false);
-
-  const ctx = fakeCtx();
-  assert.strictEqual(S.drawBillboard(ctx, S.pick(0), 10, 300, 220, 100), true);
-  assert.ok(ctx.calls.rects > 0, '기둥과 액센트 바가 그려진다');
-  assert.ok(ctx.calls.text.length >= 1, '문구가 들어간다');
-  assert.ok(ctx.calls.gradients > 0, '조명 빛이 그려진다');
-
-  // 마크가 없는 보드도 기본 마크로 안전하게 그려진다
-  const noMark = fakeCtx();
-  assert.strictEqual(
-    S.drawBillboard(noMark, { text: 'X', bg: '#000000', fg: '#ffffff', accent: '#ff0000' },
-                    0, 300, 200, 90), true);
-});
-
 test('대형 세로 광고판', () => {
   const small = fakeCtx();
   assert.strictEqual(S.drawTowerBillboard(small, S.pick(0), 0, 300, 60, 80), false, '낮으면 생략');

@@ -2212,78 +2212,6 @@ if ('serviceWorker' in navigator) {
   }
 
   /**
-   * 대형 광고판 — 강 건너 둑에 세워진 옥외 간판.
-   * 배경 레이어에 그리므로 골문·공보다 항상 뒤에 있고 플레이를 가리지 않는다.
-   * x,baseY 는 기둥이 땅에 닿는 지점(왼쪽 기준), w/h 는 패널 크기.
-   */
-  function drawBillboard(ctx, board, x, baseY, w, h, alpha) {
-    if (!board || w < 90) return false;
-    var legH = Math.max(16, h * 0.34);
-    var top = baseY - legH - h;
-
-    ctx.save();
-    ctx.globalAlpha = alpha === undefined ? 1 : alpha;
-
-    // 지지 기둥
-    ctx.fillStyle = 'rgba(30,40,54,0.85)';
-    ctx.fillRect(x + w * 0.18, baseY - legH, Math.max(3, w * 0.035), legH);
-    ctx.fillRect(x + w * 0.78, baseY - legH, Math.max(3, w * 0.035), legH);
-    ctx.fillRect(x + w * 0.18, baseY - legH * 0.55, w * 0.63, Math.max(2, w * 0.014));
-
-    // 패널
-    ctx.fillStyle = board.bg;
-    roundRect(ctx, x, top, w, h, 6);
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,0.22)';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-    ctx.fillStyle = board.accent;
-    ctx.fillRect(x + 6, top + 5, w - 12, 4);
-    ctx.fillRect(x + 6, top + h - 9, w - 12, 4);
-
-    // 로고 + 문구 (가로 배치)
-    var markR = Math.min(h * 0.26, w * 0.12);
-    drawMark(ctx, board.mark || 'shield', x + 14 + markR, top + h * 0.5, markR,
-             board.accent, board.bg);
-    var tx = x + 22 + markR * 2;
-    var tw = w - (tx - x) - 14;
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'middle';
-    ctx.fillStyle = board.fg;
-    ctx.font = '800 ' + Math.round(h * 0.24) + 'px system-ui, sans-serif';
-    ctx.fillText(board.text, tx, top + h * (board.sub ? 0.42 : 0.5), tw);
-    if (board.sub) {
-      ctx.fillStyle = board.accent;
-      ctx.font = '600 ' + Math.round(h * 0.15) + 'px system-ui, sans-serif';
-      ctx.fillText(board.sub, tx, top + h * 0.68, tw);
-    }
-
-    // 조명 — 위쪽 램프와 옅은 빛
-    ctx.fillStyle = 'rgba(255,240,200,0.85)';
-    for (var i = 0; i < 3; i++) {
-      var lx = x + w * (0.24 + i * 0.26);
-      ctx.fillRect(lx - 3, top - 7, 6, 5);
-      var glow = ctx.createLinearGradient(0, top - 6, 0, top + h * 0.55);
-      glow.addColorStop(0, 'rgba(255,240,200,0.22)');
-      glow.addColorStop(1, 'rgba(255,240,200,0)');
-      ctx.fillStyle = glow;
-      ctx.beginPath();
-      ctx.moveTo(lx - 4, top - 4);
-      ctx.lineTo(lx + 4, top - 4);
-      ctx.lineTo(lx + w * 0.12, top + h * 0.55);
-      ctx.lineTo(lx - w * 0.12, top + h * 0.55);
-      ctx.closePath();
-      ctx.fill();
-      ctx.fillStyle = 'rgba(255,240,200,0.85)';
-    }
-
-    ctx.restore();
-    ctx.textAlign = 'start';
-    ctx.textBaseline = 'alphabetic';
-    return true;
-  }
-
-  /**
    * 대형 세로 광고판 — 타워형 간판. 좁고 높아서 하늘 쪽으로 뻗는다.
    * 한글은 세로쓰기, 영문은 눕혀서 표시한다(기둥 배너와 같은 규칙).
    */
@@ -2417,7 +2345,6 @@ if ('serviceWorker' in navigator) {
     drawMark: drawMark,
     hasHangul: hasHangul,
     drawPostBanner: drawPostBanner,
-    drawBillboard: drawBillboard,
     drawTowerBillboard: drawTowerBillboard,
     drawPerimeter: drawPerimeter
   };
@@ -3456,33 +3383,25 @@ if ('serviceWorker' in navigator) {
     drawCheerSquad();
   }
 
-  // 대형 광고판 — 강 건너 둑에 일정 간격으로 세워진다 (배경 레이어)
+  // 대형 세로 광고판 — 강 건너 둑에 일정 간격으로 세워진다 (배경 레이어)
   function drawBillboards() {
-    if (!Sponsor || !scenery || !Sponsor.drawBillboard) return;
+    if (!Sponsor || !scenery || !Sponsor.drawTowerBillboard) return;
     var L = scenery.layout();
     if (!L) return;
     var par = 0.22;                       // 숲과 같은 속도로 흐른다
     // 간판 사이 간격(패럴랙스 좌표). 700 이면 실제 이동 거리로 약 3,200px,
     // 기본 속도에서 10초에 한 번꼴로 새 간판이 지나간다.
     var spacing = 700;
-    var bw = Math.max(150, Math.min(250, W * 0.58));
-    var bh = bw * 0.46;
-    var baseY = L.riverTop + 2;
-    var tw = Math.max(52, Math.min(84, W * 0.19));      // 세로형 폭
+    var tw = Math.max(52, Math.min(84, W * 0.19));
     var th = tw * 3.1;
+    var baseY = L.riverTop + 2;
     var travelled = scroll * par;
-    var start = Math.floor((travelled - bw) / spacing);
+    var start = Math.floor((travelled - tw) / spacing);
     var end = Math.ceil((travelled + W) / spacing);
     for (var n = start; n <= end; n++) {
       var sx = n * spacing - travelled;
-      // 가로형과 세로형을 번갈아 세운다
-      if (n % 2 === 0) {
-        if (sx <= W + 10 && sx + bw >= -10) {
-          Sponsor.drawBillboard(ctx, Sponsor.pick(n * 2 + 1), sx, baseY, bw, bh, 0.94);
-        }
-      } else if (sx <= W + 10 && sx + tw >= -10) {
-        Sponsor.drawTowerBillboard(ctx, Sponsor.pick(n * 2 + 1), sx, baseY, tw, th, 0.94);
-      }
+      if (sx > W + 10 || sx + tw < -10) continue;
+      Sponsor.drawTowerBillboard(ctx, Sponsor.pick(n * 2 + 1), sx, baseY, tw, th, 0.94);
     }
   }
 

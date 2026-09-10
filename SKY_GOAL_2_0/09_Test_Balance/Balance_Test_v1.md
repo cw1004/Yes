@@ -61,7 +61,7 @@ node 07_MVP_Code/tests/browser.smoke.mjs --screenshot ./shots
 | 7개 스테이지 | 팔레트 존재 + 렌더 호출 발생, 알 수 없는 키도 안전 |
 | 초기화 전 호출 | resize 전에 draw 해도 죽지 않음 |
 
-## 1-4. 광고판 테스트 (`tests/sponsor.test.js`, 12개)
+## 1-4. 광고판 테스트 (`tests/sponsor.test.js`, 11개)
 | 항목 | 확인 내용 |
 |---|---|
 | 목록 유효성 | id 중복 없음, 색 형식, 문구 길이, 판매용 지면 존재 |
@@ -74,7 +74,6 @@ node 07_MVP_Code/tests/browser.smoke.mjs --screenshot ./shots
 | 가상 브랜드 | 이름 있는 광고는 전부 `fictional: true` (실존 상표 사용 방지) |
 | 로고 마크 | 정의된 7종만 사용, 알 수 없는 값도 안전하게 그려짐 |
 | 노출 순서 | 모든 보드가 정확히 한 번, **광고 3연속 금지**, 캠페인이 고르게 분포 |
-| 대형 광고판 | 크기가 작으면 생략, 정상 크기면 기둥·문구·조명이 그려짐, 마크 없어도 안전 |
 | 대형 세로 광고판 | 높이가 모자라면 생략, 한글 세로쓰기 / 영문 눕히기 |
 
 ## 2. 브라우저 스모크 테스트 (`tests/browser.smoke.mjs`, 69개)

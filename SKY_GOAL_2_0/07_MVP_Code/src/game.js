@@ -1029,33 +1029,25 @@
     drawCheerSquad();
   }
 
-  // 대형 광고판 — 강 건너 둑에 일정 간격으로 세워진다 (배경 레이어)
+  // 대형 세로 광고판 — 강 건너 둑에 일정 간격으로 세워진다 (배경 레이어)
   function drawBillboards() {
-    if (!Sponsor || !scenery || !Sponsor.drawBillboard) return;
+    if (!Sponsor || !scenery || !Sponsor.drawTowerBillboard) return;
     var L = scenery.layout();
     if (!L) return;
     var par = 0.22;                       // 숲과 같은 속도로 흐른다
     // 간판 사이 간격(패럴랙스 좌표). 700 이면 실제 이동 거리로 약 3,200px,
     // 기본 속도에서 10초에 한 번꼴로 새 간판이 지나간다.
     var spacing = 700;
-    var bw = Math.max(150, Math.min(250, W * 0.58));
-    var bh = bw * 0.46;
-    var baseY = L.riverTop + 2;
-    var tw = Math.max(52, Math.min(84, W * 0.19));      // 세로형 폭
+    var tw = Math.max(52, Math.min(84, W * 0.19));
     var th = tw * 3.1;
+    var baseY = L.riverTop + 2;
     var travelled = scroll * par;
-    var start = Math.floor((travelled - bw) / spacing);
+    var start = Math.floor((travelled - tw) / spacing);
     var end = Math.ceil((travelled + W) / spacing);
     for (var n = start; n <= end; n++) {
       var sx = n * spacing - travelled;
-      // 가로형과 세로형을 번갈아 세운다
-      if (n % 2 === 0) {
-        if (sx <= W + 10 && sx + bw >= -10) {
-          Sponsor.drawBillboard(ctx, Sponsor.pick(n * 2 + 1), sx, baseY, bw, bh, 0.94);
-        }
-      } else if (sx <= W + 10 && sx + tw >= -10) {
-        Sponsor.drawTowerBillboard(ctx, Sponsor.pick(n * 2 + 1), sx, baseY, tw, th, 0.94);
-      }
+      if (sx > W + 10 || sx + tw < -10) continue;
+      Sponsor.drawTowerBillboard(ctx, Sponsor.pick(n * 2 + 1), sx, baseY, tw, th, 0.94);
     }
   }
 
