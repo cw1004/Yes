@@ -1028,51 +1028,38 @@
     drawCheerSquad();
   }
 
-  // 대형 세로 광고판 — 강 건너 둑에 일정 간격으로 세워진다 (배경 레이어)
+  // 흐르는 광고 — 작은 가로 보드. 화면 중간보다 약간 위에 떠서 지나간다.
+  // 배경 레이어라 골문·공보다 항상 뒤에 있고, 공이 주로 오가는 띠(골문 중앙 부근)를
+  // 피하려고 위쪽에 둔다.
   function drawBillboards() {
-    if (!Sponsor || !scenery || !Sponsor.drawTowerBillboard) return;
-    var L = scenery.layout();
-    if (!L) return;
-    var par = 0.22;                       // 숲과 같은 속도로 흐른다
-    // 간판 사이 간격(패럴랙스 좌표). 700 이면 실제 이동 거리로 약 3,200px,
-    // 기본 속도에서 10초에 한 번꼴로 새 간판이 지나간다.
-    var spacing = 700;
-    var tw = Math.max(52, Math.min(84, W * 0.19));
-    var th = tw * 3.1;
-    var baseY = L.riverTop + 2;
+    if (!Sponsor || !Sponsor.drawSignBoard) return;
+
+    var bw = Math.max(132, Math.min(190, W * 0.42));
+    var bh = bw * 0.28;
 
     // 경기 시작 전(메인 화면·킥오프·준비)에는 흐르는 간판 대신
-    // '지구 살리기 운동' 캠페인 보드를 가운데 하나만 건다.
+    // '지구 살리기 운동' 캠페인 보드를 화면 정중앙에 하나만 건다.
     if (state !== 'playing' && state !== 'ceremony' && Sponsor.introBoard) {
       var iw = Math.max(180, Math.min(280, W * 0.64));
       var ih = iw * 0.26;
-      var iy = H * 0.5;                               // 화면 한가운데
-      Sponsor.drawSignBoard(ctx, Sponsor.introBoard(), (W - iw) / 2, iy + ih / 2,
+      Sponsor.drawSignBoard(ctx, Sponsor.introBoard(), (W - iw) / 2, H * 0.5 + ih / 2,
                             iw, ih, 0.95, true);
       return;
     }
 
-    // 모든 간판은 화면 밖 오른쪽에서 출발한다. 이렇게 하지 않으면 스크롤이 0인
-    // 킥오프 직후에 첫 간판이 화면 왼쪽(선수 자리)에 그대로 걸린다.
-    // 시작 후 약 5초 동안은 화면이 비어 있다가 오른쪽에서 하나씩 들어온다.
+    var par = 0.22;                       // 숲과 같은 속도로 흐른다
+    var spacing = 700;                    // 실제 이동 거리로 약 3,200px (10초에 하나)
+    var by = H * 0.33;                    // 중간보다 약간 위
+    // 모든 간판은 화면 밖 오른쪽에서 출발한다. 그러지 않으면 스크롤이 0인
+    // 킥오프 직후에 첫 간판이 선수 자리(화면 왼쪽)에 그대로 걸린다.
     var travelled = scroll * par - (W + spacing * 0.5);
-    var start = Math.max(0, Math.floor((travelled - tw) / spacing));
+    var start = Math.max(0, Math.floor((travelled - bw) / spacing));
     var end = Math.ceil((travelled + W) / spacing);
-    // 자연보호 캠페인 표지판 — 타워와 타워 사이 중간에 작게 놓는다
-    var sw = Math.max(96, Math.min(152, W * 0.35));
-    var sh = sw * 0.30;
 
     for (var n = start; n <= end; n++) {
       var sx = n * spacing - travelled;
-      if (sx <= W + 10 && sx + tw >= -10) {
-        Sponsor.drawTowerBillboard(ctx, Sponsor.pick(n * 2 + 1), sx, baseY, tw, th, 0.94);
-      }
-      if (Sponsor.drawSignBoard) {
-        var mx = (n + 0.5) * spacing - travelled;       // 두 타워의 한가운데
-        if (mx <= W + 10 && mx + sw >= -10) {
-          Sponsor.drawSignBoard(ctx, Sponsor.pickKind('campaign', n), mx, baseY, sw, sh, 0.92);
-        }
-      }
+      if (sx > W + 10 || sx + bw < -10) continue;
+      Sponsor.drawSignBoard(ctx, Sponsor.pick(n * 2 + 1), sx, by + bh / 2, bw, bh, 0.92, true);
     }
   }
 

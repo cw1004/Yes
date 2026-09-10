@@ -174,21 +174,45 @@ test('작은 가로 캠페인 표지판', () => {
   assert.strictEqual(ctx.calls.rotate, 0, '작은 가로 표지판은 회전하지 않는다');
 });
 
-test('대형 세로 광고판', () => {
-  const small = fakeCtx();
-  assert.strictEqual(S.drawTowerBillboard(small, S.pick(0), 0, 300, 60, 80), false, '낮으면 생략');
-  assert.strictEqual(S.drawTowerBillboard(small, null, 0, 300, 60, 200), false);
-
-  const latin = S.BOARDS.find((b) => !S.hasHangul(b.text));
-  const ctxL = fakeCtx();
-  assert.strictEqual(S.drawTowerBillboard(ctxL, latin, 0, 400, 70, 220), true);
-  assert.ok(ctxL.calls.rotate > 0, '영문은 눕혀서 그린다');
-  assert.ok(ctxL.calls.text.includes(latin.text));
-
-  const korean = S.BOARDS.find((b) => S.hasHangul(b.text));
-  const ctxK = fakeCtx();
-  S.drawTowerBillboard(ctxK, korean, 0, 400, 70, 220);
-  const chars = korean.text.replace(/\s+/g, '').length;
-  assert.strictEqual(ctxK.calls.text.filter((t) => t.length === 1).length, chars,
-    '한글은 세로쓰기로 한 자씩');
+test('캠페인 표지판은 캠페인 보드만 돌린다', () => {
+  const n = S.boardsOfKind('campaign').length;
+  assert.ok(n >= 3);
+  for (let i = 0; i < n * 2 + 3; i++) {
+    const b = S.pickKind('campaign', i);
+    assert.strictEqual(b.kind, 'campaign', i + '번째가 캠페인이 아니다: ' + b.id);
+  }
+  assert.strictEqual(S.pickKind('campaign', 0).id, S.pickKind('campaign', n).id, '한 바퀴 순환');
+  assert.strictEqual(S.pickKind('campaign', -1).kind, 'campaign', '음수도 안전');
+  assert.strictEqual(S.pickKind('없는종류', 0), null);
 });
+
+test('경기 시작 전에는 지구 살리기 캠페인을 건다', () => {
+  const intro = S.introBoard();
+  assert.ok(intro, '인트로 보드가 반드시 있어야 한다');
+  assert.strictEqual(intro.id, S.INTRO_BOARD);
+  assert.strictEqual(intro.kind, 'campaign', '인트로는 광고가 아니라 캠페인이어야 한다');
+  assert.ok(intro.text.length > 0);
+  assert.strictEqual(S.boardById(S.INTRO_BOARD).id, S.INTRO_BOARD);
+  assert.strictEqual(S.boardById('없는보드'), null);
+
+  // 가로 표지판으로 그려진다 (눕히지 않는다)
+  const ctx = fakeCtx();
+  assert.strictEqual(S.drawSignBoard(ctx, intro, 0, 400, 240, 62), true);
+  assert.ok(ctx.calls.text.includes(intro.text));
+  assert.strictEqual(ctx.calls.rotate, 0);
+});
+
+test('작은 가로 캠페인 표지판', () => {
+  const small = fakeCtx();
+  assert.strictEqual(S.drawSignBoard(small, S.pickKind('campaign', 0), 0, 300, 60, 20), false,
+    '너무 좁으면 생략');
+  assert.strictEqual(S.drawSignBoard(small, null, 0, 300, 140, 42), false);
+
+  const ctx = fakeCtx();
+  const board = S.pickKind('campaign', 0);
+  assert.strictEqual(S.drawSignBoard(ctx, board, 10, 300, 140, 42), true);
+  assert.ok(ctx.calls.rects >= 2, '나무 기둥 두 개가 그려진다');
+  assert.ok(ctx.calls.text.includes(board.text), '한글 문구를 눕히지 않고 그대로 쓴다');
+  assert.strictEqual(ctx.calls.rotate, 0, '작은 가로 표지판은 회전하지 않는다');
+});
+

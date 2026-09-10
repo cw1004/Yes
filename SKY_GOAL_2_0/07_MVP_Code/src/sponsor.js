@@ -384,96 +384,6 @@
     return true;
   }
 
-  /**
-   * 대형 세로 광고판 — 타워형 간판. 좁고 높아서 하늘 쪽으로 뻗는다.
-   * 한글은 세로쓰기, 영문은 눕혀서 표시한다(기둥 배너와 같은 규칙).
-   */
-  function drawTowerBillboard(ctx, board, x, baseY, w, h, alpha) {
-    if (!board || h < 110) return false;
-    var legH = Math.max(14, h * 0.10);
-    var top = baseY - legH - h;
-
-    ctx.save();
-    ctx.globalAlpha = alpha === undefined ? 1 : alpha;
-
-    // 지지대 (가운데 기둥 + 버팀대)
-    ctx.fillStyle = 'rgba(30,40,54,0.85)';
-    ctx.fillRect(x + w / 2 - Math.max(3, w * 0.06), baseY - legH, Math.max(6, w * 0.12), legH);
-    ctx.beginPath();
-    ctx.moveTo(x + w * 0.1, baseY);
-    ctx.lineTo(x + w / 2, baseY - legH);
-    ctx.lineTo(x + w * 0.9, baseY);
-    ctx.lineTo(x + w * 0.78, baseY);
-    ctx.lineTo(x + w / 2, baseY - legH * 0.55);
-    ctx.lineTo(x + w * 0.22, baseY);
-    ctx.closePath();
-    ctx.fill();
-
-    // 패널
-    ctx.fillStyle = board.bg;
-    roundRect(ctx, x, top, w, h, 7);
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,0.22)';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-    ctx.fillStyle = board.accent;
-    ctx.fillRect(x + 5, top + 6, w - 10, 4);
-    ctx.fillRect(x + 5, top + h - 10, w - 10, 4);
-
-    // 로고 (위쪽) + 문구 (아래 영역)
-    var markR = Math.min(w * 0.30, 22);
-    drawMark(ctx, board.mark || 'shield', x + w / 2, top + 18 + markR, markR,
-             board.accent, board.bg);
-    var ty = top + 26 + markR * 2;
-    var th = h - (ty - top) - 16;
-
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    if (hasHangul(board.text)) {
-      var chars = board.text.replace(/\s+/g, '').split('');
-      var step = Math.min(w * 0.72, th / Math.max(1, chars.length));
-      var startY = ty + th / 2 - (step * (chars.length - 1)) / 2;
-      ctx.fillStyle = board.fg;
-      ctx.font = '800 ' + Math.min(w * 0.62, step - 3).toFixed(0) + 'px system-ui, sans-serif';
-      for (var c = 0; c < chars.length; c++) {
-        ctx.fillText(chars[c], x + w / 2, startY + step * c, w - 8);
-      }
-    } else {
-      ctx.save();
-      ctx.translate(x + w / 2, ty + th / 2);
-      ctx.rotate(-Math.PI / 2);
-      ctx.fillStyle = board.fg;
-      ctx.font = '800 ' + Math.round(w * 0.34) + 'px system-ui, sans-serif';
-      ctx.fillText(board.text, 0, board.sub ? -w * 0.16 : 0, th - 12);
-      if (board.sub) {
-        ctx.fillStyle = board.accent;
-        ctx.font = '600 ' + Math.round(w * 0.19) + 'px system-ui, sans-serif';
-        ctx.fillText(board.sub, 0, w * 0.20, th - 12);
-      }
-      ctx.restore();
-    }
-
-    // 상단 조명
-    ctx.fillStyle = 'rgba(255,240,200,0.85)';
-    ctx.fillRect(x + w / 2 - 4, top - 7, 8, 5);
-    var glow = ctx.createLinearGradient(0, top - 6, 0, top + h * 0.45);
-    glow.addColorStop(0, 'rgba(255,240,200,0.20)');
-    glow.addColorStop(1, 'rgba(255,240,200,0)');
-    ctx.fillStyle = glow;
-    ctx.beginPath();
-    ctx.moveTo(x + w / 2 - 5, top - 4);
-    ctx.lineTo(x + w / 2 + 5, top - 4);
-    ctx.lineTo(x + w * 0.95, top + h * 0.45);
-    ctx.lineTo(x + w * 0.05, top + h * 0.45);
-    ctx.closePath();
-    ctx.fill();
-
-    ctx.restore();
-    ctx.textAlign = 'start';
-    ctx.textBaseline = 'alphabetic';
-    return true;
-  }
-
   return {
     BOARDS: BOARDS,
     CLICKABLE: CLICKABLE,
@@ -485,10 +395,9 @@
     boardById: boardById,
     introBoard: introBoard,
     INTRO_BOARD: INTRO_BOARD,
-    drawSignBoard: drawSignBoard,
     drawMark: drawMark,
     hasHangul: hasHangul,
     drawPostBanner: drawPostBanner,
-    drawTowerBillboard: drawTowerBillboard
+    drawSignBoard: drawSignBoard
   };
 });
