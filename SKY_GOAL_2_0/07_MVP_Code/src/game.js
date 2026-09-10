@@ -1046,7 +1046,9 @@
     if (state !== 'playing' && state !== 'ceremony' && Sponsor.introBoard) {
       var iw = Math.max(180, Math.min(280, W * 0.64));
       var ih = iw * 0.26;
-      Sponsor.drawSignBoard(ctx, Sponsor.introBoard(), (W - iw) / 2, baseY, iw, ih, 0.95);
+      var iy = H * 0.5;                               // 화면 한가운데
+      Sponsor.drawSignBoard(ctx, Sponsor.introBoard(), (W - iw) / 2, iy + ih / 2,
+                            iw, ih, 0.95, true);
       return;
     }
 

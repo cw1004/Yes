@@ -329,18 +329,29 @@
    * 작은 가로 표지판 — 자연보호 캠페인용.
    * 대형 간판 사이 중간에 낮게 놓여, 광고가 아니라 안내판처럼 보이게 한다.
    */
-  function drawSignBoard(ctx, board, x, baseY, w, h, alpha) {
+  function drawSignBoard(ctx, board, x, baseY, w, h, alpha, floating) {
     if (!board || w < 80) return false;
-    var legH = Math.max(10, h * 0.42);
+    var legH = floating ? 0 : Math.max(10, h * 0.42);
     var top = baseY - legH - h;
 
     ctx.save();
     ctx.globalAlpha = alpha === undefined ? 1 : alpha;
 
-    // 나무 기둥 두 개
-    ctx.fillStyle = 'rgba(62,48,34,0.9)';
-    ctx.fillRect(x + w * 0.16, top + h - 2, Math.max(3, w * 0.045), legH + 2);
-    ctx.fillRect(x + w * 0.80, top + h - 2, Math.max(3, w * 0.045), legH + 2);
+    if (floating) {
+      // 공중에 걸린 현수막 — 기둥 대신 짧은 걸이줄과 그림자
+      ctx.strokeStyle = 'rgba(230,240,255,0.45)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(x + w * 0.2, top); ctx.lineTo(x + w * 0.2, top - 10); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x + w * 0.8, top); ctx.lineTo(x + w * 0.8, top - 10); ctx.stroke();
+      ctx.fillStyle = 'rgba(0,0,0,0.18)';
+      roundRect(ctx, x + 4, top + 5, w, h, 4);
+      ctx.fill();
+    } else {
+      // 나무 기둥 두 개
+      ctx.fillStyle = 'rgba(62,48,34,0.9)';
+      ctx.fillRect(x + w * 0.16, top + h - 2, Math.max(3, w * 0.045), legH + 2);
+      ctx.fillRect(x + w * 0.80, top + h - 2, Math.max(3, w * 0.045), legH + 2);
+    }
 
     // 판
     ctx.fillStyle = board.bg;
