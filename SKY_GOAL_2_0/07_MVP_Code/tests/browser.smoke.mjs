@@ -218,7 +218,17 @@ try {
     await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
 
   // 모드 (아마추어 / 프로)
-  await page.evaluate(() => window.SkyGoal.home());
+  // 앞 단계(완주·고득점)에서 이미 해금됐을 수 있으므로 잠긴 상태로 되돌리고 시작한다
+  await page.evaluate(() => {
+    const p = window.SkyGoal.getProfile();
+    p.metrics.clears = 0;
+    p.bestScore = 0;
+    p.modes.amateur.bestScore = 0;
+    p.modes.pro.bestScore = 0;
+    p.mode = 'amateur';
+    window.SkyGoal.engine.loadModeState(p);
+    window.SkyGoal.home();
+  });
   const locked = await page.evaluate(() => ({
     mode: window.SkyGoal.getProfile().mode,
     proLocked: document.getElementById('mode-pro').classList.contains('locked')

@@ -2301,40 +2301,6 @@ if ('serviceWorker' in navigator) {
     return true;
   }
 
-  /**
-   * 그라운드 광고판 (경기장 앞 롤링 보드).
-   * x 부터 오른쪽으로 패널을 이어 그린다.
-   */
-  function drawPerimeter(ctx, x, y, w, h, offset, alpha) {
-    var panelW = 210;
-    var gap = 10;
-    var unit = panelW + gap;
-    var start = x - ((offset % unit) + unit) % unit;
-    ctx.save();
-    ctx.globalAlpha = alpha === undefined ? 1 : alpha;
-    ctx.beginPath();
-    ctx.rect(x, y, w, h);
-    ctx.clip();
-    var i = Math.floor(offset / unit);
-    for (var px = start; px < x + w + unit; px += unit, i++) {
-      var board = pick(i);
-      ctx.fillStyle = board.bg;
-      roundRect(ctx, px, y, panelW, h, 3);
-      ctx.fill();
-      ctx.fillStyle = board.accent;
-      ctx.fillRect(px, y + h - 3, panelW, 3);
-      if (board.mark) drawMark(ctx, board.mark, px + 14, y + h / 2, 5.5, board.accent, board.bg);
-      ctx.fillStyle = board.fg;
-      ctx.font = '700 11px system-ui, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(board.text, px + panelW / 2 + 8, y + h / 2, panelW - 34);
-    }
-    ctx.restore();
-    ctx.textAlign = 'start';
-    ctx.textBaseline = 'alphabetic';
-  }
-
   return {
     BOARDS: BOARDS,
     CLICKABLE: CLICKABLE,
@@ -2345,8 +2311,7 @@ if ('serviceWorker' in navigator) {
     drawMark: drawMark,
     hasHangul: hasHangul,
     drawPostBanner: drawPostBanner,
-    drawTowerBillboard: drawTowerBillboard,
-    drawPerimeter: drawPerimeter
+    drawTowerBillboard: drawTowerBillboard
   };
 });
 
@@ -3379,7 +3344,6 @@ if ('serviceWorker' in navigator) {
     drawBillboards();
     drawWeather();
     drawField();
-    if (Sponsor) Sponsor.drawPerimeter(ctx, 0, groundY + 3, W, 17, scroll * 0.9, 0.9);
     drawCheerSquad();
   }
 

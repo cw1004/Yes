@@ -150,13 +150,3 @@ test('대형 세로 광고판', () => {
   assert.strictEqual(ctxK.calls.text.filter((t) => t.length === 1).length, chars,
     '한글은 세로쓰기로 한 자씩');
 });
-
-test('그라운드 보드는 화면을 채우도록 반복된다', () => {
-  const ctx = fakeCtx();
-  S.drawPerimeter(ctx, 0, 100, 420, 18, 0, 1);
-  assert.ok(ctx.calls.clip > 0, '영역 밖으로 새지 않게 클립한다');
-  assert.ok(ctx.calls.text.length >= 2, '패널이 여러 개 그려진다: ' + ctx.calls.text.length);
-  const shifted = fakeCtx();
-  S.drawPerimeter(shifted, 0, 100, 420, 18, 5000, 1);
-  assert.ok(shifted.calls.text.length >= 2, '오프셋이 커도 정상 동작');
-});

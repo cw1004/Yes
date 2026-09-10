@@ -1025,7 +1025,6 @@
     drawBillboards();
     drawWeather();
     drawField();
-    if (Sponsor) Sponsor.drawPerimeter(ctx, 0, groundY + 3, W, 17, scroll * 0.9, 0.9);
     drawCheerSquad();
   }
 
