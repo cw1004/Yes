@@ -112,6 +112,14 @@
     return BOARDS.filter(function (b) { return b.kind === kind; });
   }
 
+  // 특정 종류 안에서만 순환한다 (예: 캠페인 표지판)
+  function pickKind(kind, index) {
+    var pool = boardsOfKind(kind);
+    if (!pool.length) return null;
+    var i = Math.floor(Math.abs(index || 0)) % pool.length;
+    return pool[i];
+  }
+
   /**
    * 배너 상단 로고 마크. 전부 자체 제작 도형이며 실존 상표를 본뜨지 않는다.
    * type: ball / boot / leaf / drop / star / shield / cup
@@ -292,6 +300,54 @@
   }
 
   /**
+   * 작은 가로 표지판 — 자연보호 캠페인용.
+   * 대형 간판 사이 중간에 낮게 놓여, 광고가 아니라 안내판처럼 보이게 한다.
+   */
+  function drawSignBoard(ctx, board, x, baseY, w, h, alpha) {
+    if (!board || w < 80) return false;
+    var legH = Math.max(10, h * 0.42);
+    var top = baseY - legH - h;
+
+    ctx.save();
+    ctx.globalAlpha = alpha === undefined ? 1 : alpha;
+
+    // 나무 기둥 두 개
+    ctx.fillStyle = 'rgba(62,48,34,0.9)';
+    ctx.fillRect(x + w * 0.16, top + h - 2, Math.max(3, w * 0.045), legH + 2);
+    ctx.fillRect(x + w * 0.80, top + h - 2, Math.max(3, w * 0.045), legH + 2);
+
+    // 판
+    ctx.fillStyle = board.bg;
+    roundRect(ctx, x, top, w, h, 4);
+    ctx.fill();
+    ctx.strokeStyle = board.accent;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // 로고 + 문구 (한 줄)
+    var markR = Math.min(h * 0.30, w * 0.09);
+    drawMark(ctx, board.mark || 'leaf', x + 10 + markR, top + h * 0.5, markR,
+             board.accent, board.bg);
+    var tx = x + 16 + markR * 2;
+    var tw = w - (tx - x) - 8;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = board.fg;
+    ctx.font = '700 ' + Math.round(h * 0.34) + 'px system-ui, sans-serif';
+    ctx.fillText(board.text, tx, top + h * (board.sub ? 0.38 : 0.5), tw);
+    if (board.sub && h > 26) {
+      ctx.fillStyle = board.accent;
+      ctx.font = '600 ' + Math.round(h * 0.22) + 'px system-ui, sans-serif';
+      ctx.fillText(board.sub, tx, top + h * 0.72, tw);
+    }
+
+    ctx.restore();
+    ctx.textAlign = 'start';
+    ctx.textBaseline = 'alphabetic';
+    return true;
+  }
+
+  /**
    * 대형 세로 광고판 — 타워형 간판. 좁고 높아서 하늘 쪽으로 뻗는다.
    * 한글은 세로쓰기, 영문은 눕혀서 표시한다(기둥 배너와 같은 규칙).
    */
@@ -388,6 +444,8 @@
     count: count,
     pick: pick,
     boardsOfKind: boardsOfKind,
+    pickKind: pickKind,
+    drawSignBoard: drawSignBoard,
     drawMark: drawMark,
     hasHangul: hasHangul,
     drawPostBanner: drawPostBanner,

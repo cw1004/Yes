@@ -61,7 +61,7 @@ node 07_MVP_Code/tests/browser.smoke.mjs --screenshot ./shots
 | 7개 스테이지 | 팔레트 존재 + 렌더 호출 발생, 알 수 없는 키도 안전 |
 | 초기화 전 호출 | resize 전에 draw 해도 죽지 않음 |
 
-## 1-4. 광고판 테스트 (`tests/sponsor.test.js`, 10개)
+## 1-4. 광고판 테스트 (`tests/sponsor.test.js`, 12개)
 | 항목 | 확인 내용 |
 |---|---|
 | 목록 유효성 | id 중복 없음, 색 형식, 문구 길이, 판매용 지면 존재 |
@@ -74,6 +74,8 @@ node 07_MVP_Code/tests/browser.smoke.mjs --screenshot ./shots
 | 로고 마크 | 정의된 7종만 사용, 알 수 없는 값도 안전하게 그려짐 |
 | 노출 순서 | 모든 보드가 정확히 한 번, **광고 3연속 금지**, 캠페인이 고르게 분포 |
 | 대형 세로 광고판 | 높이가 모자라면 생략, 한글 세로쓰기 / 영문 눕히기 |
+| 캠페인 순환 | `pickKind('campaign')` 이 캠페인 보드만 돌린다 (음수·범위 밖 포함) |
+| 캠페인 표지판 | 좁으면 생략, 나무 기둥 두 개, 한글을 눕히지 않고 그대로 표시 |
 
 ## 2. 브라우저 스모크 테스트 (`tests/browser.smoke.mjs`, 69개)
 실제 Chromium 에서 빌드된 단일 HTML 을 띄워 확인한다.

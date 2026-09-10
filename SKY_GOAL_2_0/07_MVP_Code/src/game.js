@@ -1043,10 +1043,21 @@
     var travelled = scroll * par;
     var start = Math.floor((travelled - tw) / spacing);
     var end = Math.ceil((travelled + W) / spacing);
+    // 자연보호 캠페인 표지판 — 타워와 타워 사이 중간에 작게 놓는다
+    var sw = Math.max(96, Math.min(152, W * 0.35));
+    var sh = sw * 0.30;
+
     for (var n = start; n <= end; n++) {
       var sx = n * spacing - travelled;
-      if (sx > W + 10 || sx + tw < -10) continue;
-      Sponsor.drawTowerBillboard(ctx, Sponsor.pick(n * 2 + 1), sx, baseY, tw, th, 0.94);
+      if (sx <= W + 10 && sx + tw >= -10) {
+        Sponsor.drawTowerBillboard(ctx, Sponsor.pick(n * 2 + 1), sx, baseY, tw, th, 0.94);
+      }
+      if (Sponsor.drawSignBoard) {
+        var mx = (n + 0.5) * spacing - travelled;       // 두 타워의 한가운데
+        if (mx <= W + 10 && mx + sw >= -10) {
+          Sponsor.drawSignBoard(ctx, Sponsor.pickKind('campaign', n), mx, baseY, sw, sh, 0.92);
+        }
+      }
     }
   }
 

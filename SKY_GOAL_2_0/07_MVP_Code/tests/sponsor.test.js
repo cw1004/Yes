@@ -132,6 +132,32 @@ test('한글 배너는 눕히지 않고 세로로 쌓는다', () => {
   assert.ok(ctx2.calls.text.includes(latin.text));
 });
 
+test('캠페인 표지판은 캠페인 보드만 돌린다', () => {
+  const n = S.boardsOfKind('campaign').length;
+  assert.ok(n >= 3);
+  for (let i = 0; i < n * 2 + 3; i++) {
+    const b = S.pickKind('campaign', i);
+    assert.strictEqual(b.kind, 'campaign', i + '번째가 캠페인이 아니다: ' + b.id);
+  }
+  assert.strictEqual(S.pickKind('campaign', 0).id, S.pickKind('campaign', n).id, '한 바퀴 순환');
+  assert.strictEqual(S.pickKind('campaign', -1).kind, 'campaign', '음수도 안전');
+  assert.strictEqual(S.pickKind('없는종류', 0), null);
+});
+
+test('작은 가로 캠페인 표지판', () => {
+  const small = fakeCtx();
+  assert.strictEqual(S.drawSignBoard(small, S.pickKind('campaign', 0), 0, 300, 60, 20), false,
+    '너무 좁으면 생략');
+  assert.strictEqual(S.drawSignBoard(small, null, 0, 300, 140, 42), false);
+
+  const ctx = fakeCtx();
+  const board = S.pickKind('campaign', 0);
+  assert.strictEqual(S.drawSignBoard(ctx, board, 10, 300, 140, 42), true);
+  assert.ok(ctx.calls.rects >= 2, '나무 기둥 두 개가 그려진다');
+  assert.ok(ctx.calls.text.includes(board.text), '한글 문구를 눕히지 않고 그대로 쓴다');
+  assert.strictEqual(ctx.calls.rotate, 0, '작은 가로 표지판은 회전하지 않는다');
+});
+
 test('대형 세로 광고판', () => {
   const small = fakeCtx();
   assert.strictEqual(S.drawTowerBillboard(small, S.pick(0), 0, 300, 60, 80), false, '낮으면 생략');
