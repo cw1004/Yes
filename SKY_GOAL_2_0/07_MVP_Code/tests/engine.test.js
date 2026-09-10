@@ -157,8 +157,8 @@ test('골문은 난이도가 낮아도 항상 살짝 오르내린다', () => {
   const stats = E.createProfile().stats;
   for (let d = 10; d <= 95; d += 5) {
     const a = E.arenaParams(d, E.stageFor(0, d), stats);
-    assert.ok(a.bob >= 8, '최소 흔들림: ' + a.bob);
-    assert.ok(a.bob <= 34, '과도한 흔들림: ' + a.bob);
+    assert.ok(a.bob >= 14, '최소 흔들림: ' + a.bob);
+    assert.ok(a.bob <= 42, '과도한 흔들림: ' + a.bob);
   }
   const easy = E.arenaParams(10, E.stageFor(0, 10), stats);
   const hard = E.arenaParams(95, E.stageFor(0, 95), stats);

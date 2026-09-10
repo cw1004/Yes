@@ -295,8 +295,10 @@
     var travel = GATE_SPACING / arena.speed;              // 골문 사이 이동 시간(초)
     var climb = Math.abs(arena.flap) * travel * 0.55;     // 그 시간에 오를 수 있는 높이
     if (lastMid !== null) {
-      lo = Math.max(lo, lastMid - climb);
-      hi = Math.min(hi, lastMid + climb * 1.6);           // 낙하는 더 쉬우므로 여유를 준다
+      // 골문이 상하로 흔들리므로 그 진폭만큼 여유를 빼서
+      // 흔들린 위치까지 포함해 도달 가능하게 만든다
+      lo = Math.max(lo, lastMid - climb + arena.bob);
+      hi = Math.min(hi, lastMid + climb * 1.6 - arena.bob);
     }
     if (hi <= lo) { lo = margin; hi = Math.max(margin + 20, groundY - margin); }
     var mid = lo + Math.random() * (hi - lo);
@@ -307,7 +309,7 @@
       mid: mid,
       gap: arena.gap,
       amp: arena.bob,                                   // 난이도가 낮아도 8px 이상 흔들린다
-      speed: 0.55 + Math.random() * 0.5,                // 천천히 오르내리게
+      speed: 0.95 + Math.random() * 0.6,                // 주기 4~6.6초 — 지나가는 동안 보인다
       phase: Math.random() * Math.PI * 2,
       flagPhase: Math.random() * Math.PI * 2,           // 깃발이 각자 다르게 나부낀다
       banner: Math.floor(Math.random() * 3),            // 상단 장식 종류

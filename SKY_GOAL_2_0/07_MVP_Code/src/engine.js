@@ -523,8 +523,10 @@
     var gravity = 950 * (1 - (s.stamina - 50) / 1200) * tune.response * tune.response * b.weight;
     var flap = -340 * (1 + (s.power - 50) / 800) * tune.response * b.kick;
 
-    // 골문은 난이도가 낮아도 항상 살짝 오르내린다 (8~34px)
-    var bob = clamp(movement * 12, 8, 34);
+    // 골문은 난이도가 낮아도 항상 살짝 오르내린다 (14~42px).
+    // 골문 하나가 화면을 가로지르는 2~3초 안에 눈에 띄어야 하므로
+    // 하한을 여유 있게 잡는다.
+    var bob = clamp(movement * 14, 14, 42);
 
     return {
       gap: clamp(gap, M.id === 'pro' ? 118 : 130, 260),

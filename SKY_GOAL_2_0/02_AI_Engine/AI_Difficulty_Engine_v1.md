@@ -62,7 +62,7 @@ movement = 0.05D * 스테이지 계수     골문 상하 이동
 wind     = max(0, (D-35)/60) * 스테이지 계수
 rain     = 스테이지가 RAIN 이상일 때 활성
 gravity  = 950, flap = -340          (성장 스탯으로 ±10% 내 보정)
-bob      = clamp(movement * 12, 8, 34)   골문 상하 진폭
+bob      = clamp(movement * 14, 14, 42)  골문 상하 진폭
 ```
 
 여기에 **플레이어 조작 설정**이 마지막으로 곱해진다.
