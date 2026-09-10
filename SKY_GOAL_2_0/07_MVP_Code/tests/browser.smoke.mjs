@@ -68,6 +68,9 @@ try {
   await page.waitForFunction(() => !!window.SkyGoal, null, { timeout: 5000 });
 
   check('시작 화면이 보인다', await page.isVisible('#screen-start'));
+  check('경기 시작 전에는 지구 살리기 캠페인이 걸린다',
+    (await page.evaluate(() => window.SkyGoal.debug().introBoard)) === 'earth',
+    await page.evaluate(() => window.SkyGoal.debug().introBoard));
   check('엔진이 로드되었다', await page.evaluate(() => !!window.SkyGoalEngine));
   check('사운드·배경 모듈이 로드되었다',
     await page.evaluate(() => !!window.SkyGoalAudio && !!window.SkyGoalScenery));
@@ -419,6 +422,8 @@ try {
   });
   const boards = await page.evaluate(() => window.SkyGoal.debug().boards);
   check('광고판 목록이 로드된다', boards >= 3, boards + '종');
+  check('경기 중에는 인트로 캠페인이 걸리지 않는다',
+    (await page.evaluate(() => window.SkyGoal.debug().introBoard)) === null);
   // 기둥 광고판 위를 실제로 탭했을 때 광고가 아니라 공이 반응해야 한다
   await page.waitForFunction(() => {
     const d = window.SkyGoal.debug();

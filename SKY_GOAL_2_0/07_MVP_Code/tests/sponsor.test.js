@@ -51,7 +51,7 @@ test('광고 브랜드는 전부 가상이며 실존 상표를 쓰지 않는다'
 });
 
 test('로고 마크는 정의된 종류만 쓰고 그리기가 실패하지 않는다', () => {
-  const types = ['ball', 'boot', 'leaf', 'drop', 'star', 'shield', 'cup'];
+  const types = ['ball', 'boot', 'leaf', 'drop', 'star', 'shield', 'cup', 'globe'];
   for (const b of S.BOARDS) {
     if (b.mark) assert.ok(types.includes(b.mark), b.id + ' 마크: ' + b.mark);
   }
@@ -142,6 +142,22 @@ test('캠페인 표지판은 캠페인 보드만 돌린다', () => {
   assert.strictEqual(S.pickKind('campaign', 0).id, S.pickKind('campaign', n).id, '한 바퀴 순환');
   assert.strictEqual(S.pickKind('campaign', -1).kind, 'campaign', '음수도 안전');
   assert.strictEqual(S.pickKind('없는종류', 0), null);
+});
+
+test('경기 시작 전에는 지구 살리기 캠페인을 건다', () => {
+  const intro = S.introBoard();
+  assert.ok(intro, '인트로 보드가 반드시 있어야 한다');
+  assert.strictEqual(intro.id, S.INTRO_BOARD);
+  assert.strictEqual(intro.kind, 'campaign', '인트로는 광고가 아니라 캠페인이어야 한다');
+  assert.ok(intro.text.length > 0);
+  assert.strictEqual(S.boardById(S.INTRO_BOARD).id, S.INTRO_BOARD);
+  assert.strictEqual(S.boardById('없는보드'), null);
+
+  // 가로 표지판으로 그려진다 (눕히지 않는다)
+  const ctx = fakeCtx();
+  assert.strictEqual(S.drawSignBoard(ctx, intro, 0, 400, 240, 62), true);
+  assert.ok(ctx.calls.text.includes(intro.text));
+  assert.strictEqual(ctx.calls.rotate, 0);
 });
 
 test('작은 가로 캠페인 표지판', () => {

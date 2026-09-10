@@ -53,6 +53,8 @@
       sub: 'sponsor@skygoal', bg: '#1b2431', fg: '#c9d6e6', accent: '#8fa6c0' },
 
     // ── 공익 캠페인 ──────────────────────────────────────────────
+    { id: 'earth', kind: 'campaign', mark: 'globe', text: '지구 살리기 운동',
+      sub: 'SAVE OUR EARTH', bg: '#0d3348', fg: '#ffffff', accent: '#5ad0c0' },
     { id: 'nature', kind: 'campaign', mark: 'leaf', text: '자연을 지켜요',
       sub: 'PROTECT NATURE', bg: '#123a2a', fg: '#ffffff', accent: '#7ee08a' },
     { id: 'eco', kind: 'campaign', mark: 'leaf', text: '생태를 지키자',
@@ -110,6 +112,17 @@
 
   function boardsOfKind(kind) {
     return BOARDS.filter(function (b) { return b.kind === kind; });
+  }
+
+  var INTRO_BOARD = 'earth';                 // 경기 시작 전에 거는 캠페인 보드
+
+  function boardById(id) {
+    for (var i = 0; i < BOARDS.length; i++) if (BOARDS[i].id === id) return BOARDS[i];
+    return null;
+  }
+
+  function introBoard() {
+    return boardById(INTRO_BOARD) || pickKind('campaign', 0);
   }
 
   // 특정 종류 안에서만 순환한다 (예: 캠페인 표지판)
@@ -196,6 +209,19 @@
       ctx.moveTo(0, r * 0.25); ctx.lineTo(0, r * 0.6); ctx.stroke();
       ctx.beginPath();
       ctx.moveTo(-r * 0.5, r * 0.85); ctx.lineTo(r * 0.5, r * 0.85); ctx.stroke();
+    } else if (type === 'globe') {             // 지구
+      ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+      if (bg) {
+        ctx.strokeStyle = bg;
+        ctx.lineWidth = Math.max(1.2, r * 0.16);
+        ctx.beginPath(); ctx.moveTo(-r, 0); ctx.lineTo(r, 0); ctx.stroke();
+        ctx.beginPath();
+        ctx.ellipse(0, 0, r * 0.45, r, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.ellipse(0, 0, r, r * 0.5, 0, Math.PI, Math.PI * 2);
+        ctx.stroke();
+      }
     } else {                                   // shield (기본)
       ctx.beginPath();
       ctx.moveTo(-r * 0.8, -r * 0.8);
@@ -445,6 +471,9 @@
     pick: pick,
     boardsOfKind: boardsOfKind,
     pickKind: pickKind,
+    boardById: boardById,
+    introBoard: introBoard,
+    INTRO_BOARD: INTRO_BOARD,
     drawSignBoard: drawSignBoard,
     drawMark: drawMark,
     hasHangul: hasHangul,

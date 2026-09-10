@@ -1040,6 +1040,16 @@
     var tw = Math.max(52, Math.min(84, W * 0.19));
     var th = tw * 3.1;
     var baseY = L.riverTop + 2;
+
+    // 경기 시작 전(메인 화면·킥오프·준비)에는 흐르는 간판 대신
+    // '지구 살리기 운동' 캠페인 보드를 가운데 하나만 건다.
+    if (state !== 'playing' && state !== 'ceremony' && Sponsor.introBoard) {
+      var iw = Math.max(180, Math.min(280, W * 0.64));
+      var ih = iw * 0.26;
+      Sponsor.drawSignBoard(ctx, Sponsor.introBoard(), (W - iw) / 2, baseY, iw, ih, 0.95);
+      return;
+    }
+
     var travelled = scroll * par;
     var start = Math.floor((travelled - tw) / spacing);
     var end = Math.ceil((travelled + W) / spacing);
@@ -1827,6 +1837,8 @@
         endReason: lastEndReason,
         kick: kick ? { t: kick.t, launched: kick.launched } : null,
         boards: Sponsor ? Sponsor.count() : 0,
+        introBoard: (Sponsor && state !== 'playing' && state !== 'ceremony')
+          ? Sponsor.introBoard().id : null,
         ceremony: ceremony ? { t: +ceremony.t.toFixed(2), lift: Math.round(ceremony.lift),
                                gift: ceremony.gift } : null,
         cheer: cheer ? {
