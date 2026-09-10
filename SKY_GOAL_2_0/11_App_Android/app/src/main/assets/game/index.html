@@ -1939,8 +1939,8 @@ p { margin: 8px 0; line-height: 1.55; color: #dbe7f7; font-size: 14px; }
    */
   var BOARDS = [
     // ── 자체 홍보 ────────────────────────────────────────────────
-    { id: 'india2030', kind: 'house', mark: 'star', text: 'INDIA 2030',
-      sub: 'ONE DREAM · ONE NATION', bg: '#12233f', fg: '#ffffff', accent: '#ff9933' },
+    { id: 'promode', kind: 'house', mark: 'star', text: 'PRO MODE',
+      sub: '좁은 골문 · 보상 1.6배', bg: '#2b1230', fg: '#ffffff', accent: '#ff6fae' },
     { id: 'shop', kind: 'house', mark: 'ball', text: '새 공 만나기',
       sub: 'BALL SHOP', bg: '#2a1a3f', fg: '#ffffff', accent: '#ffd75a' },
     { id: 'follow', kind: 'house', mark: 'shield', text: 'FOLLOW THE DREAM',
@@ -3455,8 +3455,11 @@ p { margin: 8px 0; line-height: 1.55; color: #dbe7f7; font-size: 14px; }
       return;
     }
 
-    var travelled = scroll * par;
-    var start = Math.floor((travelled - tw) / spacing);
+    // 모든 간판은 화면 밖 오른쪽에서 출발한다. 이렇게 하지 않으면 스크롤이 0인
+    // 킥오프 직후에 첫 간판이 화면 왼쪽(선수 자리)에 그대로 걸린다.
+    // 시작 후 약 5초 동안은 화면이 비어 있다가 오른쪽에서 하나씩 들어온다.
+    var travelled = scroll * par - (W + spacing * 0.5);
+    var start = Math.max(0, Math.floor((travelled - tw) / spacing));
     var end = Math.ceil((travelled + W) / spacing);
     // 자연보호 캠페인 표지판 — 타워와 타워 사이 중간에 작게 놓는다
     var sw = Math.max(96, Math.min(152, W * 0.35));

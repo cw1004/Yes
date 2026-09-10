@@ -33,8 +33,8 @@
    */
   var BOARDS = [
     // ── 자체 홍보 ────────────────────────────────────────────────
-    { id: 'india2030', kind: 'house', mark: 'star', text: 'INDIA 2030',
-      sub: 'ONE DREAM · ONE NATION', bg: '#12233f', fg: '#ffffff', accent: '#ff9933' },
+    { id: 'promode', kind: 'house', mark: 'star', text: 'PRO MODE',
+      sub: '좁은 골문 · 보상 1.6배', bg: '#2b1230', fg: '#ffffff', accent: '#ff6fae' },
     { id: 'shop', kind: 'house', mark: 'ball', text: '새 공 만나기',
       sub: 'BALL SHOP', bg: '#2a1a3f', fg: '#ffffff', accent: '#ffd75a' },
     { id: 'follow', kind: 'house', mark: 'shield', text: 'FOLLOW THE DREAM',

@@ -61,14 +61,14 @@ DAU 1,000명 기준 예시 계산(보통 값):
 캔버스에 그린 이미지는 AdMob 노출로 집계되지 않는다.
 따라서 이 지면은 **직접 판매(직거래)** 자산이며, 팔리기 전까지는 자체 홍보로 채운다.
 
-### 지금 상태 — 13종
+### 지금 상태 — 14종
 `07_MVP_Code/src/sponsor.js` 의 `BOARDS` 배열에 세 종류가 들어 있다.
 
 | 종류 | 수 | 내용 |
 |---|---|---|
-| `house` 자체 홍보 | 3 | INDIA 2030 / 공 상점 / FOLLOW THE DREAM |
+| `house` 자체 홍보 | 3 | PRO MODE / 공 상점 / FOLLOW THE DREAM |
 | `sponsor` 광고 | 5 | **가상 브랜드 4종** + 판매용 빈 지면 1종 |
-| `campaign` 공익 | 5 | 자연을 지켜요 / 생태를 지키자 / 창조 질서 보전 / 물을 아껴요 / 나무 한 그루 |
+| `campaign` 공익 | 6 | 지구 살리기 운동 / 자연을 지켜요 / 생태를 지키자 / 창조 질서 보전 / 물을 아껴요 / 나무 한 그루 |
 
 **가상 브랜드**(`fictional: true`)는 실존 상표를 쓰지 않고 이 프로젝트의 자체 IP와
 일반 명사를 조합해 만들었다 — GAJU SPORTS, GABE ENERGY, SKY GOAL ACADEMY, DREAM BOOTS.

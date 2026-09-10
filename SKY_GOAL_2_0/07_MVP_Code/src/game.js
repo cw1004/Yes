@@ -1052,8 +1052,11 @@
       return;
     }
 
-    var travelled = scroll * par;
-    var start = Math.floor((travelled - tw) / spacing);
+    // 모든 간판은 화면 밖 오른쪽에서 출발한다. 이렇게 하지 않으면 스크롤이 0인
+    // 킥오프 직후에 첫 간판이 화면 왼쪽(선수 자리)에 그대로 걸린다.
+    // 시작 후 약 5초 동안은 화면이 비어 있다가 오른쪽에서 하나씩 들어온다.
+    var travelled = scroll * par - (W + spacing * 0.5);
+    var start = Math.max(0, Math.floor((travelled - tw) / spacing));
     var end = Math.ceil((travelled + W) / spacing);
     // 자연보호 캠페인 표지판 — 타워와 타워 사이 중간에 작게 놓는다
     var sw = Math.max(96, Math.min(152, W * 0.35));
