@@ -89,13 +89,13 @@ def sheet1():
     X=198.0; WD=210.0
     y=sh.table(X,18,WD,[("ITEM",0.07,"c"),("QTY",0.09,"c"),("PART No.",0.14,"l"),
         ("DESCRIPTION",0.34,"l"),("MATERIAL",0.20,"l"),("MASS",0.16,"r")],
-      [["1","1","VC-101","CHAMBER BASE, POCKETED, 100 POSTS","Cu C1100 OFHC","77.4 g"],
-       ["2","1","VC-102","CHAMBER LID, 1.0 THK, FILL PORT","Cu C1100 OFHC","41.4 g"],
+      [["1","1","VC-101","CHAMBER BASE, POCKETED, 100 POSTS","Cu C10200 / C1020","77.4 g"],
+       ["2","1","VC-102","CHAMBER LID, 1.0 THK, FILL PORT","Cu C10200 / C1020","41.4 g"],
        ["3","1","VC-103","SINTERED WICK — IN-SITU PROCESS","Cu POWDER 45-75um","9.6 g"],
        ["4","1","VC-201","FIN STACK, 43 FIN — FORCED AIR","Al 1100-H14","88.1 g"],
        ["4A","1","VC-202","FIN STACK, 13 FIN — NAT. CONVECTION","Al 1100-H14","72.7 g"],
        ["5","1","VC-204","THERMAL INTERFACE PAD 0.2 THK","PCM / SIL-PAD","0.4 g"],
-       ["6","1","VC-205",f"PINCH-OFF TUBE OD{S['tube_od']:.1f} x ID{S['tube_id']:.1f} x {S['tube_len']:.0f}","Cu C1100","1.2 g"],
+       ["6","1","VC-205",f"PINCH-OFF TUBE OD{S['tube_od']:.1f} x ID{S['tube_id']:.1f} x {S['tube_len']:.0f}","Cu C10200 / C1020","1.2 g"],
        ["7",f"{CH['charge']:.2f} mL","VC-206","WORKING FLUID — DEAERATED","DI H2O 18 MOhm.cm","1.87 g"]],
       title="BILL OF MATERIALS   —   ASSEMBLY VC-100")
     sh.text(X+WD,y+4.4,"TOTAL MASS, CHARGED:   218 g (CONFIG A)   /   203 g (CONFIG B)",FS_S,INK,"end","700")
@@ -149,7 +149,7 @@ def sheet1():
 
 # ══════════════════════════════════════════════════════ SHEET 2
 def sheet2():
-    sh=Sheet("VC-101","CHAMBER BASE","2:1","Cu C1100 (OFHC)  /  68 x 68 x 4.0  /  100 INTEGRAL POSTS")
+    sh=Sheet("VC-101","CHAMBER BASE","2:1","Cu C10200 OFHC (JIS C1020)  /  68 x 68 x 4.0  /  100 INTEGRAL POSTS")
     sh.sheet_of="2 / 7"
     K=2.0; x0,y0=30.0,36.0
     px=lambda v:x0+v*K; py=lambda v:y0+v*K
@@ -230,7 +230,7 @@ def sheet2():
     sh.text(ox+50,176,"Bond area 4.0 x 4 sides = 1024 mm2.   Burst margin > 16 at 150 C.",FS_S-0.5,DIM,"middle")
 
     sh.notes(344,58,64,"NOTES",[
-      "MATL: Cu C1100 / C10100 OFHC, annealed.",
+      "MATL: OXYGEN-FREE copper C10200 / JIS C1020, annealed. Tough-pitch copper (C11000 / JIS C1100) is PROHIBITED: it embrittles in the 950 C hydrogen sinter.",
       "Posts integral with base — machine from solid or coin.",
       "Bond faces (rim + post tops): flatness 0.02, Ra 0.4 max.",
       "Grooves run ONE direction only, interrupted at posts.",
@@ -250,7 +250,7 @@ def sheet2():
 
 # ══════════════════════════════════════════════════════ SHEET 3
 def sheet3():
-    sh=Sheet("VC-102","CHAMBER LID","2:1","Cu C1100 (OFHC)  /  68 x 68 x 1.0  /  WICK-LINED, FILL PORT")
+    sh=Sheet("VC-102","CHAMBER LID","2:1","Cu C10200 OFHC (JIS C1020)  /  68 x 68 x 1.0  /  WICK-LINED, FILL PORT")
     sh.sheet_of="3 / 7"
     K=2.0; x0,y0=30.0,36.0
     px=lambda v:x0+v*K; py=lambda v:y0+v*K
@@ -332,7 +332,7 @@ def sheet3():
       hdr=False,title="FILL PORT — CRITICAL DIMENSIONS",rh=5.4)
 
     sh.notes(346,44,62,"NOTES",[
-      "MATL: Cu C1100 OFHC annealed, 1.0 sheet.",
+      "MATL: OXYGEN-FREE copper C10200 / JIS C1020, annealed, 1.0 sheet. NOT tough-pitch C1100 - see VC-101 note 1.",
       "Flatness 0.02 over 68 x 68 after sintering.",
       "Wick clearance holes keep post lands bare for metal-to-metal bond.",
       "Braze tube before bake-out, after diffusion bonding.",
@@ -551,6 +551,7 @@ def sheet6():
       "Threaded or O-ring fill seals. A screw seal cannot hold high vacuum; helium ingress accumulates as non-condensable gas and the condenser is blanketed within months. Cold-weld pinch-off only.",
       "Aluminium anywhere wetted. Al + water generates H2. The fin stack is external and TIM-coupled only.",
       "Undeaerated water. Dissolved O2 oxidises copper and liberates H2.",
+      "Tough-pitch copper (C11000 / JIS C1100) or brass/bronze anywhere in the envelope. Oxygen-bearing copper cracks in the hydrogen sinter; Zn and Sn evaporate under vacuum at bond temperature and contaminate the wick.",
       "Activated carbon or any organic inside the envelope without a 250 C / 8 h vacuum bake.",
     ],fs=FS_S-0.45,lh=3.4,num=False)
     sh.text(X2,y2+3,"Non-condensable gas is the dominant failure mode of a sealed two-phase device.",FS_S-0.35,INK,"start","700")
