@@ -4,6 +4,7 @@ HERE=os.path.dirname(os.path.abspath(__file__))
 sys.path[:0]=[HERE, os.path.join(HERE,"..","sim")]
 from draft import *
 from design_spec import SPEC as S, WATER, METH, charge_volume, R_vc_calc
+from passive_85c import solve as nat_solve, opt_pitch
 
 OUT=os.path.join(HERE,"out"); os.makedirs(OUT,exist_ok=True)
 CH=charge_volume(); RD,R_VC=R_vc_calc()
@@ -92,17 +93,18 @@ def sheet1():
        ["2","1","VC-102","CHAMBER LID, 1.0 THK, FILL PORT","Cu C1100 OFHC","41.4 g"],
        ["3","1","VC-103","SINTERED WICK — IN-SITU PROCESS","Cu POWDER 45-75um","9.6 g"],
        ["4","1","VC-201","FIN STACK, 43 FIN — FORCED AIR","Al 1100-H14","88.1 g"],
-       ["4A","1","VC-202","FIN STACK, 11 FIN — NAT. CONVECTION","Al 1100-H14","65.4 g"],
+       ["4A","1","VC-202","FIN STACK, 13 FIN — NAT. CONVECTION","Al 1100-H14","72.7 g"],
        ["5","1","VC-204","THERMAL INTERFACE PAD 0.2 THK","PCM / SIL-PAD","0.4 g"],
        ["6","1","VC-205",f"PINCH-OFF TUBE OD{S['tube_od']:.1f} x ID{S['tube_id']:.1f} x {S['tube_len']:.0f}","Cu C1100","1.2 g"],
        ["7",f"{CH['charge']:.2f} mL","VC-206","WORKING FLUID — DEAERATED","DI H2O 18 MOhm.cm","1.87 g"]],
       title="BILL OF MATERIALS   —   ASSEMBLY VC-100")
-    sh.text(X+WD,y+4.4,"TOTAL MASS, CHARGED:   218 g (CONFIG A)   /   196 g (CONFIG B)",FS_S,INK,"end","700")
+    sh.text(X+WD,y+4.4,"TOTAL MASS, CHARGED:   218 g (CONFIG A)   /   203 g (CONFIG B)",FS_S,INK,"end","700")
     y=sh.table(X,y+8,WD,[("CONFIGURATION",0.40,"l"),("AIR",0.16,"c"),("R th (j-a)",0.20,"c"),("Q @ dT 75 K",0.24,"r")],
       [["*CONFIG A — 43 fin @ 1.5 pitch","1 m/s","1.12 K/W","*67 W"],
        ["*CONFIG A — 43 fin @ 1.5 pitch","2 m/s","0.67 K/W","*113 W"],
        ["*CONFIG A — 43 fin @ 1.5 pitch","4 m/s","0.46 K/W","*163 W"],
-       ["CONFIG B — 11 fin @ 6.0 pitch","natural","3.87 K/W","19 W"],
+       ["CONFIG B — 13 fin @ 5.0 pitch","natural","3.42 K/W","22 W"],
+       ["*CONFIG B — passive, Tj 85 C limit","*natural","*—","*16.5 W"],
        ["capillary limit — water, vertical","—","—","804 W"],
        ["capillary limit — water, horizontal","—","—","858 W"]],
       title="PERFORMANCE   —   20 x 20 DIE, Tj 100 C, AIR IN 25 C")
@@ -141,7 +143,7 @@ def sheet1():
     sh.notes(12,244,214,"GENERAL NOTES",
       ["Interpret per ISO 128. Tolerances ISO 2768-mK unless stated. Dimensions in mm.",
        "Charging, evacuation and sealing per VC-300. NEVER charge before diffusion bonding — bond temperature exceeds the fluid critical pressure envelope.",
-       "CONFIG A requires forced air >= 1 m/s. For still air use CONFIG B (VC-202); a 1.5 mm fin pitch chokes natural convection to h = 0.25 W/m2K.",
+       "CONFIG A requires forced air >= 1 m/s. For still air use CONFIG B (VC-202); a 1.5 mm fin pitch chokes natural convection to h = 0.03 W/m2K.",
        "Orientation-independent: 10.5 kPa capillary head vs 0.66 kPa gravity head over 68 mm."],lh=3.5,fs=FS_S-0.35)
     emit(sh,"VC-100_general-assembly.svg")
 
@@ -364,13 +366,13 @@ def sheet4():
     sh.text(ox+rw+3.2,oy+lh+wl+10,"B",FS_S,INK,"start","700")
     sh.text(ox+rw+INB-6,oy+lh+wl+4.5,"C",FS_S,INK,"start","700")
     sh.text(ox+rw+INB/2,oy+lh+pdd/2,"VAPOUR CORE  2.40",FS_S-0.4,DIM,"middle")
-    sh.dim_v(oy+lh+pdd-wf,oy+lh+pdd,ox+rw+INB+10,f"A = {S['wick_floor']:.2f}",ext_from=(ox+rw+INB,ox+rw+INB))
-    sh.dim_v(oy+lh,oy+lh+wl,ox+rw+INB+34,f"C = {S['wick_lid']:.2f}",ext_from=(ox+rw+INB,ox+rw+INB))
-    sh.dim_h(ox+rw,ox+rw+ww,oy+lh+pdd+18,f"B = {S['wick_wall']:.2f}",ext_from=(oy+lh+pdd,oy+lh+pdd))
+    sh.dim_v(oy+lh,oy+lh+wl,ox+rw+INB+8,f"C = {S['wick_lid']:.2f}",ext_from=(ox+rw+INB,ox+rw+INB))
+    sh.dim_v(oy+lh+pdd-wf,oy+lh+pdd,ox+rw+INB+26,f"A = {S['wick_floor']:.2f}",ext_from=(ox+rw+INB,ox+rw+INB))
+    sh.dim_h(ox+rw,ox+rw+ww,oy+lh+pdd+16,f"B = {S['wick_wall']:.2f}",ext_from=(oy+lh+pdd,oy+lh+pdd))
     sh.text(ox,oy+lh+bh+16,"Zones A, B and C are sintered in ONE cycle and must be capillary-continuous:",FS_S-0.4,INK,"start","600")
     sh.text(ox,oy+lh+bh+21,"condensate returns C → B → A. A break at the B/A junction causes evaporator dry-out.",FS_S-0.4,DIM,"start")
 
-    y=sh.table(30,116,190,[("ZONE",0.12,"c"),("LOCATION",0.36,"l"),("THK",0.16,"c"),("FUNCTION",0.36,"l")],
+    y=sh.table(30,134,190,[("ZONE",0.12,"c"),("LOCATION",0.36,"l"),("THK",0.16,"c"),("FUNCTION",0.36,"l")],
       [["A","Pocket floor, around posts",f"{S['wick_floor']:.2f}","evaporator + liquid supply"],
        ["B","Pocket side walls (4 off)",f"{S['wick_wall']:.2f}","perimeter return path"],
        ["C","Lid underside, posts masked",f"{S['wick_lid']:.2f}","condensate collection"]],
@@ -399,7 +401,15 @@ def sheet4():
     sh.text(X,y2+6,"The original 200 um pore spec gives 380 Pa of capillary head against a 500 Pa gravity head",FS_S-0.35,INK,"start","600")
     sh.text(X,y2+10.8,"over 68 mm: the wick cannot lift liquid at all in any vertical orientation.",FS_S-0.35,DIM,"start")
 
-    sh.notes(X,y2+20,WD,"PROCESS NOTES",[
+    y3=sh.table(X,y2+18,WD,[("TERM",0.40,"l"),("VALUE",0.24,"c"),("NOTE",0.36,"r")],
+      [["*Capillary head available  2σ/r","*10 508 Pa","water @ 60 C, r = 12.6 um"],
+       ["Liquid loss through wick + grooves","− 12.6 Pa/W","at 804 W: 10 127 Pa"],
+       ["Vapour loss through 2.40 core","− 0.2 Pa/W","negligible"],
+       ["Gravity head, 68 mm adverse","− 656 Pa","vertical, evaporator up"],
+       ["*Margin at 113 W design point","*+ 8 428 Pa","*7.4 x"]],
+      title="CAPILLARY PRESSURE BUDGET  —  WORST CASE, VERTICAL",rh=5.4)
+    sh.text(X,y3+6,"The wick is sized by the vertical case. Horizontal operation carries 858 W and is never the limit.",FS_S-0.4,DIM,"start")
+    sh.notes(X,y3+14,WD,"PROCESS NOTES",[
       "Mask post top faces and the 4.0 rim before sintering — sintered powder on a bond land destroys hermeticity.",
       "Mask the fill port bore. Powder in the pinch-off tube prevents a gas-tight cold weld.",
       "Grooves must remain open under the wick. Verify by back-light or CT on the first article.",
@@ -418,67 +428,80 @@ def sheet4():
 def sheet5():
     sh=Sheet("VC-201 / VC-202","FIN STACK — TWO CONFIGURATIONS","2:1","Al 1100-H14  /  SKIVED OR BONDED  /  68 x 68 x 22")
     sh.sheet_of="5 / 7"
-    def config(x0,title,sub,n,t,p,H):
-        K=2.0; L=x0; R=x0+S['L']*K; yb0=62.0
+    def config(x0,title,sub,n,t,p,H,KD):
+        K=2.0; L=x0; R=x0+S['L']*K; yb0=60.0
         sh.view_label((L+R)/2,42,title,sub)
         fh=H*K; fb=S['fin_base']*K
         span=n*p*K; s0=(L+R)/2-span/2
         for i in range(n): sh.rect(s0+(i+0.5)*p*K-t*K/2,yb0,t*K,fh,0.28,INK,"#fff")
         sh.rect(L,yb0+fh,S['L']*K,fb,W_VIS,INK,"#fff"); sh.hatch(L,yb0+fh,S['L']*K,fb,45,1.6)
         sh.line(L,yb0,R,yb0,W_VIS,INK); sh.line(L,yb0,L,yb0+fh,W_VIS,INK); sh.line(R,yb0,R,yb0+fh,W_VIS,INK)
-        sh.text((L+R)/2,yb0-4.5,f"{n} FINS  x  {t:.2f} THK  @ {p:.1f} PITCH",FS_S-0.3,DIM,"middle","600")
+        sh.text((L+R)/2,yb0-4.0,f"{n} FINS  x  {t:.2f} THK  @ {p:.1f} PITCH",FS_S-0.3,DIM,"middle","600")
         sh.dim_v(yb0,yb0+fh,L-10,f"{H:.0f}",ext_from=(L,L))
         sh.dim_v(yb0+fh,yb0+fh+fb,R+10,f"{S['fin_base']:.1f}",ext_from=(R,R))
         sh.dim_h(L,R,yb0+fh+fb+12,f"{S['L']:.0f}",ext_from=(yb0+fh+fb,yb0+fh+fb))
         rx=L+S['fill_x']*K
         sh.rect(rx-S['fin_relief_d']*K/2,yb0+fh,S['fin_relief_d']*K,fb,W_HID,INK,dash="2 1.5")
-        sh.leader(rx+S['fin_relief_d']*K/2,yb0+fh+fb,rx+26,yb0+fh+fb+22,
+        sh.leader(rx+S['fin_relief_d']*K/2,yb0+fh+fb,rx+30,yb0+fh+fb+9,
                   f"Ø{S['fin_relief_d']:.0f} x {S['fin_relief_h']:.1f} RELIEF",fs=FS_S-0.5)
         sh.text((L+R)/2,yb0+fh+fb+22,"FRONT ELEVATION",FS_S-0.35,INK,"middle","700",0.3)
-        # ---- enlarged fin detail, scale chosen so 3 pitches span 96 mm
-        KD=96.0/(3*p); dy=138.0
-        sh.view_label((L+R)/2,dy-6,"FIN DETAIL",f"SCALE {KD:.0f}:1")
-        d0=(L+R)/2-1.6*p*KD
+        dy=132.0
+        sh.view_label((L+R)/2,dy,"FIN DETAIL",f"SCALE {KD:.0f}:1")
+        d0=(L+R)/2-1.5*p*KD; ft=148.0; FH=24.0; BH=8.0      # base shown broken, not to KD
         for i in range(4):
-            sh.rect(d0+i*p*KD,dy+6,t*KD,44,W_VIS,INK,"#fff"); sh.hatch(d0+i*p*KD,dy+6,t*KD,44,45,1.5)
-        sh.rect(d0-5,dy+50,3*p*KD+t*KD+10,S['fin_base']*KD,W_VIS,INK,"#fff")
-        sh.hatch(d0-5,dy+50,3*p*KD+t*KD+10,S['fin_base']*KD,45,1.5)
-        base_b=dy+50+S['fin_base']*KD
-        sh.dim_h(d0,d0+p*KD,base_b+11,f"{p:.1f} PITCH",ext_from=(base_b,base_b))
-        sh.dim_h(d0+t*KD,d0+p*KD,dy+2,f"{p-t:.1f}")
-        sh.leader(d0+2*p*KD+t*KD/2,dy+28,d0+2*p*KD+t*KD+18,dy+20,f"{t:.2f} THK",fs=FS_S-0.4)
-        sh.dim_v(dy+50,base_b,d0-13,f"{S['fin_base']:.1f}",ext_from=(d0-5,d0-5))
-        return base_b
-    config(30.0,"CONFIG A  —  VC-201","FORCED AIR  >=  1 m/s",S['finA_n'],S['finA_t'],S['finA_p'],S['finA_h'])
-    yb=config(190.0,"CONFIG B  —  VC-202","NATURAL CONVECTION ONLY",S['finB_n'],S['finB_t'],S['finB_p'],S['finB_h'])
+            sh.rect(d0+i*p*KD,ft,t*KD,FH,W_VIS,INK,"#fff"); sh.hatch(d0+i*p*KD,ft,t*KD,FH,45,1.5)
+        sh.rect(d0-5,ft+FH,3*p*KD+t*KD+10,BH,W_VIS,INK,"#fff")
+        sh.hatch(d0-5,ft+FH,3*p*KD+t*KD+10,BH,45,1.5)
+        bb=ft+FH+BH
+        sh.poly([(d0-5,bb),(d0+10,bb-2.5),(d0+3*p*KD*0.5,bb+2.5),(d0+3*p*KD+t*KD+5,bb-1.5)],0.3,THIN)
+        sh.dim_h(d0,d0+p*KD,bb+9,f"{p:.1f} PITCH",ext_from=(bb,bb))
+        sh.dim_h(d0+t*KD,d0+p*KD,ft-4,f"{p-t:.1f} GAP")
+        sh.leader(d0+2*p*KD+t*KD/2,ft+14,d0+2*p*KD+t*KD+16,ft+7,f"{t:.2f} THK",fs=FS_S-0.4)
+    config(30.0,"CONFIG A  —  VC-201","FORCED AIR  >=  1 m/s",S['finA_n'],S['finA_t'],S['finA_p'],S['finA_h'],20)
+    config(190.0,"CONFIG B  —  VC-202","NATURAL CONVECTION ONLY",S['finB_n'],S['finB_t'],S['finB_p'],S['finB_h'],6)
 
-    sh.notes(334,54,74,"NOTES",[
+    sh.notes(334,50,74,"NOTES",[
       "MATL: Al 1100-H14 or 6063-T5. Skived, folded or bonded fin.",
       "Base flatness 0.03. Ra 0.8 max on the TIM face.",
-      "Anodise 5 um clear, or bare + passivate. No paint.",
-      "Fit ONE configuration only — alternates, not stackable.",
-      "Relief pocket clears the folded pinch-off tube. 0.5 min clearance after pinch.",
-      "Fin tips deburred. No swarf — it migrates into the fin field.",
+      "VC-202 SHALL be anodised, 5 um clear minimum. Radiation carries 28% of the passive load.",
+      "VC-201 finish is free - forced convection swamps radiation.",
+      "Fit ONE configuration only - alternates, not stackable.",
+      "Relief pocket clears the folded pinch-off tube, 0.5 min after pinch.",
+      "Fin tips deburred. No swarf.",
     ],fs=FS_S-0.6,lh=2.9)
-    sh.table(334,150,74,[("",0.56,"l"),("",0.44,"r")],
-      [["Fin area A","0.117 m2"],["Fin area B","0.048 m2"],
-       ["h @ 2 m/s (A)","97 W/m2K"],["h natural (B)","9.6 W/m2K"],
-       ["Fin efficiency A","0.77"],["Fin efficiency B","0.97"],
-       ["Air dP (A) @ 2 m/s","~18 Pa"]],
-      hdr=False,title="DERIVED",rh=5.0)
-    sh.text(30,yb+16,"AIRFLOW:  CONFIG A channels run parallel to the 68 mm edge. Duct the fan so all 42 channels are fed;",FS_S-0.35,INK,"start","600")
-    sh.text(30,yb+21,"a partially blocked inlet starves the downstream half and the die runs 15-20 K hotter than this table predicts.",FS_S-0.35,DIM,"start")
-    sh.table(12,236,300,
-      [("",0.30,"l"),("FIN PITCH",0.14,"c"),("GAP",0.10,"c"),("FINS",0.09,"c"),
-       ("R sink",0.13,"c"),("R th (j-a)",0.13,"c"),("Q @ dT 75 K",0.11,"r")],
-      [["*CONFIG A — forced air 1 m/s","*1.5","1.1","*43","0.93","1.12","*67 W"],
-       ["*CONFIG A — forced air 2 m/s","*1.5","1.1","*43","0.47","0.67","*113 W"],
-       ["*CONFIG A — forced air 4 m/s","*1.5","1.1","*43","0.27","0.46","*163 W"],
-       ["CONFIG A — STILL AIR (invalid)","1.5","1.1","43","32.6","32.8","2 W"],
-       ["*CONFIG B — natural convection","*6.0","5.0","*11","3.68","3.87","*19 W"],
-       ["optimum plate spacing, H=20, dT=40 K","4.2","—","—","—","—","reference"]],
-      title="SELECTION TABLE   —   1.5 mm PITCH IS FORCED-AIR ONLY",rh=5.2)
-    sh.text(12,285,"A 1.1 mm gap 20 mm tall chokes buoyant flow: h collapses to 0.25 W/m2K. Never fit VC-201 in a fanless enclosure.",FS_S-0.3,INK,"start","600")
+
+    rows=[]
+    for Ta in (25,30,35,40,45):
+        r=nat_solve(85,Ta,S['finB_n'],S['finB_t'],S['finB_p'],S['finB_h'],0.85)
+        rows.append([f"{Ta} C",f"{85-Ta} K",f"{r['Tb']:.0f} C",f"{r['qc']:.1f} W",f"{r['qr']:.1f} W",
+                     ("*" if Ta==25 else "")+f"{r['Q']:.1f} W"])
+    yA=sh.table(12,196,210,[("AMBIENT",0.16,"c"),("dT",0.13,"c"),("FIN BASE",0.17,"c"),
+                            ("CONVECTION",0.19,"c"),("RADIATION",0.17,"c"),("TOTAL",0.18,"r")],rows,
+      title="PASSIVE CAPACITY  -  VC-202, Tj 85 C MAX, NO FAN, FINS VERTICAL",rh=5.2)
+    fr=[]; base=nat_solve(85,25,S['finB_n'],S['finB_t'],S['finB_p'],S['finB_h'],0.05)['Q']
+    for eps,lab in [(0.05,"bare mill finish"),(0.60,"chromate conversion"),
+                    (0.85,"clear anodise 5 um  (SPECIFIED)"),(0.92,"black anodise")]:
+        r=nat_solve(85,25,S['finB_n'],S['finB_t'],S['finB_p'],S['finB_h'],eps)
+        fr.append([("*" if eps==0.85 else "")+lab,f"{eps:.2f}",f"{r['qr']:.1f} W",
+                   ("*" if eps==0.85 else "")+f"{r['Q']:.1f} W",f"{r['Q']/base:.2f}x"])
+    yB=sh.table(230,196,178,[("FIN FINISH",0.44,"l"),("eps",0.12,"c"),("RAD",0.15,"c"),
+                             ("TOTAL",0.15,"r"),("GAIN",0.14,"r")],fr,
+      title="WHY THE FINISH IS SPECIFIED  -  Tj 85 C, 25 C AMBIENT",rh=5.2)
+    op,orr,on=opt_pitch(85,25,S['finB_t'],S['finB_h'],0.85)
+    sh.text(230,yB+5.4,f"Pitch optimum {op:.1f} mm ({orr['Q']:.1f} W); {S['finB_p']:.1f} mm used as a round tooling pitch.",FS_S-0.45,DIM,"start")
+    sh.text(230,yB+10.2,"Passive floor with channels fully blocked: 4.6 W from envelope radiation alone.",FS_S-0.45,DIM,"start")
+
+    sh.table(12,238,216,
+      [("",0.30,"l"),("PITCH",0.11,"c"),("FINS",0.09,"c"),("FINISH",0.16,"c"),
+       ("Q @ Tj 100 C",0.17,"r"),("Q @ Tj 85 C",0.17,"r")],
+      [["*VC-201 - forced air 1 m/s","*1.5","*43","any","*67 W","*54 W"],
+       ["*VC-201 - forced air 2 m/s","*1.5","*43","any","*113 W","*90 W"],
+       ["*VC-201 - forced air 4 m/s","*1.5","*43","any","*163 W","*130 W"],
+       ["VC-201 - STILL AIR (invalid)","1.5","43","anodised","9 W","7 W"],
+       ["*VC-202 - passive, fins VERTICAL","*5.0","*13","*anodised","*22 W","*16.5 W"],
+       ["VC-202 - passive, fins horizontal","5.0","13","anodised","13 W","9.5 W"],
+       ["VC-202 - passive, bare aluminium","5.0","13","bare","17 W","12.4 W"]],
+      title="SELECTION TABLE   -   Tj 85 C ROWS AT 25 C AMBIENT",rh=5.0)
     emit(sh,"VC-201_fin-stacks.svg")
 
 # ══════════════════════════════════════════════════════ SHEET 6

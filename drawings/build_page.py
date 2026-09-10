@@ -20,7 +20,8 @@ SHEETS=[
 def svg(fn):
     s=open(os.path.join(OUT,fn)).read()
     return re.sub(r'\swidth="100%"','',s,count=1)
-KPI=[("113 W","cooling capacity","20×20 mm die, 2 m/s air, ΔT 75 K"),
+KPI=[("113 W","forced air, 2 m/s","20×20 mm die, Tj 100 °C, air in 25 °C"),
+     ("16.5 W","passive, Tj 85 °C","no fan, anodised, fins vertical, 25 °C"),
      ("0.67 K/W","junction-to-air","of which 0.194 K/W is the chamber"),
      ("804 W","capillary limit","water, vertical, 45–75 µm wick"),
      ("1.90 mL","charge","DI water, deaerated, 125% of wick void")]
@@ -130,7 +131,8 @@ footer code{{font-family:var(--mono);color:var(--ink-2)}}
 <header class="mast">
   <div class="stamp"><b>INDIA-VC</b><span>VC-100 series</span><span>Rev A</span><span>ISO 128 / ISO 2768-mK</span><span>7 sheets</span></div>
   <h1>Vapour chamber, 68 × 68 × 27</h1>
-  <p class="sub">Manufacturing set for the corrected Cu–H<sub>2</sub>O design. It replaces the
+  <p class="sub">Manufacturing set for the corrected Cu–H<sub>2</sub>O design, plotted as ISO&nbsp;A3 and as a
+  5× enlargement (2100&nbsp;×&nbsp;1485&nbsp;mm, every scale label restated). It replaces the
   <b>Maxsorb III / 1.76× methanol</b> concept drawing, which could not be built: the adsorbent drained
   88% of the charge into the carbon, the unsupported 1&nbsp;mm lid yielded under atmospheric load alone,
   and the 200&nbsp;µm wick could not lift liquid against gravity. Every sheet below notes what it corrects.</p>
@@ -155,7 +157,8 @@ footer code{{font-family:var(--mono);color:var(--ink-2)}}
   </div>
 </div>
 
-<footer>Sheets are vector (SVG), drawn to scale from a single parametric source — geometry, the bill of
+<footer>PDF: <code>pdf/VC-100_drawing-set_RevA.pdf</code> (A3) and <code>…_5x.pdf</code> (2100 × 1485 mm,
+fits a 60&nbsp;in plotter roll). Sheets are vector (SVG), drawn to scale from a single parametric source — geometry, the bill of
 materials and every performance figure derive from <code>sim/design_spec.py</code>, so a spec change
 redraws the set. Title blocks read <em>CHECKED — PENDING</em>: nothing here has been reviewed by a
 responsible engineer, and the process on VC-300 has not been run on real hardware.</footer>

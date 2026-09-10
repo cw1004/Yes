@@ -21,7 +21,7 @@ SPEC = dict(
     wick_floor=0.40, wick_wall=0.30, wick_lid=0.20,
     # --- VC-201/202 fin stacks ---
     finA_n=43, finA_t=0.40, finA_p=1.5, finA_h=20.0,
-    finB_n=11, finB_t=1.00, finB_p=6.0, finB_h=20.0,
+    finB_n=13, finB_t=1.00, finB_p=5.0, finB_h=20.0,
     fin_base=2.0,
     # --- service ---
     die=20.0, Tj_max=100.0, T_air=25.0,

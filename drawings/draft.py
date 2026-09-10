@@ -1,6 +1,7 @@
+import math
+import re
 #!/usr/bin/env python3
 """Minimal but real technical-drafting primitives -> SVG (ISO-A3, mm units)."""
-import math
 
 FS   = 3.0          # standard text height (mm)
 FS_S = 2.3          # small text
@@ -9,6 +10,13 @@ FONT = "'Helvetica Neue',Helvetica,Arial,sans-serif"
 
 INK, DIM, THIN, HATCH, CTR = "#12181f", "#3c4a57", "#6b7a89", "#aab6c2", "#7a8fa3"
 W_VIS, W_HID, W_DIM, W_CTR, W_THIN = 0.50, 0.30, 0.18, 0.16, 0.22
+
+SCALE_MULT = 1          # 5 for the 5x enlarged plot set
+
+def _scl(txt):
+    """Rewrite every 'N:1' in a scale string for the enlarged plot size."""
+    if SCALE_MULT == 1 or not txt: return txt
+    return re.sub(r'(\d+):1', lambda m: f"{int(m.group(1))*SCALE_MULT}:1", str(txt))
 
 def esc(t): return (str(t).replace("&","&amp;").replace("<","&lt;").replace(">","&gt;"))
 
@@ -116,7 +124,7 @@ class Sheet:
         return self.raw(f'<polygon points="{p}" fill="url(#{gid})" stroke="none"/>')
     def view_label(self, x,y, s, sub=""):
         self.text(x,y,s,FS+0.6,INK,"middle","700",0.4)
-        if sub: self.text(x,y+5.6,sub,FS_S-0.2,DIM,"middle")
+        if sub: self.text(x,y+5.6,_scl(sub),FS_S-0.2,DIM,"middle")
         self.line(x-len(s)*1.05,y+1.3,x+len(s)*1.05,y+1.3,0.35,INK)
         return self
     def section_mark(self, x,y, letter, dirn="down", size=5.0):
@@ -202,17 +210,17 @@ class Sheet:
         self.text(x+w-3,y+6.2,"ISO 128 / ISO 2768-mK",FS_S-0.3,DIM,"end")
         # title
         self.text(x+3,y+15.5,"TITLE",FS_S-0.5,THIN,"start","600",0.4)
-        self.text(x+3,y+21.5,self.t,FS+1.2,INK,"start","700",0.2)
+        self.text(x+3,y+21.5,self.t,FS+1.2,INK,"start","700",0)
         if self.sub: self.text(x+3,y+25.6,self.sub,FS_S-0.2,DIM,"start")
         # scale / units / sheet
         self.text(x+115,y+15.5,"SCALE",FS_S-0.5,THIN,"start","600",0.4)
-        self.text(x+115,y+21.0,self.sc,FS+0.8,INK,"start","700")
+        self.text(x+115,y+21.0,_scl(self.sc),FS+0.8,INK,"start","700")
         self.text(x+145,y+15.5,"UNITS",FS_S-0.5,THIN,"start","600",0.4)
         self.text(x+145,y+21.0,"mm",FS+0.8,INK,"start","700")
         self.text(x+115,y+25.8,"THIRD ANGLE PROJECTION",FS_S-0.7,DIM,"start")
         # drawing number band
         self.text(x+3,y+33.5,"DRAWING No.",FS_S-0.5,THIN,"start","600",0.4)
-        self.text(x+30,y+34.2,self.n,FS+1.6,INK,"start","700",0.6)
+        self.text(x+30,y+34.2,self.n,FS+1.6,INK,"start","700",0)
         self.text(x+115,y+33.5,"REV",FS_S-0.5,THIN,"start","600",0.4)
         self.text(x+128,y+34.2,"A",FS+1.6,INK,"start","700")
         self.text(x+145,y+33.5,"SHEET",FS_S-0.5,THIN,"start","600",0.4)
