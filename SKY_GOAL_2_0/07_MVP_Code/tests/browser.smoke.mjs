@@ -345,6 +345,21 @@ try {
     gearCounts.slots === 3 && gearCounts.cons === 4,
     JSON.stringify(gearCounts));
 
+  const icons = await page.evaluate(() => {
+    const canvases = [...document.querySelectorAll('#gear-list .icon canvas')];
+    const consCanvases = document.querySelectorAll('#cons-list .icon canvas').length;
+    // 캔버스가 실제로 칠해졌는지 — 전부 투명하면 그리기가 실패한 것이다
+    const painted = canvases.filter((cv) => {
+      const d = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data;
+      for (let i = 3; i < d.length; i += 4) if (d[i] > 0) return true;
+      return false;
+    }).length;
+    return { gear: canvases.length, cons: consCanvases, painted };
+  });
+  check('장비 12종 · 소모품 4종이 캔버스 아이콘으로 그려진다',
+    icons.gear === 12 && icons.cons === 4 && icons.painted === 12,
+    JSON.stringify(icons));
+
   const lockedCraft = await page.evaluate(() =>
     [...document.querySelectorAll('#gear-list .ballrow button')].every((b) => b.disabled));
   check('조각이 없으면 제작 버튼이 전부 잠긴다', lockedCraft);

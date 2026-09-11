@@ -10,6 +10,7 @@
   var Scenery = window.SkyGoalScenery;
   var AudioLib = window.SkyGoalAudio;
   var Sponsor = window.SkyGoalSponsor;
+  var GearArt = window.SkyGoalGearArt;
 
   /* ------------------------------------------------------------ DOM 참조 */
 
@@ -203,7 +204,30 @@
 
   /* ------------------------------------------------------- 장비 · 조각 */
 
-  var SLOT_ICON = { boots: '👟', band: '🎗️', charm: '🍀' };
+  // 아이콘은 전부 캔버스로 그린다 (gearart.js).
+  // 모듈이 없으면 빈 칸으로 두고 게임은 그대로 돌아간다.
+  var SLOT_FALLBACK = { boots: 'B', band: 'A', charm: 'C' };
+
+  function iconCanvas(id, fallback) {
+    var box = document.createElement('div');
+    box.className = 'icon';
+    if (GearArt && GearArt.SKINS[id]) {
+      var cv = document.createElement('canvas');
+      var dpr = Math.min(window.devicePixelRatio || 1, 2);
+      var size = 40;
+      cv.width = size * dpr;
+      cv.height = size * dpr;
+      cv.style.width = size + 'px';
+      cv.style.height = size + 'px';
+      var ictx = cv.getContext('2d');
+      ictx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      GearArt.paint(ictx, size, id);
+      box.appendChild(cv);
+    } else {
+      box.textContent = fallback || '';
+    }
+    return box;
+  }
 
   // 지금 조각만으로 바로 만들 수 있는 장비 수. 결과 화면에서 "만들 수 있다"를 알려 준다.
   function craftableCount() {
@@ -276,9 +300,7 @@
     var row = document.createElement('div');
     row.className = 'ballrow' + (picked ? ' on' : '') + (owned ? '' : ' locked');
 
-    var icon = document.createElement('div');
-    icon.className = 'icon';
-    icon.textContent = SLOT_ICON[g.slot] || '🎽';
+    var icon = iconCanvas(g.id, SLOT_FALLBACK[g.slot]);
 
     var meta = document.createElement('div');
     meta.className = 'meta';
@@ -338,9 +360,7 @@
     var row = document.createElement('div');
     row.className = 'ballrow' + (picked ? ' on' : '') + (stock > 0 ? '' : ' locked');
 
-    var icon = document.createElement('div');
-    icon.className = 'icon';
-    icon.textContent = '🥤';
+    var icon = iconCanvas(c.id, 'S');
 
     var meta = document.createElement('div');
     meta.className = 'meta';
@@ -510,7 +530,7 @@
     $('s-ball').textContent = E.selectedBall(profile).name;
     var names = equippedNames();
     var snack = E.selectedConsumable(profile);
-    if (snack) names.push('🥤 ' + snack.name);
+    if (snack) names.push('· ' + snack.name);
     var craftable = craftableCount();
     $('s-gear').textContent = (names.length ? names.join(' · ') : '없음') +
       (craftable > 0 ? ' (제작 가능 ' + craftable + ')' : '');
@@ -2144,6 +2164,7 @@
     gear: showGear,
     craftableCount: craftableCount,
     paintBall: paintBall,          // 아트 확인용
+    gearArt: function () { return GearArt; },
     getArena: function () { return arena; },
     // 보상형 광고 제공자 주입: fn(callback) → callback(성공 여부)
     setRewardProvider: function (fn) { rewardProvider = typeof fn === 'function' ? fn : null; },

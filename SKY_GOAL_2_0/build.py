@@ -91,6 +91,7 @@ MARKERS = {
     "/* __AUDIO__ */": SRC / "audio.js",
     "/* __SCENERY__ */": SRC / "scenery.js",
     "/* __SPONSOR__ */": SRC / "sponsor.js",
+    "/* __GEARART__ */": SRC / "gearart.js",
     "/* __GAME__ */": SRC / "game.js",
 }
 
