@@ -34,6 +34,13 @@ function loadPlaywright() {
 
 const pw = loadPlaywright();
 if (!pw) {
+  // 개발자 노트북에는 playwright 가 없을 수 있으니 건너뛴다.
+  // 그러나 CI 에서 건너뛰면 초록불인데 아무것도 검증하지 않은 상태가 되므로,
+  // REQUIRE_BROWSER=1 이면 건너뛰지 않고 실패시킨다.
+  if (process.env.REQUIRE_BROWSER === '1') {
+    console.error('[fail] playwright 를 찾을 수 없어 보안 회귀 테스트를 돌리지 못했습니다.\n        NODE_PATH 를 `npm root -g` 값으로 맞추세요.');
+    process.exit(1);
+  }
   console.log('[skip] playwright 가 없어 보안 회귀 테스트를 건너뜁니다.');
   process.exit(0);
 }
