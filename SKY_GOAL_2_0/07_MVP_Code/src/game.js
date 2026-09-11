@@ -2070,8 +2070,8 @@
   $('btn-settings').addEventListener('click', showSettings);
   $('btn-settings-close').addEventListener('click', showStart);
   $('btn-settings-reset').addEventListener('click', function () {
-    profile.settings.ballFine = 50;
-    profile.settings.speed = 50;
+    profile.settings.ballFine = E.BALL_FINE_MIN;
+    profile.settings.speed = E.SPEED_MIN;
     applySettings(true);
   });
   $('set-fine').addEventListener('input', function () {
@@ -2143,42 +2143,45 @@
     };
   }
 
-  // 자동화 테스트/디버깅용 훅
+  // 보안 참고: window.SkyGoal 는 이전 버전에서 engine·getProfile()·getRun()·forceEnd()
+  // 를 항상 공개해, 플레이어가 브라우저 콘솔에 한 줄만 쳐도 보상을 무한 지급받을 수
+  // 있었다 (예: `SkyGoal.engine.grantClearReward(SkyGoal.getProfile())` 반복 호출,
+  // 또는 `SkyGoal.getRun().score = 999999; SkyGoal.forceEnd()` 로 가짜 점수를 정상
+  // 보상 경로에 흘려보내기). getProfile()/getRun() 이 사본이 아니라 살아있는 원본을
+  // 돌려줬기 때문에 값을 바꾸면 그대로 게임에 반영됐다.
+  //
+  // 자동화 테스트는 정확히 이 접근이 필요하다(상태를 직접 만들어 검증해야 하므로).
+  // 그래서 "보상을 지급하거나 상태를 조작할 수 있는" 멤버는 TEST_MODE 에서만 붙이고,
+  // 실제 플레이어의 기본 페이지 로드에서는 아예 존재하지 않게 한다. 이 플래그는
+  // 페이지가 처음 실행되는 시점(스크립트 평가 시)에 한 번만 읽히므로, 이미 로드된
+  // 페이지에서 콘솔로 나중에 켤 수 없다 — 새로고침해야 하고, 그러면 현재 진행 중인
+  // 판이 사라진다. "콘솔 한 줄로 즉시 무한 보상"이라는 지금 신고된 취약점은 막되,
+  // 클라이언트 전용 게임의 근본 한계(로컬 저장 자체를 직접 편집하는 것)까지
+  // 완전히 막을 수는 없다는 점은 그대로다 — 서버가 없는 한 불가능하다.
+  var TEST_MODE = window.__SKYGOAL_TEST__ === true;
+
+  // 안드로이드 네이티브 브리지가 광고 시청 결과를 돌려주는 콜백. 실제 앱이 의존하므로
+  // TEST_MODE 와 무관하게 항상 공개해야 한다. pendingReward 가 없으면(콘솔에서 근거
+  // 없이 호출한 경우) 아무 일도 일어나지 않는다 — 실제 보상은 이어하기 버튼을 눌러
+  // 광고를 띄운 뒤에만 pendingReward 가 채워진다.
   window.SkyGoal = {
-    engine: E,
     audio: function () { return audio; },
     scenery: function () { return scenery; },
-    getProfile: function () { return profile; },
     getState: function () { return state; },
-    getRun: function () { return run; },
     start: startRun,
     flap: flap,
-    forceEnd: function () {
-      if (state === 'kickoff') beginPlay();
-      if (state === 'ready') state = 'playing';
-      endRun();
-    },
     home: showStart,
     settings: showSettings,
     balls: showBalls,
     gear: showGear,
-    craftableCount: craftableCount,
-    paintBall: paintBall,          // 아트 확인용
-    gearArt: function () { return GearArt; },
     getArena: function () { return arena; },
-    // 보상형 광고 제공자 주입: fn(callback) → callback(성공 여부)
-    setRewardProvider: function (fn) { rewardProvider = typeof fn === 'function' ? fn : null; },
     hasRewardProvider: function () { return !!rewardProvider; },
-    // 안드로이드가 광고 시청 결과를 이 함수로 돌려준다
     onRewardResult: function (granted) {
       var cb = pendingReward;
       pendingReward = null;
       if (cb) cb(!!granted);
     },
-    canContinue: canContinue,
-    continueRun: continueRun,
-    finalizeRun: finalizeRun,
-    debug: function () {
+    debug: function () {                // 읽기 전용 — 보상·상태를 바꾸지 않는다
       return {
         ball: ball ? { x: ball.x, y: ball.y, vy: ball.vy } : null,
         gates: gates.map(function (g) { return { x: g.x, mid: g.mid, baseMid: g.baseMid, gap: g.gap, passed: g.passed }; }),
@@ -2200,14 +2203,35 @@
         } : null,
         size: { w: W, h: H, groundY: groundY }
       };
-    },
-    // 자동화 테스트용
-    debugClearGates: function () { gates = []; },
-    // 골키퍼 장갑이 실제로 충돌을 흡수하는지 확인한다
-    debugAbsorbHit: function () { return run && ball ? absorbHit(ball.y) : false; },
-    debugRefreshStage: function () { if (run) refreshStage(); },
+    }
+  };
+
+  // 아래는 전부 보상을 지급하거나(engine, forceEnd) 살아있는 원본 상태를 그대로
+  // 내주는(getProfile, getRun) 멤버다. 테스트 하네스가 페이지 로드 전에
+  // window.__SKYGOAL_TEST__ = true 를 설정했을 때만 붙는다.
+  if (TEST_MODE) {
+    window.SkyGoal.engine = E;
+    window.SkyGoal.getProfile = function () { return profile; };
+    window.SkyGoal.getRun = function () { return run; };
+    window.SkyGoal.paintBall = paintBall;                 // 아트 확인용
+    window.SkyGoal.setRewardProvider = function (fn) { rewardProvider = typeof fn === 'function' ? fn : null; };
+    window.SkyGoal.canContinue = canContinue;
+    window.SkyGoal.continueRun = continueRun;
+    window.SkyGoal.finalizeRun = finalizeRun;
+    window.SkyGoal.debugClearGates = function () { gates = []; };
+    window.SkyGoal.debugRefreshStage = function () { if (run) refreshStage(); };
+    window.SkyGoal.forceEnd = function () {
+      if (state === 'kickoff') beginPlay();
+      if (state === 'ready') state = 'playing';
+      endRun();
+    };
+    // 장비 — craftableCount 는 읽기 전용이지만, debugAbsorbHit 은 남은 무효 횟수를
+    // 실제로 소비한다. 공개하면 콘솔 한 줄로 장갑을 무한히 쓸 수 있으므로 여기 둔다.
+    window.SkyGoal.craftableCount = craftableCount;
+    window.SkyGoal.gearArt = function () { return GearArt; };
+    window.SkyGoal.debugAbsorbHit = function () { return run && ball ? absorbHit(ball.y) : false; };
     // 아트 확인용: 특정 스테이지 연출을 즉시 적용한다
-    previewStage: function (key) {
+    window.SkyGoal.previewStage = function (key) {
       for (var i = 0; i < E.STAGES.length; i++) {
         if (E.STAGES[i].key === key) stage = E.STAGES[i];
       }
@@ -2216,6 +2240,6 @@
       if (audio) audio.setIntensity(musicLevel());
       updateHud();
       return stage.key;
-    }
-  };
+    };
+  }
 })();

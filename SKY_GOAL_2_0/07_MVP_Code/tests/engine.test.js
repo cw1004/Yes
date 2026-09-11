@@ -87,17 +87,34 @@ test('경기장 스테이지 매핑 (통과한 골문 수 기준)', () => {
 });
 
 test('난이도가 높을수록 골문은 좁아지고 속도는 빨라진다', () => {
+  // AI 난이도가 만드는 물리값만 보고 싶으므로 조작 설정은 중립값(50/50)으로 고정한다.
+  // (기본 설정은 이제 20/30 — 가장 느긋한 값 — 이라 여기서 그대로 쓰면
+  // 개인 취향 배율까지 섞여 이 테스트의 의도와 다른 걸 검증하게 된다)
+  const neutral = { ballFine: 50, speed: 50 };
   const stats = E.createProfile().stats;
-  const easy = E.arenaParams(10, E.stageFor(0, 10), stats);
-  const hard = E.arenaParams(95, E.stageFor(0, 95), stats);
+  const easy = E.arenaParams(10, E.stageFor(0, 10), stats, neutral);
+  const hard = E.arenaParams(95, E.stageFor(0, 95), stats, neutral);
   assert.ok(hard.gap < easy.gap);
   assert.ok(hard.speed > easy.speed);
   assert.ok(hard.gap >= 130, '골문이 공보다 좁아지지 않는다');
   assert.strictEqual(easy.wind, 0, '저난이도에서는 바람이 없다');
   for (let d = 10; d <= 95; d += 5) {
-    const a = E.arenaParams(d, E.stageFor(0, d), stats);
+    const a = E.arenaParams(d, E.stageFor(0, d), stats, neutral);
     assert.ok(a.gap >= 130 && a.gap <= 260, 'gap 범위: ' + a.gap);
     assert.ok(a.speed >= 180 && a.speed <= 560, 'speed 범위: ' + a.speed);
+    assert.ok(a.gravity > 0 && a.flap < 0);
+  }
+});
+
+test('기본 조작 설정(공 20 · 스피드 30)에서도 물리값이 안전 범위 안에 있다', () => {
+  // 새 기본값은 가장 느긋한(가장 느린) 설정이므로, AI 난이도 클램프보다
+  // 최종 speed 가 더 낮아질 수 있다 — 그것이 의도된 동작이다. 다만 하한
+  // 자체(140)는 넘지 않아야 하고, 게임이 성립하지 않을 만큼 느려서도 안 된다.
+  const stats = E.createProfile().stats;
+  for (let d = 10; d <= 95; d += 5) {
+    const a = E.arenaParams(d, E.stageFor(0, d), stats); // settings 생략 → 기본값(20/30)
+    assert.ok(a.speed >= 140 && a.speed <= 660, 'speed 하드 범위: ' + a.speed);
+    assert.ok(a.gap >= 130 && a.gap <= 260, 'gap 범위: ' + a.gap);
     assert.ok(a.gravity > 0 && a.flap < 0);
   }
 });
@@ -112,14 +129,18 @@ test('조작 설정은 하한(공 20 / 스피드 30) 아래로 내려가지 않�
   assert.strictEqual(high.ballFine, 100);
   assert.strictEqual(high.speed, 100);
   const bad = E.tuningFactors({ ballFine: 'x', speed: null });
-  assert.strictEqual(bad.ballFine, 50);
-  assert.strictEqual(bad.speed, 50);
+  assert.strictEqual(bad.ballFine, 20);
+  assert.strictEqual(bad.speed, 30);
   assert.deepStrictEqual(E.tuningFactors(), E.tuningFactors({}));
 
   const p = E.normalizeProfile({ settings: { ballFine: 5, speed: 1000 } });
   assert.strictEqual(p.settings.ballFine, 20);
   assert.strictEqual(p.settings.speed, 100);
-  assert.strictEqual(E.createProfile().settings.ballFine, 50);
+  // 기본값(신규 프로필·설정 누락 시)은 하한인 20/30 — 아마추어·프로 공용 설정이다
+  assert.strictEqual(E.createProfile().settings.ballFine, 20);
+  assert.strictEqual(E.createProfile().settings.speed, 30);
+  assert.strictEqual(E.normalizeProfile({}).settings.ballFine, 20);
+  assert.strictEqual(E.normalizeProfile({}).settings.speed, 30);
 });
 
 test('공 상하 미세 조정은 반응 속도만 바꾸고 점프 높이는 유지한다', () => {

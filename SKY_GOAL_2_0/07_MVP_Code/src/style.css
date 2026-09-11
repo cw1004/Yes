@@ -39,14 +39,18 @@ html, body {
 }
 .badge b { font-size: 15px; }
 
+/* align-items:center 로 가운데를 맞추면 카드가 화면보다 길어졌을 때
+   위쪽이 잘려 나가고 스크롤로도 닿지 않는다. flex-start + margin:auto 는
+   여유가 있으면 가운데로 오고, 없으면 잘리지 않고 전부 스크롤된다. */
 #panel {
-  position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+  position: fixed; inset: 0; display: flex; align-items: flex-start; justify-content: center;
   background: rgba(4, 10, 20, 0.55); overflow-y: auto;
   padding: calc(16px + env(safe-area-inset-top, 0px)) calc(16px + env(safe-area-inset-right, 0px))
            calc(16px + env(safe-area-inset-bottom, 0px)) calc(16px + env(safe-area-inset-left, 0px));
   -webkit-overflow-scrolling: touch;
 }
 .card {
+  margin: auto;
   width: min(94vw, 440px);
   background: rgba(7, 17, 31, 0.94);
   border: 1px solid var(--line); border-radius: 22px;
@@ -74,10 +78,14 @@ p { margin: 8px 0; line-height: 1.55; color: #dbe7f7; font-size: 14px; }
 }
 .btn:active { transform: translateY(1px); }
 .btn.ghost {
-  background: transparent; color: var(--sub);
-  border: 1px solid var(--line); font-size: 13px; font-weight: 600; padding: 10px;
-  margin-top: 8px;
+  background: rgba(255, 255, 255, 0.04); color: var(--ink);
+  border: 1.5px solid var(--line); font-size: 16px; font-weight: 700; padding: 14px;
+  margin-top: 10px; letter-spacing: 0.2px;
 }
+.btn.ghost.c-shop { border-color: #ffd54a; color: #ffd54a; background: rgba(255, 213, 74, 0.12); }
+.btn.ghost.c-gear { border-color: #63d08a; color: #63d08a; background: rgba(99, 208, 138, 0.12); }
+.btn.ghost.c-settings { border-color: #4fc3f7; color: #4fc3f7; background: rgba(79, 195, 247, 0.12); }
+.btn.ghost.c-danger { border-color: #ff6b6b; color: #ff6b6b; background: rgba(255, 107, 107, 0.10); }
 .statpick { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
 .statpick button {
   flex: 1 1 30%; padding: 9px 6px; font-size: 12px; font-weight: 700; cursor: pointer;

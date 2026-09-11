@@ -77,6 +77,39 @@ node 07_MVP_Code/tests/browser.smoke.mjs --screenshot ./shots
 | 캠페인 표지판 | 좁으면 생략, 나무 기둥 두 개, 한글을 눕히지 않고 그대로 표시 |
 | 시작 전 캠페인 | 인트로 보드가 존재하고 **캠페인 종류**이며 가로로 그려짐 |
 
+## 1-5. 보안 회귀 테스트 (`tests/security.smoke.mjs`, 5개)
+`window.SkyGoal` 은 한때 `engine`·`getProfile()`·`getRun()`·`forceEnd()` 를 항상
+공개했다. `getProfile()`/`getRun()` 이 사본이 아니라 살아있는 원본을 돌려줘서,
+플레이어가 브라우저 콘솔에 딱 한 줄만 쳐도 플레이 없이 보상을 무한 지급받을 수
+있었다:
+```js
+for (let i=0;i<50;i++) SkyGoal.engine.grantClearReward(SkyGoal.getProfile());
+// 또는
+SkyGoal.getRun().score = 999999; SkyGoal.forceEnd();
+```
+자동화 테스트는 정확히 이 접근이 필요해서(상태를 직접 만들어 검증해야 하므로)
+남아 있었다. 지금은 이 멤버들이 `window.__SKYGOAL_TEST__ === true` 일 때만
+붙는다 — 이 플래그는 페이지가 처음 실행되는 시점에 한 번만 읽히므로, 이미 열려
+있는 페이지에서 콘솔로 나중에 켤 수 없다(새로고침해야 하고, 그러면 진행 중인
+판이 사라진다).
+
+| 항목 | 확인 내용 |
+|---|---|
+| 노출 표면 | `engine`·`getProfile`·`getRun`·`forceEnd` 등 보상/상태 조작 API가 테스트 플래그 없는 기본 페이지 로드에는 전혀 없음 |
+| 예전 원라이너 차단 | `grantClearReward` 무한 호출 시도가 `undefined` 오류로 막힘 |
+| 점수 조작 경로 차단 | `getRun().score` 를 바꾼 뒤 `forceEnd()` 로 정상 보상 경로에 흘려보내는 시도도 막힘 |
+| 정상 플레이 유지 | 잠근 뒤에도 시작→탭→플레이 상태 전환은 그대로 동작 |
+
+`onRewardResult` 는 예외다 — 실제 안드로이드 앱의 네이티브 광고 브리지가
+`window.SkyGoal.onRewardResult(true/false)` 를 직접 호출하므로 항상 공개되어
+있어야 한다. 다만 이어하기 버튼을 눌러 광고를 띄운 뒤에만 `pendingReward` 가
+채워지므로, 콘솔에서 근거 없이 호출해도 아무 효과가 없다.
+
+이 근본 한계는 그대로 남는다: 서버가 없는 클라이언트 전용 게임이므로,
+`localStorage` 에 저장된 JSON 을 직접 편집하는 것 자체는 막을 수 없다.
+이번 수정은 "콘솔 한 줄로 즉시 무한 보상"이라는 **가장 쉽고 퍼뜨리기 쉬운**
+경로를 막은 것이다.
+
 ## 2. 브라우저 스모크 테스트 (`tests/browser.smoke.mjs`, 71개)
 실제 Chromium 에서 빌드된 단일 HTML 을 띄워 확인한다.
 - 시작 화면 표시 / 엔진·사운드·배경 모듈 로드

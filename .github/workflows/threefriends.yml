@@ -1,0 +1,33 @@
+name: 세 친구의 여행 — 테스트
+
+on:
+  push:
+    branches: ['**']
+    paths:
+      - 'THREE_FRIENDS/**'
+      - 'IP_BIBLE/**'
+      - '.github/workflows/threefriends.yml'
+  pull_request:
+    paths:
+      - 'THREE_FRIENDS/**'
+      - 'IP_BIBLE/**'
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: 엔진 · 바이블 정합성 · 브라우저 스모크
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Playwright 설치
+        run: |
+          npm i -g playwright
+          playwright install --with-deps chromium
+      - name: 전체 검증
+        run: bash test.sh
+        working-directory: THREE_FRIENDS
+        env:
+          NODE_PATH: /usr/local/lib/node_modules

@@ -57,6 +57,12 @@ const url = `http://127.0.0.1:${server.address().port}/`;
 
 const browser = await pw.chromium.launch();
 const context = await browser.newContext({ viewport: { width: 420, height: 820 } });
+// 실제 배포본은 engine/getProfile()/getRun()/forceEnd() 같은 보상-조작 API 를
+// 공개하지 않는다(콘솔 한 줄로 무한 보상을 받는 구멍이었다 — game.js 참고).
+// 이 테스트는 상태를 직접 만들어 검증해야 하므로, 페이지가 실행되기 전에
+// 이 플래그를 심어 테스트 전용으로만 열어준다. addInitScript 는 이 컨텍스트의
+// 이후 모든 goto/reload 에 그대로 적용된다.
+await context.addInitScript(() => { window.__SKYGOAL_TEST__ = true; });
 const page = await context.newPage();
 
 const errors = [];
@@ -238,6 +244,26 @@ try {
   }));
   check('처음에는 아마추어이고 프로는 잠겨 있다',
     locked.mode === 'amateur' && locked.proLocked, JSON.stringify(locked));
+  // 시작 화면이 길어지면(장비 버튼처럼 항목이 늘어나면) 작은 화면에서
+  // 위쪽 버튼이 잘려 손이 닿지 않는 일이 생긴다. 회귀로 막는다.
+  const reach = await page.evaluate(async () => {
+    document.getElementById('panel').scrollTop = 0;
+    await new Promise((r) => requestAnimationFrame(r));
+    const card = document.querySelector('#screen-start');
+    const top = document.getElementById('mode-pro').getBoundingClientRect().top;
+    const bottom = document.getElementById('btn-reset').getBoundingClientRect().bottom;
+    document.getElementById('panel').scrollTop = 99999;
+    await new Promise((r) => requestAnimationFrame(r));
+    const bottomAfter = document.getElementById('btn-reset').getBoundingClientRect().bottom;
+    return { top: Math.round(top), cardH: Math.round(card.getBoundingClientRect().height),
+             viewH: window.innerHeight, bottom: Math.round(bottom),
+             bottomAfter: Math.round(bottomAfter) };
+  });
+  check('시작 화면이 길어져도 맨 위 버튼이 화면 안에 들어온다',
+    reach.top >= 0, JSON.stringify(reach));
+  check('맨 아래 버튼까지 스크롤로 닿는다',
+    reach.bottomAfter <= reach.viewH + 1, JSON.stringify(reach));
+
   await page.click('#mode-pro');
   check('잠긴 모드는 눌러도 바뀌지 않는다',
     (await page.evaluate(() => window.SkyGoal.getProfile().mode)) === 'amateur');
@@ -533,10 +559,10 @@ try {
     window.SkyGoal.settings();
     document.getElementById('btn-settings-reset').click();
   });
-  check('기본값으로 되돌릴 수 있다',
+  check('기본값으로 되돌릴 수 있다 (공 20 · 스피드 30)',
     await page.evaluate(() => {
       const s = window.SkyGoal.getProfile().settings;
-      return s.speed === 50 && s.ballFine === 50;
+      return s.speed === 30 && s.ballFine === 20;
     }));
   await page.evaluate(() => window.SkyGoal.home());
 
