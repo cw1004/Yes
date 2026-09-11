@@ -368,10 +368,10 @@ try {
     window.SkyGoal.settings();
     document.getElementById('btn-settings-reset').click();
   });
-  check('기본값으로 되돌릴 수 있다',
+  check('기본값으로 되돌릴 수 있다 (공 20 · 스피드 30)',
     await page.evaluate(() => {
       const s = window.SkyGoal.getProfile().settings;
-      return s.speed === 50 && s.ballFine === 50;
+      return s.speed === 30 && s.ballFine === 20;
     }));
   await page.evaluate(() => window.SkyGoal.home());
 

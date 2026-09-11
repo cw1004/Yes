@@ -256,15 +256,15 @@ if ('serviceWorker' in navigator) {
     <p class="small">내 손에 맞게 조절하세요. 값을 낮춰 쉬워지면 AI 가 그만큼 난이도를 올려 균형을 맞춥니다.</p>
 
     <div class="slider">
-      <label for="set-fine">공 상하 미세 조정 <b id="set-fine-val">50</b></label>
-      <input type="range" id="set-fine" min="20" max="100" step="1" value="50">
+      <label for="set-fine">공 상하 미세 조정 <b id="set-fine-val">20</b></label>
+      <input type="range" id="set-fine" min="20" max="100" step="1" value="20">
       <div class="hint"><span>느긋하게 (20)</span><span>민첩하게 (100)</span></div>
       <p class="small">탭에 반응하는 속도만 바뀝니다. 한 번 탭할 때 뜨는 높이는 그대로입니다.</p>
     </div>
 
     <div class="slider">
-      <label for="set-speed">스피드 <b id="set-speed-val">50</b></label>
-      <input type="range" id="set-speed" min="30" max="100" step="1" value="50">
+      <label for="set-speed">스피드 <b id="set-speed-val">30</b></label>
+      <input type="range" id="set-speed" min="30" max="100" step="1" value="30">
       <div class="hint"><span>천천히 (30)</span><span>빠르게 (100)</span></div>
       <p class="small">골문이 다가오는 속도입니다.</p>
     </div>
@@ -553,7 +553,7 @@ if ('serviceWorker' in navigator) {
       coins: 0,
       statPoints: 0,
       bestScore: 0,
-      settings: { muted: false, ballFine: 50, speed: 50 },
+      settings: { muted: false, ballFine: BALL_FINE_MIN, speed: SPEED_MIN },
       balls: { owned: [DEFAULT_BALL], selected: DEFAULT_BALL },
       stats: { control: 50, power: 50, speed: 50, luck: 50, stamina: 50 },
       metrics: {
@@ -663,8 +663,8 @@ if ('serviceWorker' in navigator) {
       bestScore: Math.max(0, Math.floor(num(raw.bestScore, 0, 0, 1e9))),
       settings: {
         muted: settings.muted === true,
-        ballFine: num(settings.ballFine, 50, BALL_FINE_MIN, 100),
-        speed: num(settings.speed, 50, SPEED_MIN, 100)
+        ballFine: num(settings.ballFine, BALL_FINE_MIN, BALL_FINE_MIN, 100),
+        speed: num(settings.speed, SPEED_MIN, SPEED_MIN, 100)
       },
       balls: normalizeBalls(balls),
       stats: {
@@ -804,8 +804,8 @@ if ('serviceWorker' in navigator) {
    */
   function tuningFactors(settings) {
     var t = settings || {};
-    var fine = clamp(num(t.ballFine, 50, BALL_FINE_MIN, 100), BALL_FINE_MIN, 100);
-    var spd = clamp(num(t.speed, 50, SPEED_MIN, 100), SPEED_MIN, 100);
+    var fine = clamp(num(t.ballFine, BALL_FINE_MIN, BALL_FINE_MIN, 100), BALL_FINE_MIN, 100);
+    var spd = clamp(num(t.speed, SPEED_MIN, SPEED_MIN, 100), SPEED_MIN, 100);
     return {
       ballFine: fine,
       speed: spd,
@@ -4044,8 +4044,8 @@ if ('serviceWorker' in navigator) {
   $('btn-settings').addEventListener('click', showSettings);
   $('btn-settings-close').addEventListener('click', showStart);
   $('btn-settings-reset').addEventListener('click', function () {
-    profile.settings.ballFine = 50;
-    profile.settings.speed = 50;
+    profile.settings.ballFine = E.BALL_FINE_MIN;
+    profile.settings.speed = E.SPEED_MIN;
     applySettings(true);
   });
   $('set-fine').addEventListener('input', function () {

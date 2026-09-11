@@ -1716,8 +1716,8 @@
   $('btn-settings').addEventListener('click', showSettings);
   $('btn-settings-close').addEventListener('click', showStart);
   $('btn-settings-reset').addEventListener('click', function () {
-    profile.settings.ballFine = 50;
-    profile.settings.speed = 50;
+    profile.settings.ballFine = E.BALL_FINE_MIN;
+    profile.settings.speed = E.SPEED_MIN;
     applySettings(true);
   });
   $('set-fine').addEventListener('input', function () {

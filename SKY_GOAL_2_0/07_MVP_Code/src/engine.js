@@ -235,7 +235,7 @@
       coins: 0,
       statPoints: 0,
       bestScore: 0,
-      settings: { muted: false, ballFine: 50, speed: 50 },
+      settings: { muted: false, ballFine: BALL_FINE_MIN, speed: SPEED_MIN },
       balls: { owned: [DEFAULT_BALL], selected: DEFAULT_BALL },
       stats: { control: 50, power: 50, speed: 50, luck: 50, stamina: 50 },
       metrics: {
@@ -345,8 +345,8 @@
       bestScore: Math.max(0, Math.floor(num(raw.bestScore, 0, 0, 1e9))),
       settings: {
         muted: settings.muted === true,
-        ballFine: num(settings.ballFine, 50, BALL_FINE_MIN, 100),
-        speed: num(settings.speed, 50, SPEED_MIN, 100)
+        ballFine: num(settings.ballFine, BALL_FINE_MIN, BALL_FINE_MIN, 100),
+        speed: num(settings.speed, SPEED_MIN, SPEED_MIN, 100)
       },
       balls: normalizeBalls(balls),
       stats: {
@@ -486,8 +486,8 @@
    */
   function tuningFactors(settings) {
     var t = settings || {};
-    var fine = clamp(num(t.ballFine, 50, BALL_FINE_MIN, 100), BALL_FINE_MIN, 100);
-    var spd = clamp(num(t.speed, 50, SPEED_MIN, 100), SPEED_MIN, 100);
+    var fine = clamp(num(t.ballFine, BALL_FINE_MIN, BALL_FINE_MIN, 100), BALL_FINE_MIN, 100);
+    var spd = clamp(num(t.speed, SPEED_MIN, SPEED_MIN, 100), SPEED_MIN, 100);
     return {
       ballFine: fine,
       speed: spd,
