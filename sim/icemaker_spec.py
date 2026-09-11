@@ -182,23 +182,36 @@ if __name__=="__main__":
     else:
         P("   -> acceptable; it is already inside the 5 kg/day figure as margin.")
 
-    P("\n"); L('='); P("5. REGENERATION TEMPERATURE — THERE IS AN OPTIMUM"); L('=')
-    P("   Hotter regeneration opens the uptake swing but costs collector efficiency.")
-    P(f"{'T_des':>7}{'coll eff':>10}{'swing':>8}{'COP':>7}{'carbon':>9}"
-      f"{'ICE/day':>10}{'MeOH charge':>13}{'Psat':>8}")
-    best=None
-    for r in optimise_Tdes():
-        m="" 
-        if best is None or r['ice']>best['ice']: best=r
-        P(f"{r['Td']:>5} C{r['eta']:>10.3f}{r['dx']:>8.3f}{r['COP']:>7.2f}"
-          f"{r['m_c']:>8.1f}kg{r['ice']:>9.1f}kg{r['charge']:>11.1f}kg{r['p']:>7.2f}b")
-    P(f"\n   peak ice at {best['Td']} C: {best['ice']:.1f} kg/day on {best['m_c']:.1f} kg of carbon")
-    P(f"   but that carries {best['charge']:.1f} kg of methanol.")
-    P("   For a portable device holding a toxic, flammable fluid, INVENTORY is a")
-    P("   design variable, not an outcome. Trading a little ice for a lot less")
-    P("   methanol is the right call - see the selection note below.")
-    sel=[r for r in optimise_Tdes() if r['Td']==110][0]
-    P(f"\n   SELECTED 110 C: {sel['ice']:.1f} kg/day, {sel['m_c']:.1f} kg carbon,"
-      f" {sel['charge']:.1f} kg methanol, {sel['p']:.1f} bar")
-    P(f"   vs 100 C: {[r for r in optimise_Tdes() if r['Td']==100][0]['ice']:.1f} kg/day,"
-      f" {[r for r in optimise_Tdes() if r['Td']==100][0]['charge']:.1f} kg methanol")
+    P("\n"); L('='); P("5. REGENERATION TEMPERATURE — SELECTED TO MINIMISE INVENTORY"); L('=')
+    P("   Hotter regeneration opens the swing, so less carbon carries the same duty,")
+    P("   and the methanol charge falls with it. The cost is pressure and collector")
+    P("   efficiency. For a portable device holding a toxic fluid, inventory wins.")
+    P(f"{'T_des':>7}{'swing':>8}{'COP':>7}{'carbon':>9}{'METHANOL':>11}"
+      f"{'coll use':>10}{'Psat':>8}   note")
+    for r in sweep():
+        note=""
+        if r['Td']==S['T_des']: note="  <-- SELECTED"
+        elif r['util']>0.92:    note="  no collector margin"
+        elif r['p_op']>=psat_meoh(S['T_stag'])/1e5*0.95: note="  at the stagnation limit"
+        P(f"{r['Td']:>5.0f} C{r['dx']:>8.3f}{r['COP']:>7.2f}{r['m_c']:>8.1f}kg"
+          f"{r['charge']:>9.1f}kg{r['util']*100:>9.0f}%{r['p_op']:>7.1f}b{note}")
+    lo=[r for r in sweep() if r['Td']==100][0]; sel=design()
+    P(f"\n   {S['T_des']:.0f} C against 100 C: methanol {lo['charge']:.1f} -> {sel['charge']:.1f} kg,"
+      f" a {100*(1-sel['charge']/lo['charge']):.0f} % cut in inventory.")
+    P(f"   150 C would reach {[r for r in sweep() if r['Td']==150][0]['charge']:.1f} kg but leaves"
+      f" only {100-[r for r in sweep() if r['Td']==150][0]['util']*100:.0f} % collector margin")
+    P("   and puts operating pressure level with the stagnation design case.")
+
+    P("\n"); L('='); P("6. SAFETY-DRIVEN CONSEQUENCES OF A 4.9 kg METHANOL CHARGE"); L('=')
+    for t in ["Outdoor device only. No indoor installation, no indoor storage while charged.",
+              "All-welded SS 316L and copper. No elastomer joints, no service ports, no",
+              "  threaded fittings on the wetted envelope. Charge under vacuum, then seal",
+              "  permanently by pinch-off and weld cap.",
+              "Bund or drip tray under the evaporator and receiver sized for the whole",
+              "  charge, in a vapour-tight secondary enclosure.",
+              "Vessel proof tested to 1.5 x the 150 C stagnation pressure = 21 bar.",
+              "No pressure relief venting to atmosphere. The vessel is designed to",
+              "  contain stagnation instead - that is why the adsorber is tubes.",
+              "Methanol burns with a nearly invisible flame. Site fire cover accordingly.",
+              "Label the vessel for methanol with flame and acute-toxicity marking."]:
+        P("   - "+t if not t.startswith("  ") else t)
