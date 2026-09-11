@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="description" content="세 친구의 여행 — 티키타카 + 리더 교체 프로토타입">
+<title>세 친구의 여행</title>
+<style>
+/* __STYLE__ */
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="hud" class="hidden" aria-hidden="true">
+  <div class="col">
+    <div class="badge">도토리 <b id="hud-acorn">0</b></div>
+    <div class="badge">거리 <b id="hud-dist">0</b>m</div>
+    <div id="hud-missions"></div>
+  </div>
+  <div class="col right">
+    <div class="badge"><b id="hud-heart">♥♥♥</b></div>
+    <div class="badge">티키타카 <b id="hud-tiki">0</b></div>
+    <div class="badge">배율 <b id="hud-mul">×1.00</b></div>
+  </div>
+</div>
+
+<div id="leaderbar" class="hidden"></div>
+
+<div id="panel">
+  <div class="card" id="screen-start">
+    <div class="tag">PROTOTYPE · 티키타카 + 리더 교체</div>
+    <h1>세 친구의 여행</h1>
+    <p>세 친구가 함께 걷습니다. <b>탭</b>하면 지금 앞에 선 친구가 행동하고,
+    아래 버튼(또는 <b>1·2·3</b> 키)으로 <b>리더를 바꿉니다.</b></p>
+    <div class="chars">
+      <div class="ch"><b>NUBI</b><span>아기 판다<br>점프 — 통나무</span></div>
+      <div class="ch"><b>WOBI</b><span>아기 퍼핀<br>활공 — 돌풍</span></div>
+      <div class="ch"><b>SARO</b><span>아기 다람쥐<br>꼬리 회전 — 좁은 틈</span></div>
+    </div>
+    <p class="small">걷다가 둘이 <b>장난</b>을 겁니다. 말풍선이 뜨면 그 사이에 탭하세요 —
+    <b>티키타카</b>입니다. 5번 연속 성공하면 <b>HAPPY PARADE</b>.
+    실패해도 벌은 없습니다.</p>
+    <div class="grid">
+      <div class="stat">모은 도토리<b id="s-acorn">0</b></div>
+      <div class="stat">최고 점수<b id="s-best">0</b></div>
+      <div class="stat">난이도<b id="s-diff">40</b></div>
+      <div class="stat">누적 게임<b id="s-games">0</b></div>
+      <div class="stat" style="grid-column:1/-1">리더로 쓴 횟수<b id="s-usage">-</b></div>
+    </div>
+    <label class="toggle"><input type="checkbox" id="assist" checked>
+      리더 자동 추천 (저연령 · 탭만으로 진행)</label>
+    <button class="btn" id="btn-start" type="button">여행 시작</button>
+    <button class="btn ghost" id="btn-reset" type="button">기록 초기화</button>
+  </div>
+
+  <div class="card hidden" id="screen-result">
+    <div class="tag">RESULT</div>
+    <h2>오늘의 여행</h2>
+    <div class="grid">
+      <div class="stat">점수<b id="r-score">0</b></div>
+      <div class="stat">도토리<b id="r-acorn">+0</b></div>
+      <div class="stat">티키타카<b id="r-tiki">0/0</b></div>
+      <div class="stat">배율<b id="r-mul">×1.00</b></div>
+      <div class="stat">장애물 통과<b id="r-clear">0/0</b></div>
+      <div class="stat">새 난이도<b id="r-diff">40</b></div>
+    </div>
+    <ul class="missions" id="r-missions"></ul>
+    <p class="small" id="r-note"></p>
+    <button class="btn" id="btn-retry" type="button">다시 여행</button>
+    <button class="btn ghost" id="btn-home" type="button">메인으로</button>
+  </div>
+</div>
+
+<script>
+/* __ENGINE__ */
+</script>
+<script>
+/* __GAME__ */
+</script>
+</body>
+</html>

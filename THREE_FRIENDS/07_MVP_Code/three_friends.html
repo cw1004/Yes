@@ -1,0 +1,1445 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="description" content="세 친구의 여행 — 티키타카 + 리더 교체 프로토타입">
+<title>세 친구의 여행</title>
+<style>
+* { box-sizing: border-box; }
+:root {
+  --bg: #0d151f; --card: rgba(12, 20, 30, 0.9); --line: rgba(255, 255, 255, 0.14);
+  --text: #eef3f8; --sub: #9fb0c3; --accent: #ff9933; --good: #63d08a;
+}
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+  font-family: system-ui, -apple-system, 'Noto Sans KR', sans-serif;
+  overscroll-behavior: none; -webkit-tap-highlight-color: transparent; }
+#c { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+
+#hud { position: fixed; top: 0; left: 0; right: 0; padding: 10px 12px;
+  display: flex; gap: 8px; align-items: flex-start; pointer-events: none; z-index: 5; }
+#hud .col { display: flex; flex-direction: column; gap: 5px; }
+#hud .col.right { margin-left: auto; align-items: flex-end; }
+.badge { background: rgba(10, 18, 28, 0.62); border: 1px solid var(--line);
+  border-radius: 9px; padding: 4px 9px; font-size: 11px; letter-spacing: 0.03em; color: var(--sub); }
+.badge b { color: var(--text); font-size: 14px; margin-left: 4px; }
+#hud-missions { margin-top: 6px; display: flex; flex-direction: column; gap: 3px; }
+.mrow { background: rgba(10, 18, 28, 0.58); border: 1px solid var(--line); border-radius: 8px;
+  padding: 3px 8px; font-size: 10.5px; color: var(--sub); }
+.mrow.done { color: var(--good); border-color: rgba(99, 208, 138, 0.5); }
+
+#leaderbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 6;
+  display: flex; gap: 8px; padding: 10px 12px calc(12px + env(safe-area-inset-bottom)); }
+.leaderbtn { flex: 1 1 0; min-width: 0; padding: 9px 4px; border-radius: 12px; cursor: pointer;
+  background: rgba(10, 18, 28, 0.78); border: 2px solid var(--line); color: var(--sub);
+  display: flex; flex-direction: column; align-items: center; gap: 1px; font-family: inherit; }
+.leaderbtn b { font-size: 14px; color: var(--text); letter-spacing: 0.04em; }
+.leaderbtn span { font-size: 10px; }
+.leaderbtn.on { border-color: var(--accent); background: rgba(255, 153, 51, 0.18); color: var(--text); }
+
+#panel { position: fixed; inset: 0; display: grid; place-items: center; padding: 16px; z-index: 10;
+  overflow: auto; }
+.card { width: min(440px, 100%); background: var(--card); border: 1px solid var(--line);
+  border-radius: 18px; padding: 20px; backdrop-filter: blur(8px); }
+.tag { font-size: 10px; letter-spacing: 0.16em; color: var(--accent); }
+h1 { margin: 4px 0 8px; font-size: 30px; letter-spacing: -0.01em; }
+h2 { margin: 4px 0 8px; font-size: 21px; }
+p { margin: 6px 0; font-size: 13.5px; line-height: 1.6; color: var(--sub); }
+p b, li b { color: var(--text); }
+.small { font-size: 11.5px; }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 14px 0; }
+.stat { background: rgba(255, 255, 255, 0.05); border: 1px solid var(--line);
+  border-radius: 11px; padding: 8px 10px; font-size: 11px; color: var(--sub); }
+.stat b { display: block; font-size: 17px; color: var(--text); margin-top: 2px; }
+.btn { width: 100%; margin-top: 9px; padding: 13px; border: 0; border-radius: 13px; cursor: pointer;
+  font-size: 15px; font-weight: 700; font-family: inherit; color: #0d1b2a;
+  background: linear-gradient(90deg, var(--accent), #ffd28a); }
+.btn.ghost { background: transparent; color: var(--sub); border: 1px solid var(--line); font-weight: 500; }
+.chars { display: flex; gap: 8px; margin: 12px 0; }
+.chars .ch { flex: 1 1 0; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--line);
+  border-radius: 12px; padding: 9px 6px; text-align: center; }
+.chars .ch b { display: block; font-size: 13px; }
+.chars .ch span { font-size: 10.5px; color: var(--sub); }
+ul.missions { margin: 10px 0; padding-left: 2px; list-style: none; font-size: 12px; color: var(--sub); }
+ul.missions li { padding: 3px 0; }
+ul.missions li.done { color: var(--good); }
+label.toggle { display: flex; align-items: center; gap: 8px; margin: 12px 0 4px;
+  font-size: 12.5px; color: var(--sub); cursor: pointer; }
+.hidden { display: none !important; }
+
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="hud" class="hidden" aria-hidden="true">
+  <div class="col">
+    <div class="badge">도토리 <b id="hud-acorn">0</b></div>
+    <div class="badge">거리 <b id="hud-dist">0</b>m</div>
+    <div id="hud-missions"></div>
+  </div>
+  <div class="col right">
+    <div class="badge"><b id="hud-heart">♥♥♥</b></div>
+    <div class="badge">티키타카 <b id="hud-tiki">0</b></div>
+    <div class="badge">배율 <b id="hud-mul">×1.00</b></div>
+  </div>
+</div>
+
+<div id="leaderbar" class="hidden"></div>
+
+<div id="panel">
+  <div class="card" id="screen-start">
+    <div class="tag">PROTOTYPE · 티키타카 + 리더 교체</div>
+    <h1>세 친구의 여행</h1>
+    <p>세 친구가 함께 걷습니다. <b>탭</b>하면 지금 앞에 선 친구가 행동하고,
+    아래 버튼(또는 <b>1·2·3</b> 키)으로 <b>리더를 바꿉니다.</b></p>
+    <div class="chars">
+      <div class="ch"><b>NUBI</b><span>아기 판다<br>점프 — 통나무</span></div>
+      <div class="ch"><b>WOBI</b><span>아기 퍼핀<br>활공 — 돌풍</span></div>
+      <div class="ch"><b>SARO</b><span>아기 다람쥐<br>꼬리 회전 — 좁은 틈</span></div>
+    </div>
+    <p class="small">걷다가 둘이 <b>장난</b>을 겁니다. 말풍선이 뜨면 그 사이에 탭하세요 —
+    <b>티키타카</b>입니다. 5번 연속 성공하면 <b>HAPPY PARADE</b>.
+    실패해도 벌은 없습니다.</p>
+    <div class="grid">
+      <div class="stat">모은 도토리<b id="s-acorn">0</b></div>
+      <div class="stat">최고 점수<b id="s-best">0</b></div>
+      <div class="stat">난이도<b id="s-diff">40</b></div>
+      <div class="stat">누적 게임<b id="s-games">0</b></div>
+      <div class="stat" style="grid-column:1/-1">리더로 쓴 횟수<b id="s-usage">-</b></div>
+    </div>
+    <label class="toggle"><input type="checkbox" id="assist" checked>
+      리더 자동 추천 (저연령 · 탭만으로 진행)</label>
+    <button class="btn" id="btn-start" type="button">여행 시작</button>
+    <button class="btn ghost" id="btn-reset" type="button">기록 초기화</button>
+  </div>
+
+  <div class="card hidden" id="screen-result">
+    <div class="tag">RESULT</div>
+    <h2>오늘의 여행</h2>
+    <div class="grid">
+      <div class="stat">점수<b id="r-score">0</b></div>
+      <div class="stat">도토리<b id="r-acorn">+0</b></div>
+      <div class="stat">티키타카<b id="r-tiki">0/0</b></div>
+      <div class="stat">배율<b id="r-mul">×1.00</b></div>
+      <div class="stat">장애물 통과<b id="r-clear">0/0</b></div>
+      <div class="stat">새 난이도<b id="r-diff">40</b></div>
+    </div>
+    <ul class="missions" id="r-missions"></ul>
+    <p class="small" id="r-note"></p>
+    <button class="btn" id="btn-retry" type="button">다시 여행</button>
+    <button class="btn ghost" id="btn-home" type="button">메인으로</button>
+  </div>
+</div>
+
+<script>
+/*
+ * 세 친구의 여행 — 로직 엔진
+ * DOM 의존성이 없다. 브라우저와 Node 에서 똑같이 동작한다.
+ * 브라우저: window.FriendsEngine / Node: module.exports
+ */
+(function (root, factory) {
+  var api = factory();
+  if (typeof module === 'object' && module.exports) module.exports = api;
+  root.FriendsEngine = api;
+})(typeof globalThis !== 'undefined' ? globalThis : this, function () {
+  'use strict';
+
+  var VERSION = '0.1.0';
+  var STORAGE_KEY = 'three_friends_profile_v1';
+
+  function clamp(v, a, b) {
+    if (!isFinite(v)) return a;
+    return Math.max(a, Math.min(b, v));
+  }
+  function mean(list) {
+    if (!list || !list.length) return 0;
+    var s = 0;
+    for (var i = 0; i < list.length; i++) s += list[i];
+    return s / list.length;
+  }
+  function pushCapped(list, v, cap) {
+    list.push(v);
+    while (list.length > cap) list.shift();
+    return list;
+  }
+  function num(v, fallback, min, max) {
+    var n = typeof v === 'number' ? v : parseFloat(v);
+    if (!isFinite(n)) n = fallback;
+    if (min !== undefined) n = clamp(n, min, max);
+    return n;
+  }
+
+  /* ------------------------------------------------------------ 캐릭터 */
+
+  /**
+   * 세 명이 함께 걷고, 그중 한 명만 "리더"가 되어 행동한다.
+   * 캐릭터마다 막을 수 있는 장애물이 다르기 때문에
+   * 세 명을 다 쓰지 않으면 진행이 막힌다 — 3인조를 장식으로 두지 않기 위한 장치다.
+   */
+  var CHARACTERS = [
+    { id: 'nubi', name: 'NUBI', ko: '누비', species: '아기 판다',
+      action: 'jump', actionKo: '점프', counters: 'log',
+      color: { body: '#f6f1e7', mark: '#2b2b33', cheek: '#ffb3ba', accent: '#3e8bff' } },
+    { id: 'wobi', name: 'WOBI', ko: '워비', species: '아기 퍼핀',
+      action: 'glide', actionKo: '활공', counters: 'gust',
+      color: { body: '#2f3b52', mark: '#f6f7fb', cheek: '#ffb3ba', accent: '#ff8a3d' } },
+    { id: 'saro', name: 'SARO', ko: '사로', species: '아기 다람쥐',
+      action: 'spin', actionKo: '꼬리 회전', counters: 'gap',
+      color: { body: '#d9813f', mark: '#f7e3c8', cheek: '#ffb3ba', accent: '#4fbf5a' } }
+  ];
+
+  function characterById(id) {
+    for (var i = 0; i < CHARACTERS.length; i++) if (CHARACTERS[i].id === id) return CHARACTERS[i];
+    return CHARACTERS[0];
+  }
+
+  /* ---------------------------------------------------------- 장애물 */
+
+  var OBSTACLES = [
+    { id: 'log',  name: '쓰러진 통나무', need: 'nubi', hint: '뛰어넘어야 한다' },
+    { id: 'gust', name: '돌풍',         need: 'wobi', hint: '바람을 타야 한다' },
+    { id: 'gap',  name: '좁은 틈',      need: 'saro', hint: '꼬리로 빠져나가야 한다' }
+  ];
+
+  function obstacleById(id) {
+    for (var i = 0; i < OBSTACLES.length; i++) if (OBSTACLES[i].id === id) return OBSTACLES[i];
+    return OBSTACLES[0];
+  }
+
+  /* -------------------------------------------------------------- 난이도 */
+
+  /**
+   * 난이도 → 실제 수치.
+   * 걷는 속도는 크게 올리지 않는다. 저연령이 따라가지 못하면 그 순간 게임이 끝난다.
+   * 대신 장애물 간격과 티키타카 판정 폭을 좁혀 난이도를 만든다.
+   */
+  function params(difficulty) {
+    var d = clamp(difficulty, 10, 95);
+    return {
+      difficulty: d,
+      walkSpeed: 118 + 0.55 * d,            // px/s — 118 ~ 170
+      obstacleGap: clamp(360 - 1.5 * d, 190, 360),
+      reactWindow: clamp(1.25 - 0.006 * d, 0.60, 1.25),   // 장애물 대응 여유(초)
+      tikitakaWindow: clamp(1.10 - 0.005 * d, 0.60, 1.10),
+      tikitakaEvery: clamp(7.5 - 0.03 * d, 3.5, 7.5),     // 평균 몇 초마다 장난이 오는가
+      acornRate: 1 + d / 200
+    };
+  }
+
+  /**
+   * 장애물 구성. **가장 적게 쓴 캐릭터가 막는 장애물의 비중을 올린다.**
+   * 한 명만 쓰는 플레이어에게 "세 명을 다 써라"고 말로 가르치지 않고
+   * 게임 구성으로 유도한다. 이 게임의 AI 파트 핵심이다.
+   */
+  function obstacleMix(usage, difficulty) {
+    var u = usage || {};
+    var counts = CHARACTERS.map(function (c) { return Math.max(0, u[c.id] || 0); });
+    var total = counts.reduce(function (a, b) { return a + b; }, 0);
+    var weights = {};
+    CHARACTERS.forEach(function (c, i) {
+      if (total < 6) {                       // 표본이 적으면 고르게 낸다
+        weights[c.counters] = 1;
+        return;
+      }
+      var share = counts[i] / total;
+      // 적게 쓸수록(share 가 1/3 보다 작을수록) 그 캐릭터의 장애물이 많이 나온다
+      var w = 1 + (1 / 3 - share) * 2.4;
+      weights[c.counters] = clamp(w, 0.45, 1.9);
+    });
+    // 난이도가 높을수록 편중 보정을 조금 더 세게 건다
+    var k = 1 + clamp(difficulty, 10, 95) / 300;
+    Object.keys(weights).forEach(function (key) {
+      weights[key] = clamp(Math.pow(weights[key], k), 0.4, 2.0);
+    });
+    return weights;
+  }
+
+  function rollObstacle(usage, difficulty, rng) {
+    var w = obstacleMix(usage, difficulty);
+    var total = 0;
+    OBSTACLES.forEach(function (o) { total += w[o.id]; });
+    var r = (rng || Math.random)() * total;
+    for (var i = 0; i < OBSTACLES.length; i++) {
+      r -= w[OBSTACLES[i].id];
+      if (r <= 0) return OBSTACLES[i];
+    }
+    return OBSTACLES[OBSTACLES.length - 1];
+  }
+
+  /* ------------------------------------------------------------ 티키타카 */
+
+  var TIKITAKA = [
+    { id: 'poke',   text: '콕 찌르기',   pair: ['nubi', 'saro'] },
+    { id: 'tickle', text: '꼬리 간지럼', pair: ['saro', 'wobi'] },
+    { id: 'mimic',  text: '흉내내기',   pair: ['wobi', 'nubi'] },
+    { id: 'toss',   text: '도토리 던지기', pair: ['saro', 'nubi'] },
+    { id: 'hold',   text: '손잡기',     pair: ['nubi', 'wobi'] }
+  ];
+
+  var TIKITAKA_BASE_MUL = 0.05;
+  var TIKITAKA_CAP = 1.5;
+  var PARADE_STREAK = 5;
+  var PARADE_SECONDS = 6;
+
+  function tikitakaMultiplier(successes, cap) {
+    var limit = cap === undefined ? TIKITAKA_CAP : cap;
+    return clamp(1 + TIKITAKA_BASE_MUL * Math.max(0, successes), 1, limit);
+  }
+
+  function rollTikitaka(rng) {
+    var r = (rng || Math.random)();
+    return TIKITAKA[Math.floor(r * TIKITAKA.length) % TIKITAKA.length];
+  }
+
+  /* -------------------------------------------------------------- 미션 */
+
+  /**
+   * 판 미션. 출발 전 3개를 뽑아 그 판에서 바로 달성한다.
+   * 3개 중 최소 1개는 **세 캐릭터를 모두 써야 하는** 미션이 들어간다.
+   * 튜토리얼 없이 리더 교체를 가르치는 가장 자연스러운 방법이다.
+   */
+  var MISSIONS = [
+    { id: 'acorn120', metric: 'acorns',        target: 120, reward: 100, text: '도토리 120개 모으기' },
+    { id: 'tiki5',    metric: 'tikitaka',      target: 5,   reward: 120, text: '티키타카 5회 성공' },
+    { id: 'tiki12',   metric: 'tikitaka',      target: 12,  reward: 220, text: '티키타카 12회 성공' },
+    { id: 'nubi3',    metric: 'cleared_nubi',  target: 3,   reward: 150, text: 'NUBI 로 통나무 3개 넘기' },
+    { id: 'wobi3',    metric: 'cleared_wobi',  target: 3,   reward: 150, text: 'WOBI 로 돌풍 3번 타기' },
+    { id: 'saro3',    metric: 'cleared_saro',  target: 3,   reward: 150, text: 'SARO 로 좁은 틈 3번 지나기' },
+    { id: 'parade1',  metric: 'parades',       target: 1,   reward: 200, text: 'HAPPY PARADE 1회 발동' },
+    { id: 'noMiss8',  metric: 'cleanStreak',   target: 8,   reward: 180, text: '실수 없이 장애물 8개 연속 통과' }
+  ];
+
+  // 세 명을 모두 써야 끝나는 미션 (반드시 한 개는 들어간다)
+  var TEAM_MISSION = {
+    id: 'allthree', metric: 'charactersUsed', target: 3, reward: 160,
+    text: '세 친구를 모두 리더로 써 보기'
+  };
+
+  function missionById(id) {
+    if (id === TEAM_MISSION.id) return TEAM_MISSION;
+    for (var i = 0; i < MISSIONS.length; i++) if (MISSIONS[i].id === id) return MISSIONS[i];
+    return null;
+  }
+
+  function rollMissions(rng, count) {
+    var r = rng || Math.random;
+    var n = Math.max(1, count || 3);
+    var pool = MISSIONS.slice();
+    var picked = [TEAM_MISSION];                 // 팀 미션은 고정으로 하나
+    while (picked.length < n && pool.length) {
+      var i = Math.floor(r() * pool.length) % pool.length;
+      picked.push(pool.splice(i, 1)[0]);
+    }
+    return picked;
+  }
+
+  function missionProgress(mission, run) {
+    if (!mission || !run) return 0;
+    switch (mission.metric) {
+      case 'acorns': return run.acorns || 0;
+      case 'tikitaka': return run.tikitakaHits || 0;
+      case 'parades': return run.parades || 0;
+      case 'cleanStreak': return run.bestCleanStreak || 0;
+      case 'charactersUsed': return Object.keys(run.usage || {}).filter(function (k) {
+        return (run.usage[k] || 0) > 0;
+      }).length;
+      case 'cleared_nubi': return (run.clearedBy || {}).nubi || 0;
+      case 'cleared_wobi': return (run.clearedBy || {}).wobi || 0;
+      case 'cleared_saro': return (run.clearedBy || {}).saro || 0;
+      default: return 0;
+    }
+  }
+
+  function missionDone(mission, run) {
+    return missionProgress(mission, run) >= mission.target;
+  }
+
+  /* -------------------------------------------------------------- 보상 */
+
+  // 0점이어도 최소 8개는 준다. 실패한 판이 완전한 손실이 되면 다시 안 한다.
+  function acornReward(score) {
+    return Math.round(8 + 20 * Math.log(Math.max(0, score) + 1));
+  }
+
+  function runAcorns(run) {
+    var base = acornReward(run.score || 0) + (run.acorns || 0);
+    var bonus = 0;
+    (run.missions || []).forEach(function (m) {
+      if (missionDone(m, run)) bonus += m.reward;
+    });
+    var mul = tikitakaMultiplier(run.tikitakaHits || 0, run.tikitakaCap);
+    return { base: base, missionBonus: bonus, multiplier: mul,
+             total: Math.round((base + bonus) * mul) };
+  }
+
+  /* ------------------------------------------------------------ 프로필 */
+
+  function createProfile() {
+    return {
+      version: VERSION,
+      acorns: 0,
+      starPieces: 0,
+      bestScore: 0,
+      difficulty: 40,                 // 첫 판은 조금 쉽게 연다
+      skill: 45,
+      leader: 'nubi',
+      settings: { muted: false, assist: true },   // assist = 리더 자동 추천(저연령)
+      metrics: {
+        games: 0, distance: 0, obstacles: 0, cleared: 0,
+        tikitakaTries: 0, tikitakaHits: 0, parades: 0,
+        usage: { nubi: 0, wobi: 0, saro: 0 },
+        recentSuccesses: []
+      },
+      lastRun: { score: 0, acorns: 0, tikitaka: 0 }
+    };
+  }
+
+  function normalizeProfile(raw) {
+    var base = createProfile();
+    if (!raw || typeof raw !== 'object') return base;
+    var m = raw.metrics && typeof raw.metrics === 'object' ? raw.metrics : {};
+    var u = m.usage && typeof m.usage === 'object' ? m.usage : {};
+    var st = raw.settings && typeof raw.settings === 'object' ? raw.settings : {};
+    var lr = raw.lastRun && typeof raw.lastRun === 'object' ? raw.lastRun : {};
+    var usage = {};
+    CHARACTERS.forEach(function (c) {
+      usage[c.id] = Math.max(0, Math.floor(num(u[c.id], 0, 0, 1e9)));
+    });
+    var recent = [];
+    if (Array.isArray(m.recentSuccesses)) {
+      m.recentSuccesses.forEach(function (v) {
+        var n = parseFloat(v);
+        if (isFinite(n)) recent.push(clamp(n, 0, 1));
+      });
+    }
+    var leader = characterById(raw.leader).id;
+    return {
+      version: VERSION,
+      acorns: Math.max(0, Math.floor(num(raw.acorns, 0, 0, 1e12))),
+      starPieces: Math.max(0, Math.floor(num(raw.starPieces, 0, 0, 1e9))),
+      bestScore: Math.max(0, Math.floor(num(raw.bestScore, 0, 0, 1e9))),
+      difficulty: num(raw.difficulty, 40, 10, 95),
+      skill: num(raw.skill, 45, 0, 100),
+      leader: leader,
+      settings: { muted: st.muted === true, assist: st.assist !== false },
+      metrics: {
+        games: Math.max(0, Math.floor(num(m.games, 0, 0, 1e9))),
+        distance: Math.max(0, num(m.distance, 0, 0, 1e12)),
+        obstacles: Math.max(0, Math.floor(num(m.obstacles, 0, 0, 1e9))),
+        cleared: Math.max(0, Math.floor(num(m.cleared, 0, 0, 1e9))),
+        tikitakaTries: Math.max(0, Math.floor(num(m.tikitakaTries, 0, 0, 1e9))),
+        tikitakaHits: Math.max(0, Math.floor(num(m.tikitakaHits, 0, 0, 1e9))),
+        parades: Math.max(0, Math.floor(num(m.parades, 0, 0, 1e9))),
+        usage: usage,
+        recentSuccesses: recent.slice(-10)
+      },
+      lastRun: {
+        score: Math.max(0, Math.floor(num(lr.score, 0, 0, 1e9))),
+        acorns: Math.max(0, Math.floor(num(lr.acorns, 0, 0, 1e9))),
+        tikitaka: Math.max(0, Math.floor(num(lr.tikitaka, 0, 0, 1e9)))
+      }
+    };
+  }
+
+  /* ------------------------------------------------------ 숙련도 / 난이도 */
+
+  function computeSkill(profile) {
+    var m = profile.metrics;
+    var obstacleRate = m.obstacles > 0 ? m.cleared / m.obstacles : 0.6;
+    var tikiRate = m.tikitakaTries > 0 ? m.tikitakaHits / m.tikitakaTries : 0.5;
+    // 캐릭터를 고르게 쓰는가 — 편중되면 숙련도로 치지 않는다
+    var counts = CHARACTERS.map(function (c) { return m.usage[c.id] || 0; });
+    var total = counts.reduce(function (a, b) { return a + b; }, 0);
+    var balance = 0.5;
+    if (total >= 6) {
+      var ideal = total / 3;
+      var dev = counts.reduce(function (a, n) { return a + Math.abs(n - ideal); }, 0) / (total * 2);
+      balance = clamp(1 - dev, 0, 1);
+    }
+    var raw = 100 * (0.45 * obstacleRate + 0.35 * tikiRate + 0.20 * balance);
+    return clamp(0.70 * profile.skill + 0.30 * raw, 0, 100);
+  }
+
+  // SKY GOAL 과 같은 안티 프러스트레이션 규칙을 쓴다.
+  function computeDifficulty(profile, nextSkill) {
+    var recent = profile.metrics.recentSuccesses.slice(-10);
+    var rate = recent.length ? mean(recent) : 0.7;
+    var F = 0;
+    var reasons = [];
+    if (recent.length >= 3) {
+      if (rate > 0.80) { F += 5; reasons.push('최근 성공률 > 80% +5'); }
+      else if (rate < 0.65) { F -= 5; reasons.push('최근 성공률 < 65% -5'); }
+      else reasons.push('성공률 65~80% 유지');
+    }
+    var target = clamp(0.85 * nextSkill + 6 + F, 10, 95);
+    var delta = clamp(target - profile.difficulty, -5, 5);
+    return { difficulty: clamp(profile.difficulty + delta, 10, 95),
+             delta: delta, successRate: rate, reasons: reasons };
+  }
+
+  /* ----------------------------------------------------------- 런 커밋 */
+
+  function commitRun(profile, run) {
+    var m = profile.metrics;
+    var score = Math.max(0, Math.round(run.score || 0));
+    var obstacles = Math.max(0, run.obstacles || 0);
+    var cleared = Math.max(0, run.cleared || 0);
+
+    m.games += 1;
+    m.distance += Math.max(0, run.distance || 0);
+    m.obstacles += obstacles;
+    m.cleared += cleared;
+    m.tikitakaTries += Math.max(0, run.tikitakaTries || 0);
+    m.tikitakaHits += Math.max(0, run.tikitakaHits || 0);
+    m.parades += Math.max(0, run.parades || 0);
+    CHARACTERS.forEach(function (c) {
+      m.usage[c.id] += Math.max(0, (run.usage || {})[c.id] || 0);
+    });
+
+    // "성공한 판"의 기준 — 장애물의 3분의 2 이상을 넘겼는가
+    var success = obstacles === 0 ? 0 : (cleared / obstacles >= 0.66 ? 1 : 0);
+    pushCapped(m.recentSuccesses, success, 10);
+
+    var reward = runAcorns(run);
+    profile.acorns += reward.total;
+    profile.bestScore = Math.max(profile.bestScore, score);
+
+    var nextSkill = computeSkill(profile);
+    profile.skill = nextSkill;
+    var diff = computeDifficulty(profile, nextSkill);
+    var previous = profile.difficulty;
+    profile.difficulty = diff.difficulty;
+
+    var missions = (run.missions || []).map(function (mi) {
+      return { id: mi.id, text: mi.text, target: mi.target,
+               progress: missionProgress(mi, run), done: missionDone(mi, run),
+               reward: mi.reward };
+    });
+
+    profile.lastRun = { score: score, acorns: reward.total, tikitaka: run.tikitakaHits || 0 };
+
+    return {
+      score: score,
+      acorns: reward.total,
+      acornBase: reward.base,
+      missionBonus: reward.missionBonus,
+      multiplier: reward.multiplier,
+      tikitakaHits: run.tikitakaHits || 0,
+      tikitakaTries: run.tikitakaTries || 0,
+      parades: run.parades || 0,
+      obstacles: obstacles,
+      cleared: cleared,
+      missions: missions,
+      charactersUsed: missionProgress(TEAM_MISSION, run),
+      previousDifficulty: previous,
+      difficulty: profile.difficulty,
+      difficultyDelta: profile.difficulty - previous,
+      skill: nextSkill,
+      successRate: diff.successRate,
+      reasons: diff.reasons
+    };
+  }
+
+  /* ------------------------------------------------------------ 저장소 */
+
+  function createStorage(backend) {
+    var store = backend;
+    if (store === undefined) {
+      try {
+        store = typeof localStorage !== 'undefined' ? localStorage : null;
+        if (store) { store.setItem('__tf__', '1'); store.removeItem('__tf__'); }
+      } catch (e) { store = null; }
+    }
+    var memory = {};
+    return {
+      persistent: !!store,
+      load: function () {
+        try {
+          var raw = store ? store.getItem(STORAGE_KEY) : memory[STORAGE_KEY];
+          return normalizeProfile(raw ? JSON.parse(raw) : null);
+        } catch (e) { return createProfile(); }
+      },
+      save: function (p) {
+        var payload = JSON.stringify(p);
+        try {
+          if (store) store.setItem(STORAGE_KEY, payload);
+          else memory[STORAGE_KEY] = payload;
+          return true;
+        } catch (e) { memory[STORAGE_KEY] = payload; return false; }
+      },
+      reset: function () {
+        try { if (store) store.removeItem(STORAGE_KEY); } catch (e) { /* ignore */ }
+        delete memory[STORAGE_KEY];
+        return createProfile();
+      }
+    };
+  }
+
+  return {
+    VERSION: VERSION, STORAGE_KEY: STORAGE_KEY,
+    clamp: clamp, mean: mean,
+    CHARACTERS: CHARACTERS, characterById: characterById,
+    OBSTACLES: OBSTACLES, obstacleById: obstacleById,
+    TIKITAKA: TIKITAKA, TIKITAKA_CAP: TIKITAKA_CAP,
+    PARADE_STREAK: PARADE_STREAK, PARADE_SECONDS: PARADE_SECONDS,
+    MISSIONS: MISSIONS, TEAM_MISSION: TEAM_MISSION, missionById: missionById,
+    params: params, obstacleMix: obstacleMix, rollObstacle: rollObstacle,
+    tikitakaMultiplier: tikitakaMultiplier, rollTikitaka: rollTikitaka,
+    rollMissions: rollMissions, missionProgress: missionProgress, missionDone: missionDone,
+    acornReward: acornReward, runAcorns: runAcorns,
+    createProfile: createProfile, normalizeProfile: normalizeProfile,
+    computeSkill: computeSkill, computeDifficulty: computeDifficulty,
+    commitRun: commitRun, createStorage: createStorage
+  };
+});
+
+</script>
+<script>
+/*
+ * 세 친구의 여행 — 게임 셸 (렌더링 / 입력 / 화면 전환)
+ * 로직은 전부 FriendsEngine 에 있고, 이 파일은 그것을 화면에 연결한다.
+ */
+(function () {
+  'use strict';
+
+  var E = window.FriendsEngine;
+  if (!E) { console.error('FriendsEngine 을 찾을 수 없습니다.'); return; }
+
+  var $ = function (id) { return document.getElementById(id); };
+  var canvas = $('c');
+  var ctx = canvas.getContext('2d');
+  var panel = $('panel');
+  var hud = $('hud');
+  var screenStart = $('screen-start');
+  var screenResult = $('screen-result');
+  var leaderBar = $('leaderbar');
+
+  var storage = E.createStorage();
+  var profile = storage.load();
+
+  var W = 0, H = 0, groundY = 0;
+  var state = 'idle';            // idle | playing | over
+  var run = null;
+  var party = null;              // 세 친구의 공통 상태
+  var obstacles = [];
+  var acorns = [];
+  var puffs = [];
+  var popups = [];
+  var tiki = null;               // 진행 중인 티키타카
+  var parade = 0;                // 남은 퍼레이드 시간(초)
+  var arena = null;
+  var elapsed = 0;
+  var lastFrame = 0;
+  var scroll = 0;
+  var nextObstacleAt = 0;
+  var nextTikiAt = 0;
+  var nextAcornAt = 0;
+  var shake = 0;
+
+  var ACTION_TIME = 0.45;        // 탭 한 번이 유효한 시간
+  var ACTION_TIME_ASSIST = 0.9;  // 보조 모드에서는 두 배로 넓힌다
+  var HEARTS = 3;
+  var PARTY_X_RATIO = 0.40;
+
+  /* ------------------------------------------------------------- 캔버스 */
+
+  function resize() {
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = canvas.clientWidth || window.innerWidth;
+    H = canvas.clientHeight || window.innerHeight;
+    canvas.width = Math.max(1, Math.round(W * dpr));
+    canvas.height = Math.max(1, Math.round(H * dpr));
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    groundY = H * 0.70;
+  }
+  window.addEventListener('resize', resize);
+  window.addEventListener('orientationchange', resize);
+
+  /* ---------------------------------------------------------- 화면 전환 */
+
+  function partyX() { return W * PARTY_X_RATIO; }
+
+  function showStart() {
+    state = 'idle';
+    run = null;
+    obstacles = [];
+    acorns = [];
+    puffs = [];
+    popups = [];
+    tiki = null;
+    parade = 0;
+    arena = E.params(profile.difficulty);
+    party = makeParty();
+    refreshStartScreen();
+    screenResult.classList.add('hidden');
+    screenStart.classList.remove('hidden');
+    panel.classList.remove('hidden');
+    hud.classList.add('hidden');
+    leaderBar.classList.add('hidden');
+  }
+
+  function refreshStartScreen() {
+    $('s-acorn').textContent = profile.acorns;
+    $('s-best').textContent = profile.bestScore;
+    $('s-diff').textContent = Math.round(profile.difficulty);
+    $('s-games').textContent = profile.metrics.games;
+    var u = profile.metrics.usage;
+    $('s-usage').textContent = E.CHARACTERS.map(function (c) {
+      return c.name + ' ' + (u[c.id] || 0);
+    }).join(' · ');
+    $('assist').checked = profile.settings.assist !== false;
+  }
+
+  /* -------------------------------------------------------------- 시작 */
+
+  function makeParty() {
+    return {
+      leader: E.characterById(profile.leader).id,
+      y: 0, vy: 0, jumping: false,
+      glide: 0, spin: 0,
+      actionUntil: -1, actionKind: null,
+      hearts: HEARTS, stumble: 0, bob: 0
+    };
+  }
+
+  function startRun() {
+    arena = E.params(profile.difficulty);
+    party = makeParty();
+    run = {
+      score: 0, distance: 0, acorns: 0,
+      obstacles: 0, cleared: 0,
+      tikitakaTries: 0, tikitakaHits: 0, tikitakaStreak: 0, parades: 0,
+      cleanStreak: 0, bestCleanStreak: 0,
+      usage: {}, clearedBy: { nubi: 0, wobi: 0, saro: 0 },
+      missions: E.rollMissions(Math.random, 3),
+      tikitakaCap: E.TIKITAKA_CAP
+    };
+    run.usage[party.leader] = 1;
+    obstacles = [];
+    acorns = [];
+    puffs = [];
+    popups = [];
+    tiki = null;
+    parade = 0;
+    elapsed = 0;
+    scroll = 0;
+    shake = 0;
+    nextObstacleAt = 1.8;
+    nextTikiAt = 2.6;
+    nextAcornAt = 0.8;
+    state = 'playing';
+    renderMissionList();
+    renderLeaderBar();
+    panel.classList.add('hidden');
+    hud.classList.remove('hidden');
+    leaderBar.classList.remove('hidden');
+    updateHud();
+  }
+
+  /* ------------------------------------------------------------- 입력 */
+
+  // 리더 교체. 티키타카 중에도 자유롭게 바꿀 수 있다.
+  function setLeader(id) {
+    if (!party) return false;
+    var c = E.characterById(id);
+    if (party.leader === c.id) return false;
+    party.leader = c.id;
+    profile.leader = c.id;
+    if (run) run.usage[c.id] = (run.usage[c.id] || 0) + 1;
+    renderLeaderBar();
+    return true;
+  }
+
+  /**
+   * 탭 하나로 두 가지를 한다.
+   *   - 티키타카가 떠 있으면 그것에 답한다
+   *   - 아니면 리더의 행동을 쓴다
+   * 장애물이 코앞일 때는 티키타카를 띄우지 않으므로 둘이 겹치지 않는다.
+   */
+  function tap() {
+    if (state === 'idle') { startRun(); return; }
+    if (state !== 'playing') return;
+    if (tiki && tiki.age <= tiki.window) { answerTikitaka(); return; }
+    doAction();
+  }
+
+  // 보조 모드는 리더를 대신 바꿔 줄 뿐 아니라 탭 판정도 넓힌다.
+  // 리더만 맞춰 주고 0.45초 안에 누르라고 하면 저연령에게는 여전히 어렵다.
+  function actionTime() {
+    return profile.settings.assist !== false ? ACTION_TIME_ASSIST : ACTION_TIME;
+  }
+
+  function doAction() {
+    var c = E.characterById(party.leader);
+    party.actionUntil = elapsed + actionTime();
+    party.actionKind = c.action;
+    if (c.action === 'jump' && !party.jumping) {
+      party.jumping = true;
+      party.vy = -430;
+    } else if (c.action === 'glide') {
+      party.glide = 0.55;
+    } else if (c.action === 'spin') {
+      party.spin = 0.5;
+    }
+    puff(partyX() - 14, groundY, 5, '255,255,255');
+  }
+
+  function actionActive() {
+    return party && elapsed <= party.actionUntil;
+  }
+
+  /* ---------------------------------------------------------- 티키타카 */
+
+  function spawnTikitaka() {
+    var t = E.rollTikitaka(Math.random);
+    tiki = { info: t, age: 0, window: arena.tikitakaWindow, done: false };
+    run.tikitakaTries += 1;
+  }
+
+  function answerTikitaka() {
+    if (!tiki || tiki.done) return;
+    tiki.done = true;
+    tiki.hit = true;
+    run.tikitakaHits += 1;
+    run.tikitakaStreak += 1;
+    run.acorns += 5;
+    run.score += 6;
+    popup('+5 ' + tiki.info.text, H * 0.30);
+    puff(partyX(), groundY - 70, 10, '255,215,90');
+    if (run.tikitakaStreak >= E.PARADE_STREAK) {
+      run.tikitakaStreak = 0;
+      run.parades += 1;
+      parade = E.PARADE_SECONDS;
+      popup('HAPPY PARADE!', H * 0.22);
+      puff(partyX(), groundY - 40, 26, '255,190,80');
+    }
+    updateHud();
+  }
+
+  // 실패해도 벌은 없다. 장난이 벌이 되면 저연령이 먼저 떠난다.
+  function missTikitaka() {
+    run.tikitakaStreak = 0;
+    tiki = null;
+  }
+
+  /* ---------------------------------------------------------- 장애물 */
+
+  function spawnObstacle() {
+    var o = E.rollObstacle(profile.metrics.usage, arena.difficulty, Math.random);
+    obstacles.push({ type: o, x: W + 60, resolved: false });
+    run.obstacles += 1;
+  }
+
+  function resolveObstacle(ob) {
+    ob.resolved = true;
+    var need = ob.type.need;
+    var ok = parade > 0 || (party.leader === need && actionActive());
+    if (ok) {
+      run.cleared += 1;
+      run.clearedBy[need] = (run.clearedBy[need] || 0) + 1;
+      run.cleanStreak += 1;
+      run.bestCleanStreak = Math.max(run.bestCleanStreak, run.cleanStreak);
+      run.score += 12 + Math.min(20, run.cleanStreak * 2);
+      run.acorns += 6;
+      popup('+' + (12 + Math.min(20, run.cleanStreak * 2)), H * 0.34);
+      puff(partyX() + 30, groundY - 30, 10, '160,240,180');
+    } else {
+      run.cleanStreak = 0;
+      party.hearts -= 1;
+      party.stumble = 0.7;
+      shake = 0.35;
+      popup(E.characterById(need).name + ' 가 필요했어!', H * 0.34);
+      puff(partyX() + 20, groundY - 20, 14, '255,140,120');
+      if (party.hearts <= 0) return endRun();
+    }
+    updateHud();
+  }
+
+  /* -------------------------------------------------------------- 루프 */
+
+  function update(dt) {
+    if (state !== 'playing') return;
+    elapsed += dt;
+
+    var speed = arena.walkSpeed * (parade > 0 ? 1.25 : 1) * (party.stumble > 0 ? 0.55 : 1);
+    run.distance += speed * dt;
+    run.score += speed * dt * 0.02;
+    scroll += speed * dt;
+    party.bob += dt * (speed / 26);
+    if (party.stumble > 0) party.stumble -= dt;
+    if (parade > 0) parade -= dt;
+    if (shake > 0) shake -= dt;
+
+    // 리더 물리 (점프 / 활공 / 회전)
+    if (party.jumping) {
+      var g = party.glide > 0 ? 520 : 1250;
+      party.vy += g * dt;
+      party.y += party.vy * dt;
+      if (party.y >= 0) { party.y = 0; party.vy = 0; party.jumping = false; }
+    }
+    if (party.glide > 0) party.glide -= dt;
+    if (party.spin > 0) party.spin -= dt;
+
+    // 장애물
+    nextObstacleAt -= dt;
+    if (nextObstacleAt <= 0) {
+      spawnObstacle();
+      nextObstacleAt = arena.obstacleGap / speed + Math.random() * 0.6;
+    }
+    for (var i = obstacles.length - 1; i >= 0; i--) {
+      var ob = obstacles[i];
+      ob.x -= speed * dt;
+      if (!ob.resolved && ob.x <= partyX()) { resolveObstacle(ob); if (state !== 'playing') return; }
+      if (ob.x < -90) obstacles.splice(i, 1);
+    }
+
+    // 도토리
+    nextAcornAt -= dt;
+    if (nextAcornAt <= 0) {
+      // 점프 최고점은 약 74px 다. 그보다 높이 두면 영영 먹을 수 없는 도토리가 된다.
+      acorns.push({ x: W + 30, y: groundY - 28 - Math.random() * 72, got: false });
+      nextAcornAt = 0.5 + Math.random() * 0.7;
+    }
+    var leaderY = groundY + party.y;
+    for (var a = acorns.length - 1; a >= 0; a--) {
+      var ac = acorns[a];
+      ac.x -= speed * dt;
+      var reach = party.spin > 0 ? 110 : 58;       // 꼬리 회전이면 넓게 줍는다
+      if (!ac.got && Math.abs(ac.x - partyX()) < reach &&
+          Math.abs(ac.y - (leaderY - 34)) < reach) {
+        ac.got = true;
+        run.acorns += parade > 0 ? 2 : 1;
+        run.score += 1;
+      }
+      if (ac.got || ac.x < -40) acorns.splice(a, 1);
+    }
+
+    // 티키타카 — 장애물이 코앞이면 띄우지 않는다 (탭이 겹치지 않게)
+    var busy = obstacles.some(function (o) {
+      return !o.resolved && o.x - partyX() < arena.reactWindow * speed + 60;
+    });
+    if (!tiki && !busy) {
+      nextTikiAt -= dt;
+      if (nextTikiAt <= 0) {
+        spawnTikitaka();
+        nextTikiAt = arena.tikitakaEvery + Math.random() * 2;
+      }
+    }
+    if (tiki) {
+      tiki.age += dt;
+      if (!tiki.done && tiki.age > tiki.window) missTikitaka();
+      else if (tiki.done && tiki.age > tiki.window + 0.5) tiki = null;
+    }
+
+    // 저연령 보조: 장애물이 다가오면 리더를 알아서 바꿔 준다
+    if (profile.settings.assist !== false) {
+      var next = null;
+      obstacles.forEach(function (o) {
+        if (o.resolved) return;
+        if (!next || o.x < next.x) next = o;
+      });
+      if (next && next.x - partyX() < arena.reactWindow * speed * 0.8) {
+        if (party.leader !== next.type.need) setLeader(next.type.need);
+      }
+    }
+
+    updatePuffs(dt);
+    updatePopups(dt);
+    if (elapsed % 0.25 < dt) updateHud();
+  }
+
+  function endRun() {
+    if (state !== 'playing') return;
+    state = 'over';
+    var sum = E.commitRun(profile, run);
+    storage.save(profile);
+    showResult(sum);
+  }
+
+  /* -------------------------------------------------------------- 연출 */
+
+  function puff(x, y, n, color) {
+    for (var i = 0; i < n; i++) {
+      puffs.push({ x: x, y: y, vx: (Math.random() - 0.5) * 180,
+        vy: -40 - Math.random() * 160, life: 0.4 + Math.random() * 0.4, age: 0, c: color });
+    }
+  }
+  function updatePuffs(dt) {
+    for (var i = puffs.length - 1; i >= 0; i--) {
+      var p = puffs[i];
+      p.age += dt;
+      if (p.age >= p.life) { puffs.splice(i, 1); continue; }
+      p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 420 * dt;
+    }
+  }
+  function popup(text, y) {
+    popups.push({ x: W * 0.5, y: y === undefined ? H * 0.32 : y, text: text, age: 0, life: 1.2 });
+  }
+  function updatePopups(dt) {
+    for (var i = popups.length - 1; i >= 0; i--) {
+      popups[i].age += dt;
+      popups[i].y -= 30 * dt;
+      if (popups[i].age >= popups[i].life) popups.splice(i, 1);
+    }
+  }
+
+  /* -------------------------------------------------------------- 렌더 */
+
+  function drawBackground() {
+    var sky = ctx.createLinearGradient(0, 0, 0, H);
+    if (parade > 0) { sky.addColorStop(0, '#ffd9a0'); sky.addColorStop(1, '#ffeccd'); }
+    else { sky.addColorStop(0, '#8fd4f5'); sky.addColorStop(1, '#dff3ff'); }
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, W, H);
+
+    // 구름 — 하늘이 통째로 비어 보이지 않게
+    ctx.fillStyle = 'rgba(255,255,255,0.72)';
+    for (var cl = 0; cl < 4; cl++) {
+      var cx = ((cl * 260 - scroll * 0.12) % (W + 320)) - 160;
+      var cy = H * (0.10 + (cl % 3) * 0.07);
+      var cs = 1 + (cl % 2) * 0.4;
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, 34 * cs, 16 * cs, 0, 0, Math.PI * 2);
+      ctx.ellipse(cx + 26 * cs, cy + 4 * cs, 24 * cs, 12 * cs, 0, 0, Math.PI * 2);
+      ctx.ellipse(cx - 26 * cs, cy + 5 * cs, 20 * cs, 10 * cs, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // 먼 언덕 (패럴랙스)
+    for (var layer = 0; layer < 2; layer++) {
+      var k = layer === 0 ? 0.18 : 0.38;
+      var base = groundY - (layer === 0 ? 70 : 34);
+      ctx.fillStyle = layer === 0 ? '#a8dcb4' : '#7fc98f';
+      ctx.beginPath();
+      ctx.moveTo(0, base + 60);
+      for (var x = 0; x <= W + 80; x += 40) {
+        var wx = x + ((-scroll * k) % 160);
+        ctx.lineTo(x, base - Math.sin((wx + layer * 90) / 95) * 26);
+      }
+      ctx.lineTo(W, H); ctx.lineTo(0, H);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // 나무
+    ctx.fillStyle = '#5aa86c';
+    for (var t = 0; t < 6; t++) {
+      var tx = ((t * 210 - scroll * 0.55) % (W + 260)) - 130;
+      var ty = groundY - 26;
+      ctx.beginPath();
+      ctx.moveTo(tx, ty);
+      ctx.lineTo(tx + 26, ty - 58);
+      ctx.lineTo(tx + 52, ty);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // 땅
+    ctx.fillStyle = '#67b96f';
+    ctx.fillRect(0, groundY, W, H - groundY);
+    ctx.fillStyle = '#4f9c57';
+    ctx.fillRect(0, groundY, W, 6);
+    ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+    ctx.lineWidth = 2;
+    for (var g = 0; g < 20; g++) {
+      var gx = ((g * 70 - scroll) % (W + 140)) - 70;
+      ctx.beginPath();
+      ctx.moveTo(gx, groundY + 16);
+      ctx.lineTo(gx + 10, groundY + 8);
+      ctx.stroke();
+    }
+  }
+
+  // 캐릭터 하나. leader 면 크고 앞에 선다.
+  function drawFriend(c, x, y, s, isLeader, phase) {
+    var col = c.color;
+    ctx.save();
+    ctx.translate(x, y);
+    var hop = Math.abs(Math.sin(phase)) * (isLeader ? 5 : 3);
+    ctx.translate(0, -hop);
+    if (isLeader && party.spin > 0) ctx.rotate(elapsed * 16);
+    ctx.scale(s, s);
+
+    // 그림자
+    ctx.fillStyle = 'rgba(0,0,0,0.16)';
+    ctx.beginPath();
+    ctx.ellipse(0, 4 + hop, 20, 5, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 몸
+    ctx.beginPath();
+    ctx.ellipse(0, -20, 19, 20, 0, 0, Math.PI * 2);
+    ctx.fillStyle = col.body;
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = '#2b2b33';
+    ctx.stroke();
+
+    if (c.id === 'nubi') {                       // 판다 — 귀와 눈 주변
+      ctx.fillStyle = col.mark;
+      [[-13, -36], [13, -36]].forEach(function (p) {
+        ctx.beginPath(); ctx.arc(p[0], p[1], 7, 0, Math.PI * 2); ctx.fill();
+      });
+      [[-7, -24], [7, -24]].forEach(function (p) {
+        ctx.beginPath(); ctx.ellipse(p[0], p[1], 6, 7, 0, 0, Math.PI * 2); ctx.fill();
+      });
+    } else if (c.id === 'wobi') {                // 퍼핀 — 흰 배, 주황 부리
+      ctx.fillStyle = col.mark;
+      ctx.beginPath();
+      ctx.ellipse(0, -16, 12, 14, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = col.accent;
+      ctx.beginPath();
+      ctx.moveTo(-6, -26); ctx.lineTo(8, -23); ctx.lineTo(-6, -19);
+      ctx.closePath(); ctx.fill();
+      if (party.glide > 0 && isLeader) {         // 활공 날개
+        ctx.fillStyle = col.mark;
+        ctx.beginPath();
+        ctx.ellipse(-22, -22, 14, 5, -0.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.ellipse(22, -22, 14, 5, 0.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    } else {                                     // 다람쥐 — 큰 꼬리
+      ctx.fillStyle = col.body;
+      ctx.beginPath();
+      ctx.ellipse(-22, -28, 9, 17, 0.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#2b2b33';
+      ctx.stroke();
+      ctx.fillStyle = col.mark;
+      ctx.beginPath();
+      ctx.ellipse(0, -16, 10, 12, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // 눈 + 볼
+    ctx.fillStyle = '#1b1f28';
+    ctx.beginPath(); ctx.arc(-6, -25, 2.6, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(6, -25, 2.6, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = col.cheek;
+    ctx.beginPath(); ctx.arc(-12, -18, 3.2, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(12, -18, 3.2, 0, Math.PI * 2); ctx.fill();
+
+    // 다리
+    ctx.strokeStyle = '#2b2b33';
+    ctx.lineWidth = 3;
+    var swing = Math.sin(phase) * 6;
+    ctx.beginPath();
+    ctx.moveTo(-6, -2); ctx.lineTo(-6 + swing, 4);
+    ctx.moveTo(6, -2); ctx.lineTo(6 - swing, 4);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawParty() {
+    var px = partyX();
+    var order = E.CHARACTERS.slice().sort(function (a, b) {
+      return (a.id === party.leader ? 1 : 0) - (b.id === party.leader ? 1 : 0);
+    });
+    var slot = 0;
+    order.forEach(function (c) {
+      var isLeader = c.id === party.leader;
+      var x = isLeader ? px : px - 58 - slot * 50;
+      var y = groundY + (isLeader ? party.y : 0);
+      if (!isLeader) slot++;
+      drawFriend(c, x, y, isLeader ? 1.75 : 1.3, isLeader, party.bob + (isLeader ? 0 : slot));
+    });
+
+    if (party.stumble > 0) {                    // 넘어진 표시
+      ctx.fillStyle = 'rgba(255,90,90,0.25)';
+      ctx.fillRect(0, 0, W, H);
+    }
+  }
+
+  function drawObstacles() {
+    obstacles.forEach(function (ob) {
+      var x = ob.x;
+      var t = ob.type.id;
+      ctx.save();
+      ctx.translate(x, groundY);
+      ctx.scale(1.4, 1.4);
+      ctx.translate(-x, -groundY);
+      if (t === 'log') {
+        ctx.fillStyle = '#8a5a33';
+        ctx.beginPath();
+        ctx.roundRect ? ctx.roundRect(x - 26, groundY - 34, 52, 34, 8)
+                      : ctx.rect(x - 26, groundY - 34, 52, 34);
+        ctx.fill();
+        ctx.strokeStyle = '#5c3a20'; ctx.lineWidth = 3; ctx.stroke();
+        ctx.fillStyle = '#c08b57';
+        ctx.beginPath(); ctx.ellipse(x - 26, groundY - 17, 7, 17, 0, 0, Math.PI * 2); ctx.fill();
+      } else if (t === 'gust') {
+        ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+        ctx.lineWidth = 4;
+        for (var i = 0; i < 3; i++) {
+          ctx.beginPath();
+          ctx.arc(x, groundY - 70 - i * 26, 22 + i * 6,
+                  0.4 + Math.sin(elapsed * 4 + i) * 0.3, Math.PI * 1.5);
+          ctx.stroke();
+        }
+        ctx.fillStyle = 'rgba(180,220,255,0.35)';
+        ctx.fillRect(x - 26, groundY - 140, 52, 140);
+      } else {
+        ctx.fillStyle = '#6b7280';               // 좁은 틈 — 바위 두 덩이
+        [[-1, 0], [1, 0]].forEach(function (s) {
+          ctx.beginPath();
+          ctx.ellipse(x + s[0] * 40, groundY - 26, 26, 30, 0, 0, Math.PI * 2);
+          ctx.fill();
+        });
+        ctx.strokeStyle = '#414651'; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(x, groundY - 56); ctx.lineTo(x, groundY); ctx.stroke();
+      }
+      // 필요한 친구 표시 — 다가올 때만 뜬다
+      var dist = ob.x - partyX();
+      if (!ob.resolved && dist < arena.reactWindow * arena.walkSpeed + 120) {
+        var need = E.characterById(ob.type.need);
+        ctx.fillStyle = party.leader === need.id ? 'rgba(80,200,120,0.95)' : 'rgba(255,255,255,0.95)';
+        var badgeY = groundY - (t === 'gust' ? 168 : 80);
+        ctx.beginPath();
+        ctx.roundRect ? ctx.roundRect(x - 28, badgeY, 56, 26, 9)
+                      : ctx.rect(x - 28, badgeY, 56, 26);
+        ctx.fill();
+        ctx.strokeStyle = '#16202c';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.beginPath();                       // 장애물을 가리키는 꼬리
+        ctx.moveTo(x - 6, badgeY + 26);
+        ctx.lineTo(x + 6, badgeY + 26);
+        ctx.lineTo(x, badgeY + 34);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = '#16202c';
+        ctx.font = 'bold 14px system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(need.name, x, badgeY + 18);
+      }
+      ctx.restore();
+    });
+  }
+
+  function drawAcorns() {
+    acorns.forEach(function (a) {
+      ctx.save();
+      ctx.translate(a.x, a.y + Math.sin(elapsed * 3 + a.x / 40) * 4);
+      ctx.scale(1.35, 1.35);
+      ctx.fillStyle = '#c98a3c';
+      ctx.beginPath(); ctx.ellipse(0, 2, 7, 8, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#6b4a22';
+      ctx.beginPath(); ctx.ellipse(0, -5, 8, 4, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#4a3016';
+      ctx.lineWidth = 1.4;
+      ctx.beginPath(); ctx.ellipse(0, 2, 7, 8, 0, 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+    });
+  }
+
+  function drawTikitaka() {
+    if (!tiki) return;
+    var px = partyX();
+    var y = groundY - 150 + Math.min(0, party.y);
+    var left = Math.max(0, 1 - tiki.age / tiki.window);
+    ctx.save();
+    ctx.translate(px - 10, y);
+    ctx.fillStyle = tiki.done ? 'rgba(120,220,150,0.96)' : 'rgba(255,255,255,0.96)';
+    ctx.beginPath();
+    ctx.roundRect ? ctx.roundRect(-72, -26, 144, 44, 14) : ctx.rect(-72, -26, 144, 44);
+    ctx.fill();
+    ctx.fillStyle = '#16202c';
+    ctx.font = 'bold 15px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(tiki.done ? '까르르!' : tiki.info.text, 0, -4);
+    if (!tiki.done) {                              // 남은 시간 게이지
+      ctx.fillStyle = '#e3e8ee';
+      ctx.fillRect(-56, 6, 112, 6);
+      ctx.fillStyle = '#ff9933';
+      ctx.fillRect(-56, 6, 112 * left, 6);
+    }
+    ctx.restore();
+  }
+
+  function drawEffects() {
+    puffs.forEach(function (p) {
+      ctx.globalAlpha = Math.max(0, 1 - p.age / p.life);
+      ctx.fillStyle = 'rgb(' + p.c + ')';
+      ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI * 2); ctx.fill();
+    });
+    ctx.globalAlpha = 1;
+    popups.forEach(function (p) {
+      ctx.globalAlpha = Math.max(0, 1 - p.age / p.life);
+      ctx.fillStyle = '#16202c';
+      ctx.font = 'bold 20px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(p.text, p.x, p.y);
+    });
+    ctx.globalAlpha = 1;
+    if (parade > 0) {
+      ctx.fillStyle = 'rgba(255,180,60,0.16)';
+      ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = '#b5560f';
+      ctx.font = 'bold 18px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('HAPPY PARADE  ' + parade.toFixed(1) + 's', W / 2, 44);
+    }
+  }
+
+  function frame(ts) {
+    var dt = lastFrame ? Math.min(0.05, (ts - lastFrame) / 1000) : 0;
+    lastFrame = ts;
+    update(dt);
+
+    ctx.save();
+    if (shake > 0) ctx.translate((Math.random() - 0.5) * 10, (Math.random() - 0.5) * 10);
+    drawBackground();
+    drawAcorns();
+    drawObstacles();
+    if (party) drawParty();
+    drawTikitaka();
+    drawEffects();
+    ctx.restore();
+    requestAnimationFrame(frame);
+  }
+
+  /* ---------------------------------------------------------------- HUD */
+
+  function updateHud() {
+    if (!run) return;
+    $('hud-acorn').textContent = run.acorns;
+    $('hud-dist').textContent = Math.round(run.distance / 10);
+    $('hud-tiki').textContent = run.tikitakaHits;
+    $('hud-heart').textContent = '♥'.repeat(Math.max(0, party.hearts));
+    $('hud-mul').textContent = '×' + E.tikitakaMultiplier(run.tikitakaHits, run.tikitakaCap).toFixed(2);
+    renderMissionList();
+  }
+
+  function renderMissionList() {
+    var box = $('hud-missions');
+    if (!run) { box.innerHTML = ''; return; }
+    box.innerHTML = '';
+    run.missions.forEach(function (m) {
+      var done = E.missionDone(m, run);
+      var el = document.createElement('div');
+      el.className = 'mrow' + (done ? ' done' : '');
+      el.textContent = (done ? '✓ ' : '') + m.text +
+        ' (' + Math.min(E.missionProgress(m, run), m.target) + '/' + m.target + ')';
+      box.appendChild(el);
+    });
+  }
+
+  function renderLeaderBar() {
+    leaderBar.innerHTML = '';
+    E.CHARACTERS.forEach(function (c, i) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'leaderbtn' + (party && party.leader === c.id ? ' on' : '');
+      b.setAttribute('data-char', c.id);
+      b.innerHTML = '<b>' + c.name + '</b><span>' + c.actionKo + ' · ' + (i + 1) + '</span>';
+      b.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        setLeader(c.id);
+      });
+      leaderBar.appendChild(b);
+    });
+  }
+
+  /* ---------------------------------------------------------- 결과 화면 */
+
+  function showResult(sum) {
+    $('r-score').textContent = Math.round(sum.score);
+    $('r-acorn').textContent = '+' + sum.acorns;
+    $('r-tiki').textContent = sum.tikitakaHits + '/' + sum.tikitakaTries;
+    $('r-mul').textContent = '×' + sum.multiplier.toFixed(2);
+    $('r-clear').textContent = sum.cleared + '/' + sum.obstacles;
+    $('r-diff').textContent = Math.round(sum.difficulty) +
+      ' (' + (sum.difficultyDelta >= 0 ? '+' : '') + sum.difficultyDelta.toFixed(1) + ')';
+
+    var list = $('r-missions');
+    list.innerHTML = '';
+    sum.missions.forEach(function (m) {
+      var li = document.createElement('li');
+      li.className = m.done ? 'done' : '';
+      li.textContent = (m.done ? '✓ ' : '· ') + m.text +
+        ' (' + Math.min(m.progress, m.target) + '/' + m.target + ')' +
+        (m.done ? '  +' + m.reward : '');
+      list.appendChild(li);
+    });
+
+    $('r-note').textContent = sum.charactersUsed < 3
+      ? '이번 판에는 친구 ' + sum.charactersUsed + '명만 썼어요. 셋을 다 쓰면 더 멀리 갑니다.'
+      : '세 친구를 모두 썼습니다!';
+
+    refreshStartScreen();
+    screenStart.classList.add('hidden');
+    screenResult.classList.remove('hidden');
+    panel.classList.remove('hidden');
+    hud.classList.add('hidden');
+    leaderBar.classList.add('hidden');
+  }
+
+  /* -------------------------------------------------------------- 이벤트 */
+
+  canvas.addEventListener('pointerdown', function (e) { e.preventDefault(); tap(); });
+  window.addEventListener('keydown', function (e) {
+    if (e.code === 'Space' || e.code === 'ArrowUp') { e.preventDefault(); tap(); return; }
+    if (e.key === '1') setLeader('nubi');
+    if (e.key === '2') setLeader('wobi');
+    if (e.key === '3') setLeader('saro');
+  });
+  $('btn-start').addEventListener('click', function (e) { e.stopPropagation(); startRun(); });
+  $('btn-retry').addEventListener('click', function (e) { e.stopPropagation(); startRun(); });
+  $('btn-home').addEventListener('click', function (e) { e.stopPropagation(); showStart(); });
+  $('btn-reset').addEventListener('click', function (e) {
+    e.stopPropagation();
+    profile = storage.reset();
+    showStart();
+  });
+  $('assist').addEventListener('change', function () {
+    profile.settings.assist = $('assist').checked;
+    storage.save(profile);
+  });
+
+  /* -------------------------------------------------------------- 시작 */
+
+  resize();
+  showStart();
+  requestAnimationFrame(frame);
+
+  // 자동화 테스트/디버깅용
+  window.Friends = {
+    engine: E,
+    getProfile: function () { return profile; },
+    getRun: function () { return run; },
+    getState: function () { return state; },
+    getParty: function () { return party; },
+    getTiki: function () { return tiki; },
+    start: startRun,
+    home: showStart,
+    tap: tap,
+    setLeader: setLeader,
+    forceEnd: endRun,
+    debugSpawnObstacle: function (id) {
+      var o = id ? E.obstacleById(id) : E.rollObstacle(profile.metrics.usage, arena.difficulty, Math.random);
+      obstacles.push({ type: o, x: W + 60, resolved: false });
+      run.obstacles += 1;
+      return o.id;
+    },
+    debugSpawnTikitaka: function () { tiki = null; spawnTikitaka(); return tiki.info.id; },
+    debugExpireAction: function () { if (party) party.actionUntil = -1; },
+    debugReachObstacle: function () {            // 맨 앞 장애물을 즉시 판정 지점으로
+      var next = null;
+      obstacles.forEach(function (o) { if (!o.resolved && (!next || o.x < next.x)) next = o; });
+      if (next) next.x = partyX() - 1;
+      return !!next;
+    },
+    debug: function () {
+      return { parade: parade, obstacles: obstacles.length, acorns: acorns.length,
+               elapsed: elapsed, actionTime: actionTime(), arena: arena };
+    }
+  };
+})();
+
+</script>
+</body>
+</html>
