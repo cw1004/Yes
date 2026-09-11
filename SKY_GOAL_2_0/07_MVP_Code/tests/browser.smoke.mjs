@@ -57,6 +57,12 @@ const url = `http://127.0.0.1:${server.address().port}/`;
 
 const browser = await pw.chromium.launch();
 const context = await browser.newContext({ viewport: { width: 420, height: 820 } });
+// 실제 배포본은 engine/getProfile()/getRun()/forceEnd() 같은 보상-조작 API 를
+// 공개하지 않는다(콘솔 한 줄로 무한 보상을 받는 구멍이었다 — game.js 참고).
+// 이 테스트는 상태를 직접 만들어 검증해야 하므로, 페이지가 실행되기 전에
+// 이 플래그를 심어 테스트 전용으로만 열어준다. addInitScript 는 이 컨텍스트의
+// 이후 모든 goto/reload 에 그대로 적용된다.
+await context.addInitScript(() => { window.__SKYGOAL_TEST__ = true; });
 const page = await context.newPage();
 
 const errors = [];

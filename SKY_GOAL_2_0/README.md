@@ -45,11 +45,11 @@ python3 build.py --pwa      # 설치형 웹앱(PWA)까지 생성
 python3 build.py --zip      # 배포용 zip 까지 생성
 
 cd 11_App_Android && ./sync_assets.sh && gradle bundleRelease   # 스토어 업로드용 AAB
-./test.sh                   # 빌드 + 엔진 테스트 15개 + 브라우저 스모크 테스트 15개
+./test.sh                   # 빌드 + 단위 테스트 58개 + 브라우저 71개 + 보안 회귀 5개
 ```
 
-- 단위 테스트 48개(엔진 26 · 사운드 5 · 배경 6 · 광고판 11): Node 만 있으면 실행된다 (`node --test`)
-- 브라우저 스모크 테스트: Playwright 가 있으면 실제 Chromium 에서 한 판을 자동 플레이하고,
+- 단위 테스트 58개(엔진 32 · 사운드 5 · 배경 6 · 광고판 15): Node 만 있으면 실행된다 (`node --test`)
+- 브라우저 스모크 테스트 71개 + **보안 회귀 테스트 5개**: Playwright 가 있으면 실제 Chromium 에서 한 판을 자동 플레이하고,
   없으면 자동으로 건너뛴다 (62개 항목)
 
 ## 구조
@@ -72,7 +72,7 @@ SKY_GOAL_2_0/
 │   ├── src/sponsor.js          경기장 광고판 13종 (스폰서가 붙으면 여기만 수정)
 │   ├── src/game.js             렌더링·입력·화면 전환
 │   ├── src/style.css, template.html
-│   └── tests/                  엔진 단위 테스트 + 브라우저 스모크 테스트
+│   └── tests/                  엔진 단위 테스트 + 브라우저 스모크 + 보안 회귀 테스트
 ├── 08_Patent/                  기술 정리 노트
 ├── 09_Test_Balance/            테스트·밸런스 기준
 ├── 10_Release/                 릴리즈 · 스토어 출시 · 수익화 문서
