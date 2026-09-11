@@ -220,6 +220,333 @@
     return true;
   }
 
+  /* -------------------------------------------------------- 조각 / 장비 */
+
+  /**
+   * 등급 조각 → 장비.
+   *
+   * 기존 inventory{common,rare,epic,legendary} 카운터를 그대로 "조각"으로 쓴다.
+   * 저장 구조를 바꾸지 않으므로 지금까지 쌓인 수치가 손실 없이 이어진다.
+   *
+   * 슬롯은 3개(부츠·암밴드·부적)이고 슬롯마다 등급별로 1종씩 있다.
+   * 랜덤 뽑기가 아니라 **조각을 모아 원하는 것을 지정 해금**한다.
+   * 확률형 아이템 규제를 피하려는 목적도 있지만, 그보다
+   * "모으면 반드시 받는다"가 더 강한 동기이기 때문이다.
+   */
+  var RARITIES = ['common', 'rare', 'epic', 'legendary'];
+  var RARITY_LABEL = { common: 'COMMON', rare: 'RARE', epic: 'EPIC', legendary: 'LEGENDARY' };
+  var CRAFT_COST = { common: 5, rare: 8, epic: 12, legendary: 15 };
+  var DUST_VALUE = { common: 20, rare: 60, epic: 150, legendary: 400 };
+
+  // 장비 보정의 상한. 스탯(±10~20%)·공 보정과 겹쳐도 게임이 무너지지 않게 잠근다.
+  var GEAR_REWARD_CAP = 1.30;     // 코인·XP 는 최대 +30%
+  var GEAR_PHYSICS_CAP = 0.15;    // 물리 보정은 ±15%
+  var EARLY_GATES = 5;            // "초반"으로 보는 골문 수
+
+  var GEAR_SLOTS = [
+    { id: 'boots', tag: 'BOOTS', label: '부츠',   theme: '물리 · 조작' },
+    { id: 'band',  tag: 'BAND',  label: '암밴드', theme: '보상 · 성장' },
+    { id: 'charm', tag: 'CHARM', label: '부적',   theme: '확률 · 안전' }
+  ];
+
+  var GEAR = [
+    /* 부츠 — 물리 · 조작 */
+    { id: 'boots_practice', slot: 'boots', rarity: 'common', name: '연습장 부츠',
+      desc: '닳았지만 발에 익었다.', spec: '탭 상승력 +3%',
+      mod: { flap: 1.03 } },
+    { id: 'boots_mid', slot: 'boots', rarity: 'rare', name: '미드필더 부츠',
+      desc: '중앙을 넓게 보는 사람의 신발.', spec: '퍼펙트 판정 +6%',
+      mod: { perfect: 1.06 } },
+    { id: 'boots_striker', slot: 'boots', rarity: 'epic', name: '스트라이커 부츠',
+      desc: '한 번의 정확함이 더 크게 돌아온다.', spec: '퍼펙트마다 점수 +3',
+      mod: { perfectScore: 3 } },
+    { id: 'boots_silver30', slot: 'boots', rarity: 'legendary', name: '2030 실버 부츠',
+      desc: '연속된 정확함이 흐름이 된다.', spec: '퍼펙트 2연속마다 COMBO +1',
+      mod: { comboPerTwoPerfect: true } },
+
+    /* 암밴드 — 보상 · 성장 */
+    { id: 'band_cloth', slot: 'band', rarity: 'common', name: '천 암밴드',
+      desc: '땀을 닦던 낡은 천.', spec: '코인 +5%',
+      mod: { coin: 1.05 } },
+    { id: 'band_captain', slot: 'band', rarity: 'rare', name: '주장 완장',
+      desc: '앞에서 뛰는 사람의 표식.', spec: 'XP +10%',
+      mod: { xp: 1.10 } },
+    { id: 'band_ribbon', slot: 'band', rarity: 'epic', name: '응원단 리본',
+      desc: '관중이 뜨거울수록 힘이 난다.', spec: '응원 최고조에 통과하면 코인 +20%',
+      mod: { hotCoin: 0.20 } },
+    { id: 'band_captain30', slot: 'band', rarity: 'legendary', name: '2030 캡틴 완장',
+      desc: '흐름을 오래 쥔 사람에게 주어진다.', spec: 'COMBO 10 이상이면 코인·XP +25%',
+      mod: { comboCoin: 0.25, comboXp: 0.25 } },
+
+    /* 부적 — 확률 · 안전 */
+    { id: 'charm_clover', slot: 'charm', rarity: 'common', name: '잔디 클로버',
+      desc: '경기장 구석에서 주웠다.', spec: 'LUCK +3',
+      mod: { luckAdd: 3 } },
+    { id: 'charm_whistle', slot: 'charm', rarity: 'rare', name: '낡은 호루라기',
+      desc: '첫 휘슬은 언제나 느긋했다.', spec: '첫 ' + EARLY_GATES + '골문 동안 난이도 -3',
+      mod: { earlyRelief: 3 } },
+    { id: 'charm_gloves', slot: 'charm', rarity: 'epic', name: '골키퍼 장갑',
+      desc: '한 번은 막아 준다.', spec: '기둥 충돌 1회 무효 (판당 1회)',
+      mod: { blockHits: 1 } },
+    { id: 'charm_golden30', slot: 'charm', rarity: 'legendary', name: '2030 골든 휘슬',
+      desc: '경기는 아직 끝나지 않았다.', spec: '사망 시 1회 부활 · COMBO 절반 유지',
+      mod: { save: 'whistle' } }
+  ];
+
+  /**
+   * 소모품. 경기 전에 하나만 고르고, 조건이 되면 자동으로 발동한다.
+   * 원버튼 게임에 "사용 버튼"을 만들지 않기 위한 설계다 —
+   * 두 번째 버튼이 생기는 순간 이 게임의 조작이 무너진다.
+   */
+  var CONSUMABLES = [
+    { id: 'cons_drink', rarity: 'common', price: 80, name: '워밍업 드링크',
+      desc: '몸이 풀릴 때까지는 여유가 있다.', spec: '첫 ' + EARLY_GATES + '골문 간격 +12%',
+      mod: { earlyGap: 1.12 } },
+    { id: 'cons_taping', rarity: 'common', price: 150, name: '테이핑',
+      desc: '한 번의 실수는 없던 일로.', spec: '첫 사망 시 되감기 1회 (COMBO 유지)',
+      mod: { save: 'taping' } },
+    { id: 'cons_scout', rarity: 'rare', price: 300, name: '스카우팅 리포트',
+      desc: '골문이 어떻게 움직이는지 안다.', spec: '골문 흔들림 -30%',
+      mod: { wobble: 0.70 } },
+    { id: 'cons_home', rarity: 'epic', price: 600, name: '홈 어드밴티지',
+      desc: '홈 관중 앞에서는 모든 게 커진다.', spec: '코인 · XP +40%',
+      mod: { coin: 1.40, xp: 1.40 } }
+  ];
+
+  function gearById(id) {
+    for (var i = 0; i < GEAR.length; i++) if (GEAR[i].id === id) return GEAR[i];
+    return null;
+  }
+
+  function consumableById(id) {
+    for (var i = 0; i < CONSUMABLES.length; i++) if (CONSUMABLES[i].id === id) return CONSUMABLES[i];
+    return null;
+  }
+
+  function gearBySlot(slot) {
+    var out = [];
+    for (var i = 0; i < GEAR.length; i++) if (GEAR[i].slot === slot) out.push(GEAR[i]);
+    return out;
+  }
+
+  function ownsGear(profile, id) {
+    return !!(profile && profile.gear && profile.gear.owned.indexOf(id) >= 0);
+  }
+
+  function craftCost(id) {
+    var g = gearById(id);
+    return g ? CRAFT_COST[g.rarity] : 0;
+  }
+
+  /** 조각을 지불하고 장비를 만든다. 만들면 해당 슬롯에 바로 장착된다. */
+  function craftGear(profile, id) {
+    var g = gearById(id);
+    if (!profile || !profile.gear) return { ok: false, reason: 'no-profile' };
+    if (!g) return { ok: false, reason: 'unknown' };
+    if (ownsGear(profile, id)) return { ok: false, reason: 'owned' };
+    var cost = CRAFT_COST[g.rarity];
+    var have = profile.inventory[g.rarity] || 0;
+    if (have < cost) return { ok: false, reason: 'shards', short: cost - have, cost: cost };
+    profile.inventory[g.rarity] = have - cost;
+    profile.gear.owned.push(g.id);
+    profile.gear.equipped[g.slot] = g.id;           // 만든 것은 바로 쓰게 한다
+    return { ok: true, gear: g, cost: cost };
+  }
+
+  function equipGear(profile, id) {
+    var g = gearById(id);
+    if (!g || !ownsGear(profile, id)) return false;
+    profile.gear.equipped[g.slot] = g.id;
+    return true;
+  }
+
+  function unequipGear(profile, slot) {
+    if (!profile || !profile.gear) return false;
+    if (!Object.prototype.hasOwnProperty.call(profile.gear.equipped, slot)) return false;
+    profile.gear.equipped[slot] = null;
+    return true;
+  }
+
+  /** 남는 조각을 코인으로 바꾼다. 중복 등급의 출구가 없으면 조각이 죽은 자원이 된다. */
+  function dustShards(profile, rarity, count) {
+    if (!profile || RARITIES.indexOf(rarity) < 0) return { ok: false, reason: 'unknown' };
+    var n = Math.max(1, Math.floor(count || 1));
+    var have = profile.inventory[rarity] || 0;
+    if (have < n) return { ok: false, reason: 'shards', short: n - have };
+    profile.inventory[rarity] = have - n;
+    var coins = DUST_VALUE[rarity] * n;
+    profile.coins += coins;
+    return { ok: true, coins: coins, count: n, rarity: rarity };
+  }
+
+  /* ------------------------------------------------------------- 소모품 */
+
+  function consumableStock(profile, id) {
+    if (!profile || !profile.consumables) return 0;
+    return Math.max(0, profile.consumables.stock[id] || 0);
+  }
+
+  function buyConsumable(profile, id, count) {
+    var c = consumableById(id);
+    if (!profile || !profile.consumables) return { ok: false, reason: 'no-profile' };
+    if (!c) return { ok: false, reason: 'unknown' };
+    var n = Math.max(1, Math.floor(count || 1));
+    var price = c.price * n;
+    if (profile.coins < price) return { ok: false, reason: 'coins', short: price - profile.coins };
+    profile.coins -= price;
+    profile.consumables.stock[id] = consumableStock(profile, id) + n;
+    if (!profile.consumables.selected) profile.consumables.selected = id;
+    return { ok: true, consumable: c, count: n, price: price };
+  }
+
+  /** 경기 전 슬롯에 올린다. null 이면 아무것도 쓰지 않는다. */
+  function selectConsumable(profile, id) {
+    if (!profile || !profile.consumables) return false;
+    if (id === null) { profile.consumables.selected = null; return true; }
+    if (!consumableById(id) || consumableStock(profile, id) <= 0) return false;
+    profile.consumables.selected = id;
+    return true;
+  }
+
+  function selectedConsumable(profile) {
+    if (!profile || !profile.consumables) return null;
+    var id = profile.consumables.selected;
+    if (!id || consumableStock(profile, id) <= 0) return null;
+    return consumableById(id);
+  }
+
+  /**
+   * 한 판을 시작하며 소모품을 실제로 소비한다.
+   * 소비된 소모품 객체를 돌려주고, 재고가 떨어지면 슬롯을 비운다.
+   */
+  function consumeSelected(profile) {
+    var c = selectedConsumable(profile);
+    if (!c) return null;
+    profile.consumables.stock[c.id] = consumableStock(profile, c.id) - 1;
+    if (profile.consumables.stock[c.id] <= 0) {
+      delete profile.consumables.stock[c.id];
+      profile.consumables.selected = null;
+    }
+    return c;
+  }
+
+  /* ----------------------------------------------------------- 보정 집계 */
+
+  function neutralMods() {
+    return {
+      flap: 1, perfect: 1, gap: 1, wobble: 1,
+      perfectScore: 0, comboPerTwoPerfect: false,
+      luckAdd: 0, blockHits: 0, save: null, earlyRelief: 0,
+      gearCoin: 1, gearXp: 1, hotCoin: 0, comboCoin: 0, comboXp: 0,
+      snackCoin: 1, snackXp: 1,
+      equipped: [], snack: null, early: false
+    };
+  }
+
+  function capPhysics(v) {
+    return clamp(v, 1 - GEAR_PHYSICS_CAP, 1 + GEAR_PHYSICS_CAP);
+  }
+
+  /**
+   * 장착 장비 + 소모품을 하나의 보정 객체로 집계한다.
+   * **보정 계산은 전부 여기 한 곳에서만 한다.** 여러 곳에 흩어지면
+   * 상한을 지키는지 아무도 확인할 수 없게 된다.
+   *
+   * opts = { early: 초반 골문 구간인가, snack: 이번 판에 소비된 소모품 }
+   */
+  function runMods(profile, opts) {
+    var o = opts || {};
+    var m = neutralMods();
+    m.early = !!o.early;
+
+    if (profile && profile.gear) {
+      for (var i = 0; i < GEAR_SLOTS.length; i++) {
+        var g = gearById(profile.gear.equipped[GEAR_SLOTS[i].id]);
+        if (!g || !ownsGear(profile, g.id)) continue;
+        var d = g.mod;
+        m.equipped.push(g);
+        if (d.flap) m.flap *= d.flap;
+        if (d.perfect) m.perfect *= d.perfect;
+        if (d.coin) m.gearCoin *= d.coin;
+        if (d.xp) m.gearXp *= d.xp;
+        if (d.perfectScore) m.perfectScore += d.perfectScore;
+        if (d.comboPerTwoPerfect) m.comboPerTwoPerfect = true;
+        if (d.luckAdd) m.luckAdd += d.luckAdd;
+        if (d.blockHits) m.blockHits += d.blockHits;
+        if (d.hotCoin) m.hotCoin += d.hotCoin;
+        if (d.comboCoin) m.comboCoin += d.comboCoin;
+        if (d.comboXp) m.comboXp += d.comboXp;
+        if (d.earlyRelief) m.earlyRelief += d.earlyRelief;
+        if (d.save) m.save = d.save;
+      }
+    }
+
+    // 장비만의 물리 보정을 먼저 ±15% 안으로 잠근다.
+    m.flap = capPhysics(m.flap);
+    m.perfect = capPhysics(m.perfect);
+
+    // 소모품은 그 위에 곱해진다. 한 판에 한 번 쓰고 사라지는 값이라
+    // 장비와 같은 상한을 걸면 의미가 없어진다.
+    var snack = o.snack || null;
+    if (snack) {
+      m.snack = snack;
+      var s = snack.mod;
+      if (s.wobble) m.wobble *= s.wobble;
+      if (s.coin) m.snackCoin *= s.coin;
+      if (s.xp) m.snackXp *= s.xp;
+      if (s.earlyGap && m.early) m.gap *= s.earlyGap;
+      // 부활류는 판당 1회. 골든 휘슬(장비)이 있으면 그쪽이 우선한다.
+      if (s.save && !m.save) m.save = s.save;
+    }
+
+    m.blockHits = Math.min(1, m.blockHits);          // 충돌 무효도 판당 1회
+    return m;
+  }
+
+  /** 부활 규칙. PRO 모드에서는 기록 공정성을 위해 전부 비활성이다. */
+  function saveRule(mods, mode) {
+    if (!mods || !mods.save) return null;
+    if (mode === 'pro') return null;
+    if (mods.save === 'whistle') return { kind: 'whistle', comboKeep: 0.5, label: '2030 골든 휘슬' };
+    return { kind: 'taping', comboKeep: 1, label: '테이핑' };
+  }
+
+  /**
+   * 골문 하나를 통과했을 때의 점수와 퍼펙트 여부.
+   * 퍼펙트 판정을 엔진 안으로 들여와야 "퍼펙트마다 +3" 같은 보정을
+   * 화면 코드가 아니라 엔진에서 일관되게 계산할 수 있다.
+   */
+  function passResult(combo, error, gap, perfectWindow, mods) {
+    var perfect = Math.abs(error) <= gap * (perfectWindow || 0);
+    var bonus = perfect && mods ? (mods.perfectScore || 0) : 0;
+    return { score: passScore(combo, error, gap) + bonus, perfect: perfect };
+  }
+
+  /**
+   * 이번 판의 코인·XP 배율.
+   * 장비 몫을 먼저 +30% 안으로 잠그고, 그 위에 소모품을 곱한다.
+   * run = { passCount, hotPasses, combo }
+   */
+  function rewardMultipliers(mods, run) {
+    var m = mods || neutralMods();
+    var r = run || {};
+    var passes = Math.max(0, r.passCount || 0);
+    var hot = clamp(passes > 0 ? (r.hotPasses || 0) / passes : 0, 0, 1);
+    var combo = Math.max(0, r.combo || 0);
+
+    var coin = m.gearCoin * (1 + m.hotCoin * hot);
+    var xp = m.gearXp;
+    if (combo >= 10) {
+      coin *= 1 + m.comboCoin;
+      xp *= 1 + m.comboXp;
+    }
+    return {
+      coin: clamp(coin, 1, GEAR_REWARD_CAP) * m.snackCoin,
+      xp: clamp(xp, 1, GEAR_REWARD_CAP) * m.snackXp,
+      hotRatio: hot
+    };
+  }
+
   /* -------------------------------------------------------------- profile */
 
   function createProfile() {
@@ -252,7 +579,10 @@
         loseStreak: 0,
         clears: 0
       },
+      // inventory 는 등급별 "조각" 보유량이다 (장비 제작 재료).
       inventory: { common: 0, rare: 0, epic: 0, legendary: 0 },
+      gear: { owned: [], equipped: { boots: null, band: null, charm: null } },
+      consumables: { stock: {}, selected: null },
       lastRun: { score: 0, combo: 0, difficulty: 50, stage: 'DAY' }
     };
   }
@@ -278,6 +608,37 @@
     var selected = raw && typeof raw.selected === 'string' ? raw.selected : DEFAULT_BALL;
     if (owned.indexOf(selected) < 0) selected = DEFAULT_BALL;
     return { owned: owned, selected: selected };
+  }
+
+  // 보유 장비를 실제 존재하는 id 로만 정리하고, 장착 칸은 보유한 것만 남긴다.
+  function normalizeGear(raw) {
+    var owned = [];
+    var list = raw && Array.isArray(raw.owned) ? raw.owned : [];
+    for (var i = 0; i < list.length; i++) {
+      var g = gearById(list[i]);
+      if (g && owned.indexOf(g.id) < 0) owned.push(g.id);
+    }
+    var eqRaw = raw && raw.equipped && typeof raw.equipped === 'object' ? raw.equipped : {};
+    var equipped = {};
+    for (var k = 0; k < GEAR_SLOTS.length; k++) {
+      var slot = GEAR_SLOTS[k].id;
+      var item = gearById(eqRaw[slot]);
+      equipped[slot] = (item && item.slot === slot && owned.indexOf(item.id) >= 0) ? item.id : null;
+    }
+    return { owned: owned, equipped: equipped };
+  }
+
+  function normalizeConsumables(raw) {
+    var stockRaw = raw && raw.stock && typeof raw.stock === 'object' ? raw.stock : {};
+    var stock = {};
+    for (var i = 0; i < CONSUMABLES.length; i++) {
+      var id = CONSUMABLES[i].id;
+      var n = Math.max(0, Math.floor(num(stockRaw[id], 0, 0, 1e6)));
+      if (n > 0) stock[id] = n;
+    }
+    var sel = raw && typeof raw.selected === 'string' ? raw.selected : null;
+    if (!sel || !stock[sel]) sel = null;
+    return { stock: stock, selected: sel };
   }
 
   function normalizeProfile(raw) {
@@ -376,6 +737,8 @@
         epic: Math.max(0, Math.floor(num(inv.epic, 0, 0, 1e9))),
         legendary: Math.max(0, Math.floor(num(inv.legendary, 0, 0, 1e9)))
       },
+      gear: normalizeGear(raw.gear),
+      consumables: normalizeConsumables(raw.consumables),
       lastRun: {
         score: Math.max(0, Math.floor(num(lr.score, 0, 0, 1e9))),
         combo: Math.max(0, Math.floor(num(lr.combo, 0, 0, 1e9))),
@@ -497,7 +860,8 @@
   }
 
   // 문서 5장 + 성장 스탯 보정
-  function arenaParams(difficulty, stage, stats, settings, ball, mode) {
+  function arenaParams(difficulty, stage, stats, settings, ball, mode, mods) {
+    var gm = mods || neutralMods();
     var d = clamp(difficulty, 10, 95);
     var s = stats || { control: 50, power: 50, speed: 50, luck: 50, stamina: 50 };
     var st = stage || STAGES[0];
@@ -521,7 +885,11 @@
     speed = clamp(speed, 180, 560) * tune.speedMul;
     // 공의 무게가 상하 운동을 바꾼다. 가벼운 공은 높이 뜨고 천천히 떨어진다.
     var gravity = 950 * (1 - (s.stamina - 50) / 1200) * tune.response * tune.response * b.weight;
-    var flap = -340 * (1 + (s.power - 50) / 800) * tune.response * b.kick;
+    var flap = -340 * (1 + (s.power - 50) / 800) * tune.response * b.kick * gm.flap;
+
+    // 장비·소모품 보정 (집계는 runMods 한 곳에서만 한다)
+    gap = gap * gm.gap;
+    movement = movement * gm.wobble;
 
     // 골문은 난이도가 낮아도 항상 살짝 오르내린다 (14~42px).
     // 골문 하나가 화면을 가로지르는 2~3초 안에 눈에 띄어야 하므로
@@ -537,10 +905,11 @@
       rain: st.rain,
       gravity: gravity,
       flap: flap,
-      perfectWindow: (0.12 + (s.control - 50) / 1000 + (b.perfectBonus || 0)) * M.perfect,
+      perfectWindow: (0.12 + (s.control - 50) / 1000 + (b.perfectBonus || 0)) * M.perfect * gm.perfect,
       tuning: tune,
       ball: b,
-      mode: M.id
+      mode: M.id,
+      mods: gm
     };
   }
 
@@ -582,7 +951,7 @@
     } else {
       profile.coins += CLEAR_COINS;
       profile.inventory.legendary += 1;
-      gift = { type: 'coins', coins: CLEAR_COINS, label: '+' + CLEAR_COINS + ' 코인 · 레전더리 아이템' };
+      gift = { type: 'coins', coins: CLEAR_COINS, label: '+' + CLEAR_COINS + ' 코인 · 레전더리 조각' };
     }
     gift.clears = profile.metrics.clears;
     return gift;
@@ -676,16 +1045,21 @@
 
     var ballKind = selectedBall(profile);
     var modeM = modeParams(profile.mode);
-    var coins = Math.round(coinReward(score) * (ballKind.coinBonus || 1) * modeM.reward);
+    // 이번 판에 실제로 걸려 있던 장비·소모품 보정
+    var mods = runMods(profile, { snack: run.snack || null });
+    var mult = rewardMultipliers(mods, {
+      passCount: passes, hotPasses: run.hotPasses || 0, combo: combo
+    });
+    var coins = Math.round(coinReward(score) * (ballKind.coinBonus || 1) * modeM.reward * mult.coin);
     var xp = xpReward(score, perfect, run.difficulty !== undefined ? run.difficulty : profile.difficulty)
-      * modeM.reward;
+      * modeM.reward * mult.xp;
     profile.coins += coins;
     profile.xp += xp;
     var levelsGained = applyLevelUps(profile);
 
     var loot = rollLoot(
       run.difficulty !== undefined ? run.difficulty : profile.difficulty,
-      profile.stats.luck,
+      profile.stats.luck + mods.luckAdd,
       rng
     );
     profile.inventory[loot] += 1;
@@ -714,6 +1088,11 @@
       coins: coins,
       xp: xp,
       loot: loot,
+      shardLabel: RARITY_LABEL[loot],
+      coinMultiplier: mult.coin,
+      xpMultiplier: mult.xp,
+      gearUsed: mods.equipped.map(function (g) { return g.name; }),
+      snackUsed: mods.snack ? mods.snack.name : null,
       ballId: ballKind.id,
       mode: profile.mode,
       modeLabel: modeM.label,
@@ -821,6 +1200,35 @@
     xpRequired: xpRequired,
     lootTable: lootTable,
     rollLoot: rollLoot,
+    RARITIES: RARITIES,
+    RARITY_LABEL: RARITY_LABEL,
+    CRAFT_COST: CRAFT_COST,
+    DUST_VALUE: DUST_VALUE,
+    GEAR_REWARD_CAP: GEAR_REWARD_CAP,
+    GEAR_PHYSICS_CAP: GEAR_PHYSICS_CAP,
+    EARLY_GATES: EARLY_GATES,
+    GEAR_SLOTS: GEAR_SLOTS,
+    GEAR: GEAR,
+    CONSUMABLES: CONSUMABLES,
+    gearById: gearById,
+    gearBySlot: gearBySlot,
+    consumableById: consumableById,
+    ownsGear: ownsGear,
+    craftCost: craftCost,
+    craftGear: craftGear,
+    equipGear: equipGear,
+    unequipGear: unequipGear,
+    dustShards: dustShards,
+    consumableStock: consumableStock,
+    buyConsumable: buyConsumable,
+    selectConsumable: selectConsumable,
+    selectedConsumable: selectedConsumable,
+    consumeSelected: consumeSelected,
+    neutralMods: neutralMods,
+    runMods: runMods,
+    saveRule: saveRule,
+    passResult: passResult,
+    rewardMultipliers: rewardMultipliers,
     applyLevelUps: applyLevelUps,
     spendStatPoint: spendStatPoint,
     commitRun: commitRun,

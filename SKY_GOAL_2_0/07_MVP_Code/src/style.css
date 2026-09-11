@@ -166,3 +166,35 @@ p { margin: 8px 0; line-height: 1.55; color: #dbe7f7; font-size: 14px; }
 }
 .iconbtn.off { opacity: 0.55; }
 .hidden { display: none !important; }
+
+/* 장비 · 조각 화면 — 공 상점(.ballrow)의 행 구조를 그대로 재사용한다 */
+.subhead { margin: 20px 0 2px; font-size: 14px; letter-spacing: 0.04em; color: var(--accent); }
+.shards { display: flex; gap: 6px; margin: 12px 0 8px; }
+.shards .shard {
+  flex: 1 1 0; min-width: 0; padding: 7px 4px; border-radius: 9px; text-align: center;
+  background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12);
+}
+.shards .shard span { display: block; font-size: 9px; letter-spacing: 0.06em; color: var(--sub); }
+.shards .shard b { display: block; font-size: 17px; margin-top: 1px; }
+.shards .shard.common b { color: #cdd6e2; }
+.shards .shard.rare b { color: #6fd3ff; }
+.shards .shard.epic b { color: #c48bff; }
+.shards .shard.legendary b { color: #ffc53d; }
+.slotname { margin: 16px 0 4px; font-size: 12px; letter-spacing: 0.08em; color: var(--sub); }
+.ballrow .rar {
+  display: inline-block; margin-right: 5px; padding: 1px 5px; border-radius: 4px;
+  font-size: 9px; letter-spacing: 0.06em; vertical-align: 1px;
+  background: rgba(255, 255, 255, 0.12); color: var(--sub);
+}
+.ballrow .rar.rare { background: rgba(111, 211, 255, 0.18); color: #6fd3ff; }
+.ballrow .rar.epic { background: rgba(196, 139, 255, 0.18); color: #c48bff; }
+.ballrow .rar.legendary { background: rgba(255, 197, 61, 0.2); color: #ffc53d; }
+.ballrow .icon {
+  flex: 0 0 40px; width: 40px; height: 40px; display: grid; place-items: center;
+  font-size: 22px; border-radius: 10px; background: rgba(255, 255, 255, 0.07);
+}
+.shards .shard .dust {
+  margin-top: 4px; width: 100%; padding: 3px 0; font-size: 9px; cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.18); border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08); color: var(--sub);
+}

@@ -26,7 +26,11 @@
 | `metrics.recentScores` | number[10] | 최근 10게임 점수 |
 | `metrics.recentSuccesses` | 0\|1[10] | 최근 10게임 성공 여부 |
 | `metrics.winStreak` / `loseStreak` | int | 연속 성공·실패 |
-| `inventory.*` | int | 등급별 획득 아이템 수 |
+| `inventory.*` | int | 등급별 **조각** 보유량 (장비 제작 재료) |
+| `gear.owned[]` | string[] | 제작한 장비 id |
+| `gear.equipped.{boots,band,charm}` | string\|null | 슬롯별 장착 장비 id |
+| `consumables.stock.{id}` | int | 소모품 보유 수량 |
+| `consumables.selected` | string\|null | 다음 경기에 쓸 소모품 (시작 시 1개 소비) |
 | `lastRun` | object | 직전 판 요약 |
 
 ## 복구 정책 (`normalizeProfile`)

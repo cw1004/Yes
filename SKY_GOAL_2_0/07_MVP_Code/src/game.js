@@ -23,6 +23,7 @@
   var screenContinue = $('screen-continue');
   var screenSettings = $('screen-settings');
   var screenBalls = $('screen-balls');
+  var screenGear = $('screen-gear');
   var bridge = window.SkyGoalNative || null;      // 안드로이드 앱이 주입하는 브리지
 
   /* ---------------------------------------------------------- 상태 변수 */
@@ -60,6 +61,7 @@
   var pendingReward = null;          // 광고 결과를 기다리는 콜백
 
   var boardSeq = 0;                  // 골문 광고판 순환용
+  var HOT_CHEER = 1.2;               // 이 이상이면 응원이 "최고조" (응원단 리본)
   var GATE_W = 54;
   var GATE_SPACING = 260;
 
@@ -91,11 +93,11 @@
     gates = [];
     sparks = [];
     stage = E.stageFor(0, profile.difficulty);
-    arena = E.arenaParams(profile.difficulty, stage, profile.stats, profile.settings,
-                          E.selectedBall(profile), profile.mode);
+    refreshArena();
     refreshStartScreen();
     refreshModes();
     screenBalls.classList.add('hidden');
+    screenGear.classList.add('hidden');
     screenSettings.classList.add('hidden');
     screenResult.classList.add('hidden');
     screenStart.classList.remove('hidden');
@@ -192,17 +194,252 @@
     screenStart.classList.add('hidden');
     screenResult.classList.add('hidden');
     screenSettings.classList.add('hidden');
+    screenGear.classList.add('hidden');
     hideContinuePrompt();
     screenBalls.classList.remove('hidden');
     panel.classList.remove('hidden');
     hud.classList.add('hidden');
   }
 
+  /* ------------------------------------------------------- 장비 · 조각 */
+
+  var SLOT_ICON = { boots: '👟', band: '🎗️', charm: '🍀' };
+
+  // 지금 조각만으로 바로 만들 수 있는 장비 수. 결과 화면에서 "만들 수 있다"를 알려 준다.
+  function craftableCount() {
+    var n = 0;
+    for (var i = 0; i < E.GEAR.length; i++) {
+      var g = E.GEAR[i];
+      if (!E.ownsGear(profile, g.id) && (profile.inventory[g.rarity] || 0) >= E.craftCost(g.id)) n++;
+    }
+    return n;
+  }
+
+  function equippedNames() {
+    var eq = E.runMods(profile, {}).equipped;
+    return eq.map(function (g) { return g.name; });
+  }
+
+  // 그 등급의 장비를 전부 만들었는가 — 그때부터 조각은 "남는 조각"이 된다.
+  function rarityExhausted(rarity) {
+    for (var i = 0; i < E.GEAR.length; i++) {
+      var g = E.GEAR[i];
+      if (g.rarity === rarity && !E.ownsGear(profile, g.id)) return false;
+    }
+    return true;
+  }
+
+  function renderShardRow() {
+    var row = $('shard-row');
+    row.innerHTML = '';
+    E.RARITIES.forEach(function (r) {
+      var cell = document.createElement('div');
+      cell.className = 'shard ' + r;
+      var label = document.createElement('span');
+      label.textContent = E.RARITY_LABEL[r];
+      var count = document.createElement('b');
+      count.textContent = profile.inventory[r] || 0;
+      cell.appendChild(label);
+      cell.appendChild(count);
+
+      // 분해는 그 등급에 더 만들 것이 없을 때만 열린다.
+      // 항상 열어 두면 아직 필요한 조각을 실수로 날리게 된다.
+      if (rarityExhausted(r) && (profile.inventory[r] || 0) > 0) {
+        var dust = document.createElement('button');
+        dust.className = 'dust';
+        dust.textContent = '분해 +' + E.DUST_VALUE[r];
+        dust.addEventListener('click', function () {
+          if (E.dustShards(profile, r, 1).ok) {
+            storage.save(profile);
+            renderGear();
+            refreshStartScreen();
+            if (audio) audio.tap();
+          }
+        });
+        cell.appendChild(dust);
+      }
+      row.appendChild(cell);
+    });
+  }
+
+  function rarityBadge(rarity) {
+    var el = document.createElement('i');
+    el.className = 'rar ' + rarity;
+    el.textContent = E.RARITY_LABEL[rarity];
+    return el;
+  }
+
+  function gearRow(g) {
+    var owned = E.ownsGear(profile, g.id);
+    var picked = profile.gear.equipped[g.slot] === g.id;
+
+    var row = document.createElement('div');
+    row.className = 'ballrow' + (picked ? ' on' : '') + (owned ? '' : ' locked');
+
+    var icon = document.createElement('div');
+    icon.className = 'icon';
+    icon.textContent = SLOT_ICON[g.slot] || '🎽';
+
+    var meta = document.createElement('div');
+    meta.className = 'meta';
+    var name = document.createElement('b');
+    name.appendChild(rarityBadge(g.rarity));
+    name.appendChild(document.createTextNode(g.name + (picked ? ' ✓' : '')));
+    var desc = document.createElement('span');
+    desc.textContent = g.desc;
+    var spec = document.createElement('div');
+    spec.className = 'spec';
+    spec.textContent = g.spec;
+    meta.appendChild(name);
+    meta.appendChild(desc);
+    meta.appendChild(spec);
+
+    var btn = document.createElement('button');
+    if (picked) {
+      btn.textContent = '장착 중';
+      btn.disabled = true;
+    } else if (owned) {
+      btn.textContent = '장착';
+      btn.addEventListener('click', function () {
+        if (E.equipGear(profile, g.id)) {
+          storage.save(profile);
+          refreshArena();
+          renderGear();
+          if (audio) audio.tap();
+        }
+      });
+    } else {
+      var cost = E.craftCost(g.id);
+      btn.className = 'buy';
+      btn.textContent = cost + '조각';
+      btn.disabled = (profile.inventory[g.rarity] || 0) < cost;
+      btn.addEventListener('click', function () {
+        var res = E.craftGear(profile, g.id);
+        if (res.ok) {
+          storage.save(profile);
+          refreshArena();
+          renderGear();
+          refreshStartScreen();
+          if (audio) audio.levelUp();
+        }
+      });
+    }
+
+    row.appendChild(icon);
+    row.appendChild(meta);
+    row.appendChild(btn);
+    return row;
+  }
+
+  function consumableRow(c) {
+    var stock = E.consumableStock(profile, c.id);
+    var picked = profile.consumables.selected === c.id;
+
+    var row = document.createElement('div');
+    row.className = 'ballrow' + (picked ? ' on' : '') + (stock > 0 ? '' : ' locked');
+
+    var icon = document.createElement('div');
+    icon.className = 'icon';
+    icon.textContent = '🥤';
+
+    var meta = document.createElement('div');
+    meta.className = 'meta';
+    var name = document.createElement('b');
+    name.appendChild(rarityBadge(c.rarity));
+    name.appendChild(document.createTextNode(c.name + (picked ? ' ✓' : '')));
+    var desc = document.createElement('span');
+    desc.textContent = c.desc;
+    var spec = document.createElement('div');
+    spec.className = 'spec';
+    spec.textContent = c.spec + ' · 보유 ' + stock + '개';
+    meta.appendChild(name);
+    meta.appendChild(desc);
+    meta.appendChild(spec);
+
+    row.appendChild(icon);
+    row.appendChild(meta);
+
+    if (stock > 0) {
+      var pick = document.createElement('button');
+      pick.textContent = picked ? '해제' : '선택';
+      pick.addEventListener('click', function () {
+        E.selectConsumable(profile, picked ? null : c.id);
+        storage.save(profile);
+        refreshArena();
+        renderGear();
+        refreshStartScreen();
+        if (audio) audio.tap();
+      });
+      row.appendChild(pick);
+    }
+
+    var buy = document.createElement('button');
+    buy.className = 'buy';
+    buy.textContent = c.price + '코인';
+    buy.disabled = profile.coins < c.price;
+    buy.addEventListener('click', function () {
+      var res = E.buyConsumable(profile, c.id, 1);
+      if (res.ok) {
+        storage.save(profile);
+        refreshArena();
+        renderGear();
+        refreshStartScreen();
+        if (audio) audio.levelUp();
+      }
+    });
+    row.appendChild(buy);
+    return row;
+  }
+
+  function renderGear() {
+    renderShardRow();
+    $('gear-coins').textContent = profile.coins;
+
+    var list = $('gear-list');
+    list.innerHTML = '';
+    E.GEAR_SLOTS.forEach(function (slot) {
+      var head = document.createElement('div');
+      head.className = 'slotname';
+      head.textContent = slot.tag + ' · ' + slot.label + ' — ' + slot.theme;
+      list.appendChild(head);
+      E.gearBySlot(slot.id).forEach(function (g) { list.appendChild(gearRow(g)); });
+    });
+
+    var cons = $('cons-list');
+    cons.innerHTML = '';
+    E.CONSUMABLES.forEach(function (c) { cons.appendChild(consumableRow(c)); });
+  }
+
+  function showGear() {
+    refreshArena();
+    renderGear();
+    screenStart.classList.add('hidden');
+    screenResult.classList.add('hidden');
+    screenBalls.classList.add('hidden');
+    screenSettings.classList.add('hidden');
+    hideContinuePrompt();
+    screenGear.classList.remove('hidden');
+    panel.classList.remove('hidden');
+    hud.classList.add('hidden');
+  }
+
   /* ---------------------------------------------------------- 조작 설정 */
 
+  // 이번 판에 걸려 있는 보정. 아직 경기 전이면 "고른 소모품"을 미리 반영해 보여 준다.
+  function currentMods(early) {
+    return E.runMods(profile, {
+      early: early,
+      snack: run ? (run.snack || null) : E.selectedConsumable(profile)
+    });
+  }
+
   function refreshArena() {
-    arena = E.arenaParams(run ? run.difficulty : profile.difficulty, stage,
-                          profile.stats, profile.settings, E.selectedBall(profile), profile.mode);
+    // 초반 EARLY_GATES 골문 동안은 낡은 호루라기 · 워밍업 드링크가 걸린다.
+    var early = run ? run.passCount < E.EARLY_GATES : true;
+    var mods = currentMods(early);
+    var d = (run ? run.difficulty : profile.difficulty) - (early ? mods.earlyRelief : 0);
+    arena = E.arenaParams(d, stage, profile.stats, profile.settings,
+                          E.selectedBall(profile), profile.mode, mods);
   }
 
   function applySettings(save) {
@@ -223,6 +460,7 @@
     screenStart.classList.add('hidden');
     screenResult.classList.add('hidden');
     screenBalls.classList.add('hidden');
+    screenGear.classList.add('hidden');
     hideContinuePrompt();
     screenSettings.classList.remove('hidden');
     panel.classList.remove('hidden');
@@ -270,6 +508,12 @@
     $('s-games').textContent = profile.metrics.games +
       (profile.metrics.clears ? ' (완주 ' + profile.metrics.clears + ')' : '');
     $('s-ball').textContent = E.selectedBall(profile).name;
+    var names = equippedNames();
+    var snack = E.selectedConsumable(profile);
+    if (snack) names.push('🥤 ' + snack.name);
+    var craftable = craftableCount();
+    $('s-gear').textContent = (names.length ? names.join(' · ') : '없음') +
+      (craftable > 0 ? ' (제작 가능 ' + craftable + ')' : '');
     $('s-storage').textContent = storage.persistent
       ? '진행 상황은 이 브라우저에 저장됩니다.'
       : '이 환경에서는 저장이 차단되어 이번 세션에서만 기록이 유지됩니다.';
@@ -320,8 +564,8 @@
 
   function startRun() {
     stage = E.stageFor(0, profile.difficulty);
-    arena = E.arenaParams(profile.difficulty, stage, profile.stats, profile.settings,
-                          E.selectedBall(profile), profile.mode);
+    // 소모품은 "경기를 시작하는 순간" 실제로 소비된다. 쓰고 죽어도 돌려주지 않는다.
+    var snack = E.consumeSelected(profile);
     run = {
       score: 0,
       combo: 0,
@@ -330,8 +574,19 @@
       duration: 0,
       tapIntervals: [],
       difficulty: profile.difficulty,
-      stage: stage.key
+      stage: stage.key,
+      snack: snack,
+      hotPasses: 0,          // 응원이 최고조일 때 통과한 골문 수 (응원단 리본)
+      perfectStreak: 0,      // 연속 퍼펙트 (2030 실버 부츠)
+      blockHits: 0,          // 남은 충돌 무효 횟수 (골키퍼 장갑)
+      saveUsed: false,       // 부활은 판당 1회
+      invincibleUntil: 0
     };
+    // 이번 판 동안 바뀌지 않는 보정은 여기서 한 번만 고정한다.
+    run.mods = E.runMods(profile, { snack: snack });
+    run.blockHits = run.mods.blockHits;
+    if (snack) storage.save(profile);          // 재고 차감을 바로 보존
+    refreshArena();
     // 킥오프: 공은 잔디 위에 놓여 있고, 선수가 달려와 차 올린다.
     ball = { x: W * 0.21, y: groundY - 15, vy: 0, vx: 0, spin: 0 };
     kick = {
@@ -458,8 +713,7 @@
     var next = E.stageFor(run.passCount, run.difficulty);
     if (next.key !== stage.key) {
       stage = next;
-      arena = E.arenaParams(run.difficulty, stage, profile.stats, profile.settings,
-                            E.selectedBall(profile), profile.mode);
+      refreshArena();
       run.stage = stage.key;
       cheerUp(1.4);                        // 스테이지 전환 — 최고조
       if (audio) { audio.stage(); audio.setIntensity(musicLevel()); }
@@ -509,20 +763,31 @@
       if (!g.passed && g.x + GATE_W < ball.x) {
         g.passed = true;
         var error = Math.abs(ball.y - g.mid);
-        var gained = E.passScore(run.combo, error, g.gap);
-        run.score += gained;
+        var res = E.passResult(run.combo, error, g.gap, arena.perfectWindow, run.mods);
+        // 응원단 리본: 관중이 뜨거울 때 통과한 비율만큼 코인이 늘어난다.
+        // cheerUp 전에 재야 "이번 통과 직전의 열기"가 기준이 된다.
+        if (cheer && cheer.excite >= HOT_CHEER) run.hotPasses += 1;
+        run.score += res.score;
         run.combo += 1;
         run.passCount += 1;
-        if (error <= g.gap * arena.perfectWindow) {
+        if (res.perfect) {
           run.perfectCount += 1;
+          run.perfectStreak += 1;
+          if (run.mods.comboPerTwoPerfect && run.perfectStreak % 2 === 0) {
+            run.combo += 1;                  // 2030 실버 부츠
+            popup('COMBO +1');
+          }
           addSparks(ball.x, ball.y, 14, '255,215,0');
           cheerUp(1.0);                      // 퍼펙트 — 응원이 터진다
           if (audio) audio.perfect();
         } else {
+          run.perfectStreak = 0;
           addSparks(g.x + GATE_W, g.mid, 6, '255,255,255');
           cheerUp(0.5);
           if (audio) audio.pass(run.combo);
         }
+        // 초반 보정(낡은 호루라기 · 워밍업 드링크)이 끝나는 지점
+        if (run.passCount === E.EARLY_GATES) refreshArena();
         refreshStage();
         updateHud();
       }
@@ -530,7 +795,7 @@
       // 충돌 판정
       if (ball.x + 15 > g.x && ball.x - 15 < g.x + GATE_W &&
           (ball.y - 15 < top || ball.y + 15 > bottom)) {
-        return endRun('gate');
+        if (!absorbHit(g.mid)) return endRun('gate');
       }
 
       if (g.x < -GATE_W - 20) {
@@ -544,9 +809,15 @@
     updateCheer(dt);
     updatePopups(dt);
 
-    // 천장 / 바닥
-    if (ball.y - 15 <= 0) return endRun('ceiling');
-    if (ball.y + 15 >= groundY) return endRun('ground');
+    // 천장 / 바닥 — 무적 중에는 튕겨 나올 뿐 죽지 않는다
+    if (ball.y - 15 <= 0) {
+      if (elapsed < run.invincibleUntil) { ball.y = 16; ball.vy = 80; }
+      else return endRun('ceiling');
+    }
+    if (ball.y + 15 >= groundY) {
+      if (elapsed < run.invincibleUntil) { ball.y = groundY - 16; ball.vy = arena.flap * 0.6; }
+      else return endRun('ground');
+    }
 
     updateSparks(dt);
   }
@@ -900,8 +1171,70 @@
     ctx.textAlign = 'start';
   }
 
+  function popup(text, y) {
+    popups.push({ x: W / 2, y: y === undefined ? H * 0.38 : y, text: text, age: 0, life: 1.2 });
+  }
+
+  /**
+   * 골키퍼 장갑: 기둥 충돌 1회를 흡수하고 0.6초간 무적이 된다.
+   * 흡수하면 공을 골문 한가운데로 밀어 넣는다 — 그러지 않으면
+   * 같은 기둥에 다음 프레임에 다시 부딪혀 무효가 한 번에 소진된다.
+   */
+  function absorbHit(safeY) {
+    if (!run) return false;
+    if (elapsed < run.invincibleUntil) return true;
+    if (run.blockHits <= 0) return false;
+    run.blockHits -= 1;
+    run.invincibleUntil = elapsed + 0.6;
+    ball.y = safeY;
+    ball.vy = 0;
+    addSparks(ball.x, ball.y, 18, '160,220,255');
+    popup('SAVE!');
+    cheerUp(1.0);
+    if (audio) audio.perfect();
+    return true;
+  }
+
+  // 사망 지점에서 안전한 위치로 되돌리고 눈앞의 골문을 치운다.
+  function repositionForSave() {
+    ball.y = groundY * 0.5;
+    ball.vy = 0;
+    ball.vx = 0;
+    lastMid = ball.y;
+    for (var i = gates.length - 1; i >= 0; i--) {
+      if (gates[i].x < ball.x + W * 0.75) gates.splice(i, 1);
+    }
+    var rightMost = ball.x + W * 0.75;
+    for (var k = 0; k < gates.length; k++) rightMost = Math.max(rightMost, gates[k].x);
+    while (gates.length < 4) {
+      gates.push(makeGate(rightMost + GATE_SPACING * (gates.length + 1)));
+    }
+  }
+
+  /**
+   * 2030 골든 휘슬(장비) 또는 테이핑(소모품)으로 한 번 살아난다.
+   * 판당 1회이고, PRO 모드에서는 기록 공정성을 위해 발동하지 않는다.
+   */
+  function trySave() {
+    if (!run || run.saveUsed) return false;
+    var rule = E.saveRule(run.mods, profile.mode);
+    if (!rule) return false;
+    run.saveUsed = true;
+    run.combo = Math.floor(run.combo * rule.comboKeep);
+    repositionForSave();
+    run.invincibleUntil = elapsed + 1.2;
+    popup(rule.label + '!');
+    addSparks(ball.x, ball.y, 24, '255,215,90');
+    cheerUp(1.4);
+    if (audio) audio.levelUp();
+    state = 'ready';                 // 탭하면 다시 시작한다
+    updateHud();
+    return true;
+  }
+
   function endRun(reason) {
     if (state !== 'playing') return;
+    if (trySave()) return;
     state = 'over';
     lastEndReason = reason || 'manual';
     addSparks(ball.x, ball.y, 22, '255,120,60');
@@ -920,19 +1253,8 @@
     if (state !== 'over' || usedContinue) return false;
     usedContinue = true;
     hideContinuePrompt();
-    ball.y = groundY * 0.5;
-    ball.vy = 0;
-    ball.vx = 0;
     run.combo = 0;
-    lastMid = ball.y;
-    for (var i = gates.length - 1; i >= 0; i--) {          // 눈앞의 골문은 치운다
-      if (gates[i].x < ball.x + W * 0.75) gates.splice(i, 1);
-    }
-    var rightMost = ball.x + W * 0.75;
-    for (var k = 0; k < gates.length; k++) rightMost = Math.max(rightMost, gates[k].x);
-    while (gates.length < 4) {
-      gates.push(makeGate(rightMost + GATE_SPACING * (gates.length + 1)));
-    }
+    repositionForSave();                                   // 눈앞의 골문은 치운다
     state = 'ready';
     panel.classList.add('hidden');
     hud.classList.remove('hidden');
@@ -974,11 +1296,20 @@
       ' · 퍼펙트 ' + sum.perfectCount + (sum.cleared ? ' · 🏆 완주' : '');
     $('r-coin').textContent = '+' + sum.coins;
     $('r-xp').textContent = '+' + Math.round(sum.xp);
-    $('r-loot').textContent = sum.loot.toUpperCase();
+    $('r-loot').textContent = (sum.shardLabel || sum.loot.toUpperCase()) + ' 조각';
     $('r-level').textContent = profile.level;
     $('r-diff').textContent = Math.round(sum.difficulty) +
       ' (' + (sum.difficultyDelta >= 0 ? '+' : '') + sum.difficultyDelta.toFixed(1) + ')';
     $('r-skill').textContent = Math.round(sum.skill);
+
+    var gearBits = [];
+    if (sum.gearUsed && sum.gearUsed.length) gearBits.push('장비 ' + sum.gearUsed.join(' · '));
+    if (sum.snackUsed) gearBits.push('소모품 ' + sum.snackUsed);
+    if (sum.coinMultiplier > 1.001) gearBits.push('코인 ×' + sum.coinMultiplier.toFixed(2));
+    if (sum.xpMultiplier > 1.001) gearBits.push('XP ×' + sum.xpMultiplier.toFixed(2));
+    var craftable = craftableCount();
+    if (craftable > 0) gearBits.push('🎽 지금 만들 수 있는 장비 ' + craftable + '개');
+    $('r-gear').textContent = gearBits.join(' · ');
 
     var list = $('r-reasons');
     list.innerHTML = '';
@@ -993,6 +1324,7 @@
     refreshStatBox();
     hideContinuePrompt();
     screenBalls.classList.add('hidden');
+    screenGear.classList.add('hidden');
     screenSettings.classList.add('hidden');
     screenStart.classList.add('hidden');
     screenResult.classList.remove('hidden');
@@ -1713,6 +2045,8 @@
   $('mode-pro').addEventListener('click', function () { chooseMode('pro'); });
   $('btn-balls').addEventListener('click', showBalls);
   $('btn-balls-close').addEventListener('click', showStart);
+  $('btn-gear').addEventListener('click', showGear);
+  $('btn-gear-close').addEventListener('click', showStart);
   $('btn-settings').addEventListener('click', showSettings);
   $('btn-settings-close').addEventListener('click', showStart);
   $('btn-settings-reset').addEventListener('click', function () {
@@ -1807,6 +2141,8 @@
     home: showStart,
     settings: showSettings,
     balls: showBalls,
+    gear: showGear,
+    craftableCount: craftableCount,
     paintBall: paintBall,          // 아트 확인용
     getArena: function () { return arena; },
     // 보상형 광고 제공자 주입: fn(callback) → callback(성공 여부)
@@ -1846,14 +2182,15 @@
     },
     // 자동화 테스트용
     debugClearGates: function () { gates = []; },
+    // 골키퍼 장갑이 실제로 충돌을 흡수하는지 확인한다
+    debugAbsorbHit: function () { return run && ball ? absorbHit(ball.y) : false; },
     debugRefreshStage: function () { if (run) refreshStage(); },
     // 아트 확인용: 특정 스테이지 연출을 즉시 적용한다
     previewStage: function (key) {
       for (var i = 0; i < E.STAGES.length; i++) {
         if (E.STAGES[i].key === key) stage = E.STAGES[i];
       }
-      arena = E.arenaParams(run ? run.difficulty : profile.difficulty, stage, profile.stats,
-                            profile.settings, E.selectedBall(profile), profile.mode);
+      refreshArena();
       if (run) run.stage = stage.key;
       if (audio) audio.setIntensity(musicLevel());
       updateHud();
