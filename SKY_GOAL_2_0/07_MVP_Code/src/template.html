@@ -48,9 +48,11 @@
       <div class="stat">코인<b id="s-coin">0</b></div>
       <div class="stat">누적 게임<b id="s-games">0</b></div>
       <div class="stat" style="grid-column:1/-1">사용 중인 공<b id="s-ball">거리의 낡은 공</b></div>
+      <div class="stat" style="grid-column:1/-1">장비<b id="s-gear">없음</b></div>
     </div>
     <button class="btn" id="btn-start" type="button">경기 시작</button>
     <button class="btn ghost c-shop" id="btn-balls" type="button">⚽ 공 선택 · 상점</button>
+    <button class="btn ghost c-gear" id="btn-gear" type="button">🎽 장비 · 조각</button>
     <button class="btn ghost c-settings" id="btn-settings" type="button">⚙ 조작 설정</button>
     <button class="btn ghost c-danger" id="btn-reset" type="button">플레이어 데이터 초기화</button>
     <p class="small" id="s-storage">진행 상황은 브라우저에 저장됩니다.</p>
@@ -65,6 +67,22 @@
     <p class="small">보유 코인 <b id="ball-coins">0</b></p>
     <div id="ball-list"></div>
     <button class="btn" id="btn-balls-close" type="button">확인</button>
+  </div>
+
+  <!-- 장비 · 조각 -->
+  <div class="card hidden" id="screen-gear">
+    <div class="tag">GEAR</div>
+    <h2>장비 · 조각</h2>
+    <p class="small">경기마다 등급 조각을 하나 받습니다. 조각을 모아 <b>원하는 장비를 직접</b> 만드세요.
+    뽑기가 아니라 지정 해금이라, 모으면 반드시 그것을 받습니다.</p>
+    <div class="shards" id="shard-row"></div>
+    <p class="small">보유 코인 <b id="gear-coins">0</b></p>
+    <div id="gear-list"></div>
+    <h3 class="subhead">소모품 — 경기 전 하나</h3>
+    <p class="small">고른 소모품은 <b>경기를 시작할 때 자동으로 소비</b>되고 조건이 되면 알아서 발동합니다.
+    플레이 중에 누를 버튼은 없습니다.</p>
+    <div id="cons-list"></div>
+    <button class="btn" id="btn-gear-close" type="button">확인</button>
   </div>
 
   <!-- 조작 설정 -->
@@ -109,7 +127,7 @@
     <div class="grid">
       <div class="stat">코인<b id="r-coin">+0</b></div>
       <div class="stat">경험치<b id="r-xp">+0</b></div>
-      <div class="stat">획득 아이템<b id="r-loot">COMMON</b></div>
+      <div class="stat">획득 조각<b id="r-loot">COMMON</b></div>
       <div class="stat">레벨<b id="r-level">1</b></div>
       <div class="stat">새 난이도<b id="r-diff">50</b></div>
       <div class="stat">숙련도<b id="r-skill">50</b></div>
@@ -124,6 +142,7 @@
         <button type="button" data-stat="stamina">STAMINA</button>
       </div>
     </div>
+    <p class="small" id="r-gear"></p>
     <ul class="reasons" id="r-reasons"></ul>
     <br>
     <button class="btn" id="btn-retry" type="button">다시 경기</button>
@@ -144,6 +163,9 @@
 </script>
 <script>
 /* __SPONSOR__ */
+</script>
+<script>
+/* __GEARART__ */
 </script>
 <script>
 /* __GAME__ */
