@@ -1,0 +1,40 @@
+{
+  "schema_version": "1.0",
+  "note": "색상·수치의 유일한 기준(single source of truth). THREE_FRIENDS/07_MVP_Code/src/engine.js 의 CHARACTERS 와 일치해야 하며, tests/bible.test.js 가 이를 강제한다.",
+  "ip": {
+    "working_title": "세 친구의 여행",
+    "logline": "겁 많은 셋이 서로를 놀리며 세상 끝까지 걸어간다.",
+    "core_theme": "혼자서는 못 넘는 것을 셋이서는 넘는다"
+  },
+  "characters": [
+    {
+      "id": "nubi", "name_en": "NUBI", "name_ko": "누비",
+      "species": "아기 판다", "etymology": "누비다 — 뛰어다니며 세상을 누빈다",
+      "role": "점프 · 앞장서는 아이",
+      "color": { "body": "#f6f1e7", "mark": "#2b2b33", "cheek": "#ffb3ba", "accent": "#3e8bff" },
+      "silhouette_key": "둥근 몸 + 좌우로 벌어진 큰 귀 두 개",
+      "action": "jump", "action_ko": "점프", "counters": "쓰러진 통나무"
+    },
+    {
+      "id": "wobi", "name_en": "WOBI", "name_ko": "워비",
+      "species": "아기 퍼핀(바다오리)", "etymology": "wobble — 흔들려도 다시 선다",
+      "role": "활공 · 균형을 잡는 아이",
+      "color": { "body": "#2f3b52", "mark": "#f6f7fb", "cheek": "#ffb3ba", "accent": "#ff8a3d" },
+      "silhouette_key": "둥근 몸 + 옆으로 뻗은 삼각 부리",
+      "action": "glide", "action_ko": "활공", "counters": "돌풍"
+    },
+    {
+      "id": "saro", "name_en": "SARO", "name_ko": "사로",
+      "species": "아기 다람쥐", "etymology": "사로잡다 — 무엇이든 모은다",
+      "role": "수집 · 꾀가 많은 아이",
+      "color": { "body": "#d9813f", "mark": "#f7e3c8", "cheek": "#ffb3ba", "accent": "#4fbf5a" },
+      "silhouette_key": "둥근 몸 + 몸보다 큰 물음표 모양 꼬리",
+      "action": "spin", "action_ko": "꼬리 회전", "counters": "좁은 틈"
+    }
+  ],
+  "shared_palette": {
+    "cheek": "#ffb3ba",
+    "outline": "#2b2b33",
+    "note": "볼터치와 외곽선은 세 명이 공유한다. 이것이 '한 가족'으로 보이게 하는 최소 장치다."
+  }
+}

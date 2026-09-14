@@ -39,14 +39,18 @@ html, body {
 }
 .badge b { font-size: 15px; }
 
+/* align-items:center 로 가운데를 맞추면 카드가 화면보다 길어졌을 때
+   위쪽이 잘려 나가고 스크롤로도 닿지 않는다. flex-start + margin:auto 는
+   여유가 있으면 가운데로 오고, 없으면 잘리지 않고 전부 스크롤된다. */
 #panel {
-  position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+  position: fixed; inset: 0; display: flex; align-items: flex-start; justify-content: center;
   background: rgba(4, 10, 20, 0.55); overflow-y: auto;
   padding: calc(16px + env(safe-area-inset-top, 0px)) calc(16px + env(safe-area-inset-right, 0px))
            calc(16px + env(safe-area-inset-bottom, 0px)) calc(16px + env(safe-area-inset-left, 0px));
   -webkit-overflow-scrolling: touch;
 }
 .card {
+  margin: auto;
   width: min(94vw, 440px);
   background: rgba(7, 17, 31, 0.94);
   border: 1px solid var(--line); border-radius: 22px;
@@ -79,6 +83,7 @@ p { margin: 8px 0; line-height: 1.55; color: #dbe7f7; font-size: 14px; }
   margin-top: 10px; letter-spacing: 0.2px;
 }
 .btn.ghost.c-shop { border-color: #ffd54a; color: #ffd54a; background: rgba(255, 213, 74, 0.12); }
+.btn.ghost.c-gear { border-color: #63d08a; color: #63d08a; background: rgba(99, 208, 138, 0.12); }
 .btn.ghost.c-settings { border-color: #4fc3f7; color: #4fc3f7; background: rgba(79, 195, 247, 0.12); }
 .btn.ghost.c-danger { border-color: #ff6b6b; color: #ff6b6b; background: rgba(255, 107, 107, 0.10); }
 .statpick { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
@@ -169,3 +174,35 @@ p { margin: 8px 0; line-height: 1.55; color: #dbe7f7; font-size: 14px; }
 }
 .iconbtn.off { opacity: 0.55; }
 .hidden { display: none !important; }
+
+/* 장비 · 조각 화면 — 공 상점(.ballrow)의 행 구조를 그대로 재사용한다 */
+.subhead { margin: 20px 0 2px; font-size: 14px; letter-spacing: 0.04em; color: var(--accent); }
+.shards { display: flex; gap: 6px; margin: 12px 0 8px; }
+.shards .shard {
+  flex: 1 1 0; min-width: 0; padding: 7px 4px; border-radius: 9px; text-align: center;
+  background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12);
+}
+.shards .shard span { display: block; font-size: 9px; letter-spacing: 0.06em; color: var(--sub); }
+.shards .shard b { display: block; font-size: 17px; margin-top: 1px; }
+.shards .shard.common b { color: #cdd6e2; }
+.shards .shard.rare b { color: #6fd3ff; }
+.shards .shard.epic b { color: #c48bff; }
+.shards .shard.legendary b { color: #ffc53d; }
+.slotname { margin: 16px 0 4px; font-size: 12px; letter-spacing: 0.08em; color: var(--sub); }
+.ballrow .rar {
+  display: inline-block; margin-right: 5px; padding: 1px 5px; border-radius: 4px;
+  font-size: 9px; letter-spacing: 0.06em; vertical-align: 1px;
+  background: rgba(255, 255, 255, 0.12); color: var(--sub);
+}
+.ballrow .rar.rare { background: rgba(111, 211, 255, 0.18); color: #6fd3ff; }
+.ballrow .rar.epic { background: rgba(196, 139, 255, 0.18); color: #c48bff; }
+.ballrow .rar.legendary { background: rgba(255, 197, 61, 0.2); color: #ffc53d; }
+.ballrow .icon {
+  flex: 0 0 40px; width: 40px; height: 40px; display: grid; place-items: center;
+  font-size: 22px; border-radius: 10px; background: rgba(255, 255, 255, 0.07);
+}
+.shards .shard .dust {
+  margin-top: 4px; width: 100%; padding: 3px 0; font-size: 9px; cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.18); border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08); color: var(--sub);
+}

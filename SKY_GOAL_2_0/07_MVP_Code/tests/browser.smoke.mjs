@@ -32,6 +32,13 @@ function loadPlaywright() {
 
 const pw = loadPlaywright();
 if (!pw) {
+  // 개발자 노트북에는 playwright 가 없을 수 있으니 건너뛴다.
+  // 그러나 CI 에서 건너뛰면 초록불인데 아무것도 검증하지 않은 상태가 되므로,
+  // REQUIRE_BROWSER=1 이면 건너뛰지 않고 실패시킨다.
+  if (process.env.REQUIRE_BROWSER === '1') {
+    console.error('[fail] playwright 를 찾을 수 없어 브라우저 스모크 테스트를 돌리지 못했습니다.\n        NODE_PATH 를 `npm root -g` 값으로 맞추세요.');
+    process.exit(1);
+  }
   console.log('[skip] playwright 가 설치되어 있지 않아 브라우저 스모크 테스트를 건너뜁니다.');
   process.exit(0);
 }
@@ -244,6 +251,26 @@ try {
   }));
   check('처음에는 아마추어이고 프로는 잠겨 있다',
     locked.mode === 'amateur' && locked.proLocked, JSON.stringify(locked));
+  // 시작 화면이 길어지면(장비 버튼처럼 항목이 늘어나면) 작은 화면에서
+  // 위쪽 버튼이 잘려 손이 닿지 않는 일이 생긴다. 회귀로 막는다.
+  const reach = await page.evaluate(async () => {
+    document.getElementById('panel').scrollTop = 0;
+    await new Promise((r) => requestAnimationFrame(r));
+    const card = document.querySelector('#screen-start');
+    const top = document.getElementById('mode-pro').getBoundingClientRect().top;
+    const bottom = document.getElementById('btn-reset').getBoundingClientRect().bottom;
+    document.getElementById('panel').scrollTop = 99999;
+    await new Promise((r) => requestAnimationFrame(r));
+    const bottomAfter = document.getElementById('btn-reset').getBoundingClientRect().bottom;
+    return { top: Math.round(top), cardH: Math.round(card.getBoundingClientRect().height),
+             viewH: window.innerHeight, bottom: Math.round(bottom),
+             bottomAfter: Math.round(bottomAfter) };
+  });
+  check('시작 화면이 길어져도 맨 위 버튼이 화면 안에 들어온다',
+    reach.top >= 0, JSON.stringify(reach));
+  check('맨 아래 버튼까지 스크롤로 닿는다',
+    reach.bottomAfter <= reach.viewH + 1, JSON.stringify(reach));
+
   await page.click('#mode-pro');
   check('잠긴 모드는 눌러도 바뀌지 않는다',
     (await page.evaluate(() => window.SkyGoal.getProfile().mode)) === 'amateur');
@@ -327,6 +354,177 @@ try {
   check('선택한 공이 새로고침 후에도 유지된다',
     await page.evaluate(() => window.SkyGoal.getProfile().balls.selected === 'rubber'));
   await page.evaluate(() => window.SkyGoal.home());
+
+  // 장비 · 조각
+  await page.evaluate(() => {
+    const p = window.SkyGoal.getProfile();
+    p.coins = 0;
+    p.inventory = { common: 0, rare: 0, epic: 0, legendary: 0 };
+    p.gear = { owned: [], equipped: { boots: null, band: null, charm: null } };
+    p.consumables = { stock: {}, selected: null };
+    window.SkyGoal.home();
+  });
+  await page.click('#btn-gear');
+  check('장비 화면이 열린다', await page.isVisible('#screen-gear'));
+
+  const gearCounts = await page.evaluate(() => ({
+    shards: document.querySelectorAll('#shard-row .shard').length,
+    gear: document.querySelectorAll('#gear-list .ballrow').length,
+    slots: document.querySelectorAll('#gear-list .slotname').length,
+    cons: document.querySelectorAll('#cons-list .ballrow').length
+  }));
+  check('조각 4등급 · 장비 12종(3슬롯) · 소모품 4종이 표시된다',
+    gearCounts.shards === 4 && gearCounts.gear === 12 &&
+    gearCounts.slots === 3 && gearCounts.cons === 4,
+    JSON.stringify(gearCounts));
+
+  const icons = await page.evaluate(() => {
+    const canvases = [...document.querySelectorAll('#gear-list .icon canvas')];
+    const consCanvases = document.querySelectorAll('#cons-list .icon canvas').length;
+    // 캔버스가 실제로 칠해졌는지 — 전부 투명하면 그리기가 실패한 것이다
+    const painted = canvases.filter((cv) => {
+      const d = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data;
+      for (let i = 3; i < d.length; i += 4) if (d[i] > 0) return true;
+      return false;
+    }).length;
+    return { gear: canvases.length, cons: consCanvases, painted };
+  });
+  check('장비 12종 · 소모품 4종이 캔버스 아이콘으로 그려진다',
+    icons.gear === 12 && icons.cons === 4 && icons.painted === 12,
+    JSON.stringify(icons));
+
+  const lockedCraft = await page.evaluate(() =>
+    [...document.querySelectorAll('#gear-list .ballrow button')].every((b) => b.disabled));
+  check('조각이 없으면 제작 버튼이 전부 잠긴다', lockedCraft);
+
+  const crafted = await page.evaluate(() => {
+    const p = window.SkyGoal.getProfile();
+    p.inventory.common = 5;
+    window.SkyGoal.gear();
+    const row = [...document.querySelectorAll('#gear-list .ballrow')]
+      .find((r) => r.textContent.includes('연습장 부츠'));
+    row.querySelector('button').click();
+    return {
+      owned: p.gear.owned.slice(),
+      equipped: p.gear.equipped.boots,
+      shards: p.inventory.common,
+      flap: Math.round(window.SkyGoal.getArena().flap)
+    };
+  });
+  check('조각을 모으면 원하는 장비를 만들고 바로 장착된다',
+    crafted.owned.includes('boots_practice') && crafted.equipped === 'boots_practice' &&
+    crafted.shards === 0, JSON.stringify(crafted));
+
+  const plainFlap = await page.evaluate(() => {
+    const p = window.SkyGoal.getProfile();
+    window.SkyGoal.engine.unequipGear(p, 'boots');
+    window.SkyGoal.gear();
+    return Math.round(window.SkyGoal.getArena().flap);
+  });
+  check('장비가 실제 물리값을 바꾼다 (flap 은 음수라 셀수록 작아진다)',
+    crafted.flap < plainFlap, '장착 ' + crafted.flap + ' < 해제 ' + plainFlap);
+
+  const snack = await page.evaluate(() => {
+    const p = window.SkyGoal.getProfile();
+    p.coins = 1000;
+    window.SkyGoal.gear();
+    const row = [...document.querySelectorAll('#cons-list .ballrow')]
+      .find((r) => r.textContent.includes('스카우팅 리포트'));
+    row.querySelector('button.buy').click();
+    return { coins: p.coins, stock: p.consumables.stock.cons_scout, selected: p.consumables.selected };
+  });
+  check('소모품을 코인으로 사면 경기 전 슬롯에 올라간다',
+    snack.coins === 700 && snack.stock === 1 && snack.selected === 'cons_scout',
+    JSON.stringify(snack));
+
+  const consumed = await page.evaluate(() => {
+    window.SkyGoal.start();
+    const p = window.SkyGoal.getProfile();
+    const run = window.SkyGoal.getRun();
+    return {
+      snack: run.snack ? run.snack.id : null,
+      stock: p.consumables.stock.cons_scout || 0,
+      selected: p.consumables.selected
+    };
+  });
+  check('소모품은 경기를 시작하는 순간 소비된다',
+    consumed.snack === 'cons_scout' && consumed.stock === 0 && consumed.selected === null,
+    JSON.stringify(consumed));
+
+  const blocked = await page.evaluate(() => {
+    const p = window.SkyGoal.getProfile();
+    p.inventory.epic = 99;
+    window.SkyGoal.engine.craftGear(p, 'charm_gloves');
+    window.SkyGoal.start();
+    window.SkyGoal.flap();                       // 킥오프 건너뛰고 플레이
+    const before = window.SkyGoal.getRun().blockHits;
+    const absorbed = window.SkyGoal.debugAbsorbHit();
+    return { before, absorbed, after: window.SkyGoal.getRun().blockHits,
+             state: window.SkyGoal.getState() };
+  });
+  check('골키퍼 장갑이 충돌 1회를 흡수하고 경기가 계속된다',
+    blocked.before === 1 && blocked.absorbed === true && blocked.after === 0 &&
+    blocked.state === 'playing', JSON.stringify(blocked));
+
+  const revived = await page.evaluate(() => {
+    const p = window.SkyGoal.getProfile();
+    p.inventory.legendary = 99;
+    window.SkyGoal.engine.craftGear(p, 'charm_golden30');
+    window.SkyGoal.start();
+    window.SkyGoal.flap();
+    const run = window.SkyGoal.getRun();
+    run.combo = 10;
+    window.SkyGoal.forceEnd();                   // 첫 사망 — 골든 휘슬이 살린다
+    const afterSave = { state: window.SkyGoal.getState(), combo: run.combo, used: run.saveUsed };
+    window.SkyGoal.forceEnd();                   // 두 번째 사망 — 이제 끝난다
+    return { afterSave, finalState: window.SkyGoal.getState() };
+  });
+  check('2030 골든 휘슬이 한 번 살리고 COMBO 를 절반만 남긴다',
+    revived.afterSave.state === 'ready' && revived.afterSave.combo === 5 &&
+    revived.afterSave.used === true, JSON.stringify(revived.afterSave));
+  check('부활은 판당 한 번뿐 — 두 번째 사망은 그대로 끝난다',
+    revived.finalState === 'over', revived.finalState);
+
+  await page.reload({ waitUntil: 'load' });
+  await page.waitForFunction(() => !!window.SkyGoal, null, { timeout: 5000 });
+  const gearPersisted = await page.evaluate(() => {
+    const p = window.SkyGoal.getProfile();
+    return { owned: p.gear.owned.length, charm: p.gear.equipped.charm };
+  });
+  check('만든 장비는 새로고침 후에도 남는다',
+    gearPersisted.owned >= 2 && gearPersisted.charm === 'charm_golden30',
+    JSON.stringify(gearPersisted));
+
+  const dusted = await page.evaluate(() => {
+    const p = window.SkyGoal.getProfile();
+    // COMMON 장비를 전부 만들어 두면 그때부터 COMMON 조각은 "남는 조각"이 된다
+    p.inventory.common = 99;
+    ['boots_practice', 'band_cloth', 'charm_clover'].forEach(
+      (id) => window.SkyGoal.engine.craftGear(p, id));
+    p.inventory.common = 4;
+    p.coins = 0;
+    window.SkyGoal.gear();
+    const btn = document.querySelector('#shard-row .shard.common .dust');
+    const rareBtn = document.querySelector('#shard-row .shard.rare .dust');
+    if (btn) btn.click();
+    return { hadCommon: !!btn, hadRare: !!rareBtn,
+             shards: p.inventory.common, coins: p.coins };
+  });
+  check('더 만들 것이 없는 등급만 분해할 수 있다',
+    dusted.hadCommon === true && dusted.hadRare === false &&
+    dusted.shards === 3 && dusted.coins === 20, JSON.stringify(dusted));
+
+  // 뒤 테스트에 영향을 주지 않도록 장비를 내려 둔다.
+  // 골든 휘슬이 걸려 있으면 사망이 먼저 "부활"로 흡수되어
+  // 이어하기(보상형 광고) 화면까지 도달하지 않는다 — 의도한 우선순위지만
+  // 테스트는 알려진 상태에서 시작해야 한다.
+  await page.evaluate(() => {
+    const p = window.SkyGoal.getProfile();
+    p.gear.equipped = { boots: null, band: null, charm: null };
+    p.consumables = { stock: {}, selected: null };
+    localStorage.setItem(window.SkyGoal.engine.STORAGE_KEY, JSON.stringify(p));
+    window.SkyGoal.home();
+  });
 
   // 조작 설정 슬라이더
   await page.evaluate(() => window.SkyGoal.home());
