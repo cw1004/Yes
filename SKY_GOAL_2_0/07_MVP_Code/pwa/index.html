@@ -1247,8 +1247,11 @@ if ('serviceWorker' in navigator) {
     var M = modeParams(mode);
     d = clamp(d + M.dOffset, M.dMin, M.dMax);         // 모드가 난이도 밴드를 올린다
 
-    var gap = Math.max(145, 220 - 0.9 * d) * M.gap;
-    var speed = (210 + 2.8 * d) * M.speed;
+    // 난이도에 따른 골문 폭 / 속도 변화폭을 넓히고, 전체적으로 쉬운 쪽으로 낮췄다.
+    // (기준값을 220→250, 기울기를 0.9→1.2 로 올려 쉬운 난이도에서 골문이 더 넓어지고,
+    //  스피드 기준값도 210→180 으로 낮춰 전체적으로 느려지도록 함. 아마추어·프로 공용.)
+    var gap = Math.max(150, 250 - 1.2 * d) * M.gap;
+    var speed = (180 + 3.2 * d) * M.speed;
     var movement = 0.05 * d * st.movement * M.movement;
     var wind = Math.max(0, (d - 35) / 60) * st.wind;
 
