@@ -7,3 +7,8 @@ gTTS>=2.5.0            # 무료 대안
 
 # 선택
 imageio-ffmpeg>=0.4.9  # 시스템에 ffmpeg 이 없을 때 대체 바이너리
+
+# 「하나의 길 — ONE WAY」 상담사 (선택)
+#   없어도 오프라인 규칙 엔진으로 전부 동작합니다.
+#   설치하고 ANTHROPIC_API_KEY 를 넣으면 상담 품질이 올라갑니다.
+anthropic>=0.40.0

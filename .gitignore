@@ -9,3 +9,9 @@ assets/stock/*
 !assets/stock/.gitkeep
 !assets/**/README.md
 .DS_Store
+
+# 하나의 길 — ONE WAY
+# 방문자 세션·기도 지향 — 개인정보이므로 절대 커밋하지 않습니다
+data/
+# 정적 빌드 결과
+out/site/

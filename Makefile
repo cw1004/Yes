@@ -7,7 +7,8 @@ NARRATION ?= ko
 CAPTION ?=            # 비우면 내레이션과 동일 (예: CAPTION=ko)
 LANG_OPT = --lang $(NARRATION) $(if $(CAPTION),--caption-lang $(CAPTION),)
 
-.PHONY: help setup check scripts all hindi fast test clean
+.PHONY: help setup check scripts all hindi fast test clean \
+        oneway serve ask today site sitemap purge
 
 help:            ## 사용 가능한 명령 보기
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -30,6 +31,31 @@ hindi:           ## 힌디어 내레이션 + 한국어 자막으로 100편 생�
 
 fast:            ## 영상 100편 빠르게 생성 (미리보기 화질)
 	$(PY) -m india2030 make --range $(RANGE) --workers $(WORKERS) $(LANG_OPT) --preset veryfast --crf 26
+
+# ───────────────────────────── 하나의 길 — ONE WAY ─────────────────────────────
+PORT ?= 8000
+SITE_URL ?= https://oneway.example.com
+
+serve:           ## 홈페이지 띄우기   예) make serve PORT=8080
+	$(PY) -m oneway serve --port $(PORT)
+
+ask:             ## 터미널에서 AI 상담사와 대화
+	$(PY) -m oneway ask
+
+today:           ## 오늘의 3분 보기
+	$(PY) -m oneway today
+
+oneway:          ## 상담사·콘텐츠 환경 점검
+	$(PY) -m oneway check
+
+site:            ## 정적 사이트 내보내기 (SEO 페이지 66개)
+	$(PY) -m oneway build --clean --site-url $(SITE_URL)
+
+sitemap:         ## sitemap.xml 출력
+	$(PY) -m oneway sitemap --site-url $(SITE_URL)
+
+purge:           ## 180일 넘은 방문 기록 삭제
+	$(PY) -m oneway purge --days 180
 
 test:            ## 테스트 실행
 	$(PY) -m unittest discover -s tests
