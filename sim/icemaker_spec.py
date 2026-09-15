@@ -215,3 +215,47 @@ if __name__=="__main__":
               "Methanol burns with a nearly invisible flame. Site fire cover accordingly.",
               "Label the vessel for methanol with flame and acute-toxicity marking."]:
         P("   - "+t if not t.startswith("  ") else t)
+
+
+# ─────────────────────────────────────────────────────── envelope and mass
+ENV = dict(
+    coll_w=1120.0, coll_l=1120.0, coll_d=120.0, tilt=35.0,
+    cond_w=700.0, cond_h=400.0, cond_d=90.0,
+    recv_od=100.0, recv_len=400.0,
+    box_ext_L=660.0, box_ext_W=510.0, box_ext_H=460.0,
+    frame_L=1250.0, frame_W=800.0, wheel_od=200.0,
+)
+
+def masses():
+    od,t,Ln,n = S['tube_od'],S['tube_wall'],S['tube_len'],S['n_tube']
+    m_tube = n*math.pi*((od/2)**2-(od/2-t)**2)*Ln/1e9*7900.0
+    m_plate= S['A_coll']*0.5e-3*8960.0
+    d=design()
+    items=[("adsorber tubes, SS 316L", m_tube),
+           ("absorber plate, Cu 0.5", m_plate),
+           ("glazing, low-iron 3.2", S['A_coll']*8.0),
+           ("collector box + insulation", 12.0),
+           ("activated carbon", d['m_c']),
+           ("METHANOL CHARGE", d['charge']),
+           ("condenser + receiver", 9.0),
+           ("evaporator + ice box", 14.0),
+           ("frame, wheels, handle", 16.0)]
+    return items, sum(v for _,v in items)
+
+def cycle_corners():
+    """Four Clapeyron corners: A adsorption end, B isosteric heat, C desorption
+    end, D isosteric cool. B and D are found where uptake stays constant."""
+    d=design()
+    P_ev,P_cd = d['P_ev'], d['P_cd']
+    def T_at(x_target, P):
+        lo,hi=0.0,200.0
+        for _ in range(80):
+            m=(lo+hi)/2
+            if x_maxsorb(m,P) > x_target: lo=m
+            else: hi=m
+        return (lo+hi)/2
+    A=(S['T_ads'], P_ev)
+    B=(T_at(d['x_r'], P_cd), P_cd)
+    C=(S['T_des'],  P_cd)
+    D=(T_at(d['x_l'], P_ev), P_ev)
+    return dict(A=A,B=B,C=C,D=D,x_r=d['x_r'],x_l=d['x_l'])

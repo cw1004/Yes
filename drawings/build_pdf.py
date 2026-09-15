@@ -12,7 +12,7 @@ from pypdf import PdfWriter, PdfReader
 
 HERE=os.path.dirname(os.path.abspath(__file__))
 ARGS=[a for a in sys.argv[1:]]
-SET=next((a for a in ARGS if a in ("vc","cp")),"vc")
+SET=next((a for a in ARGS if a in ("vc","cp","si")),"vc")
 MULT=next((int(a) for a in ARGS if a.isdigit()),1)
 VC_SHEETS=[("VC-100","General Assembly","VC-100_general-assembly.svg"),
         ("VC-101","Chamber Base","VC-101_chamber-base.svg"),
@@ -27,12 +27,20 @@ CP_SHEETS=[("CP-100","D2C Cold Plate - General Assembly","CP-100_general-assembl
         ("CP-103","Thermal-Hydraulic Specification","CP-103_thermal-hydraulic.svg"),
         ("CP-200","SXM5 Mounting Interface","CP-200_mounting.svg"),
         ("CP-300","Process, Test & Coolant Specification","CP-300_process-coolant.svg")]
-SHEETS = VC_SHEETS if SET=="vc" else CP_SHEETS
-SRCDIR = "out" if SET=="vc" else "cp_out"
-MODNAME= "sheets" if SET=="vc" else "cp_sheets"
-SETNAME= ("VC-100 Vapour Chamber" if SET=="vc" else "CP-100 D2C Cold Plate")
-SETSUBJ= ("Cu-H2O vapour chamber 68 x 68 x 27 mm" if SET=="vc"
-          else "Direct-to-chip cold plate for H100 SXM5, 700 W, Cu C10200")
+SI_SHEETS=[("SI-100","Solar Ice Maker - Arrangement","SI-100_general-arrangement.svg"),
+        ("SI-101","Adsorber-Collector","SI-101_adsorber-collector.svg"),
+        ("SI-102","Condenser and Receiver","SI-102_condenser-receiver.svg"),
+        ("SI-104","Evaporator and Ice Box","SI-104_evaporator-icebox.svg"),
+        ("SI-200","Vacuum and Charging","SI-200_vacuum-charging.svg"),
+        ("SI-300","Safety, Marking and Commissioning","SI-300_safety-commissioning.svg")]
+SHEETS = {"vc":VC_SHEETS,"cp":CP_SHEETS,"si":SI_SHEETS}[SET]
+SRCDIR = {"vc":"out","cp":"cp_out","si":"si_out"}[SET]
+MODNAME= {"vc":"sheets","cp":"cp_sheets","si":"si_sheets"}[SET]
+SETNAME= {"vc":"VC-100 Vapour Chamber","cp":"CP-100 D2C Cold Plate",
+          "si":"SI-100 Solar Adsorption Ice Maker"}[SET]
+SETSUBJ= {"vc":"Cu-H2O vapour chamber 68 x 68 x 27 mm",
+          "cp":"Direct-to-chip cold plate for H100 SXM5, 700 W, Cu C10200",
+          "si":"Activated carbon + methanol solar ice maker, 1 m2, 5 kg ice/day. OUTDOOR ONLY"}[SET]
 
 if MULT!=1:                       # regenerate the sheets with multiplied scale labels
     import draft, importlib; draft.SCALE_MULT=MULT
