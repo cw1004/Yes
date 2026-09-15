@@ -24,19 +24,13 @@
   };
 
   /* ---------------------------------------------------------- 상담 대화 */
-  function section(parent, label, text) {
-    if (!text) return;
-    parent.appendChild(el("h4", null, label));
-    text.split("\n\n").forEach(function (para) {
-      if (para.trim()) parent.appendChild(el("p", null, para));
-    });
-  }
-
+  /* 답변은 한 덩어리의 말로 온다. 소제목이나 딱지를 붙이지 않는다. */
   function renderReply(log, r) {
-    var b = el("div", "bubble ai" + (r.risk === "crisis" || r.risk === "abuse" ? " alert" : ""));
+    var alert = r.risk === "crisis" || r.risk === "abuse";
+    var b = el("div", "bubble ai" + (alert ? " alert" : ""));
 
-    (r.listen || "").split("\n\n").forEach(function (p) {
-      if (p.trim()) b.appendChild(el("p", null, p));
+    (r.text || "").split("\n\n").forEach(function (para) {
+      if (para.trim()) b.appendChild(el("p", null, para));
     });
 
     if (r.hotlines && r.hotlines.length) {
@@ -44,22 +38,6 @@
       r.hotlines.forEach(function (h) { ul.appendChild(el("li", null, h)); });
       b.appendChild(ul);
     }
-
-    section(b, "", r.insight);
-
-    if (r.verse_ref) {
-      var v = el("aside", "verse");
-      var ref = el("div", "ref", r.verse_ref);
-      ref.appendChild(el("span", "alt", "개신교 표기 · " + r.verse_ref_protestant));
-      v.appendChild(ref);
-      v.appendChild(el("p", null, r.verse_gist));
-      v.appendChild(el("p", "small", "번역문은 싣지 않습니다. 직접 펴서 읽어 보십시오."));
-      b.appendChild(v);
-    }
-
-    section(b, "오늘의 질문", r.question);
-    section(b, "30초 기도", r.prayer);
-    section(b, "오늘의 한 걸음", r.step);
 
     if (r.links && r.links.length) {
       var box = el("div", "links");
@@ -72,7 +50,7 @@
     }
 
     if (r.follow_up) b.appendChild(el("p", "small", r.follow_up));
-    if (r.disclaimer) b.appendChild(el("p", "small", "(" + r.disclaimer + ")"));
+    if (r.note) b.appendChild(el("p", "small", r.note));
 
     log.appendChild(b);
     b.scrollIntoView({ behavior: "smooth", block: "nearest" });
@@ -90,7 +68,7 @@
       if (!text) return;
       log.appendChild(el("div", "bubble me", text));
       input.value = "";
-      var wait = el("p", "typing", "듣고 있습니다…");
+      var wait = el("p", "typing", "…");
       log.appendChild(wait);
       wait.scrollIntoView({ behavior: "smooth", block: "nearest" });
 
@@ -123,7 +101,7 @@
 
     var prefill = chat && chat.getAttribute("data-prefill");
     if (prefill) { input.value = prefill; send(prefill); }
-    else { send("안녕하세요"); }
+    else { input.focus(); }
   }
 
   /* ------------------------------------------------- 연속 방문·진행 상황 */

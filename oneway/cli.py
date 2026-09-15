@@ -115,8 +115,12 @@ def cmd_check(args: argparse.Namespace) -> int:
     print(f"  사이트 주소    : {cfg.site_url}")
     print(f"  데이터 폴더    : {cfg.data_dir.resolve()}")
     print()
+    from .counselor import topics as topics_mod
+    surface = sum(1 for t in topics_mod.TOPICS if not t.min_depth)
     print(f"  콘텐츠        : 50가지 {len(fifty.BELIEFS)}개 · "
           f"입구 {len(entries.ENTRIES)}개 · 고정 페이지 {len(pages_mod.PAGES)}개")
+    print(f"  상담 주제      : {len(topics_mod.TOPICS)}개 "
+          f"(종교 언어 없이 답할 수 있는 주제 {surface}개)")
     print(f"  색인 대상 URL  : {len(all_urls())}개")
     print()
     if not key:
@@ -142,7 +146,9 @@ def cmd_build(args: argparse.Namespace) -> int:
     written: List[Path] = []
 
     def write(path: str, markup: str) -> None:
-        target = out / (path.strip("/") or "index")
+        rel = path.strip("/")
+        # 첫 페이지는 out/index.html 이어야 한다. out/index/index.html 이 아니라.
+        target = (out / "index.html") if not rel else (out / rel)
         if not target.suffix:
             target = target / "index.html"
         target.parent.mkdir(parents=True, exist_ok=True)

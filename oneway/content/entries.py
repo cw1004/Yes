@@ -135,7 +135,7 @@ Entry(
     topics=("용서", "사랑", "분노", "관계"),
 ),
 Entry(
-    slug="hope", icon="🕊️", label="미래", title="희망과 기도",
+    slug="hope", icon="🕊️", label="미래", title="앞날과 희망",
     seo_title="세상이 불안할 때 — 그래도 희망을 말할 수 있는 이유",
     description="낙관은 '잘 될 것이다'이고 희망은 '어떻게 되든 끝이 아니다'입니다.",
     keywords=("미래 불안", "세상이 무섭다", "희망", "절망", "진로 고민"),

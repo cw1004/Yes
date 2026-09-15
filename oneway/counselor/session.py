@@ -78,6 +78,10 @@ class Visitor:
     read_beliefs: List[int] = field(default_factory=list)
     done_practices: List[str] = field(default_factory=list)   # 사랑 실천을 한 날짜
     nickname: str = ""                                        # 본인이 원할 때만
+    # 이 사람에게 어디까지 열렸는지 (counselor/depth.py)
+    depth: int = 0
+    # "종교 이야기는 하지 말아 달라"고 한 적이 있는가. 한 번 참이면 되돌리지 않는다.
+    faith_blocked: bool = False
 
     # ---------------------------------------------------------------- 기록
     def touch(self, today: Optional[date] = None) -> None:
@@ -113,6 +117,21 @@ class Visitor:
     def mark_read(self, no: int) -> None:
         if no not in self.read_beliefs:
             self.read_beliefs.append(no)
+
+    def open_depth(self, level: int) -> None:
+        """상대가 스스로 연 깊이를 기억한다. 우리가 올리지는 않는다.
+
+        교파(3)는 기억하지 않는다. 물어본 그 순간에만 답하는 것이 맞다.
+        """
+        if self.faith_blocked:
+            self.depth = 0
+            return
+        self.depth = max(self.depth, min(int(level), 2))
+
+    def block_faith(self) -> None:
+        """종교 이야기를 원하지 않는다고 말했다. 두 번 묻지 않는다."""
+        self.faith_blocked = True
+        self.depth = 0
 
     def mark_practice(self, on: Optional[date] = None) -> None:
         iso = (on or date.today()).isoformat()
@@ -192,6 +211,8 @@ class Visitor:
             read_beliefs=list(d.get("read_beliefs", [])),
             done_practices=list(d.get("done_practices", [])),
             nickname=d.get("nickname", ""),
+            depth=int(d.get("depth", 0)),
+            faith_blocked=bool(d.get("faith_blocked", False)),
         )
 
 

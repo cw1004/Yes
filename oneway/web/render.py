@@ -53,13 +53,21 @@ def _meta(cfg: Config, title: str, desc: str, path: str,
     return "\n".join(out)
 
 
+# 1차 메뉴에는 신앙 색을 띈 항목을 두지 않는다.
+# 처음 온 사람이 메뉴만 보고도 "여기는 교회 사이트구나" 하면 거기서 끝난다.
 NAV = [
+    ("/counsel", "이야기하기"),
     ("/today", "하루 3분"),
-    ("/counsel", "AI 상담"),
-    ("/believe", "50가지"),
-    ("/left-church", "교회를 떠났습니다"),
-    ("/pray", "함께 기도"),
+    ("/gate/heart", "마음"),
     ("/about", "소개"),
+]
+
+# 깊은 곳으로 가는 문. 페이지 아래쪽에만 조용히 둔다.
+DEEPER = [
+    ("/believe", "우리가 함께 믿는 50가지"),
+    ("/left-church", "나는 교회를 떠났습니다"),
+    ("/pray", "함께 기도"),
+    ("/traditions", "각 전통을 직접 알아보기"),
 ]
 
 
@@ -67,6 +75,7 @@ def layout(cfg: Config, *, title: str, desc: str, path: str, body: str,
            keywords: Sequence[str] = (), jsonld: Optional[Dict] = None,
            hero: str = "") -> str:
     nav = "".join(f'<a href="{u}">{E(l)}</a>' for u, l in NAV)
+    deeper = "".join(f'<a href="{u}">{E(l)}</a>' for u, l in DEEPER)
     return f"""<!doctype html>
 <html lang="ko">
 <head>
@@ -89,13 +98,10 @@ def layout(cfg: Config, *, title: str, desc: str, path: str, body: str,
 {body}
 </main>
 <footer class="foot">
-  <p class="tagline">{E(TAGLINE)}</p>
-  <p class="small">이곳은 특정 교파로 데려가기 위한 곳이 아닙니다.
-     신앙에 질문이 있는 사람이라면 누구나 들어올 수 있습니다.</p>
-  <p class="small">성경 본문은 번역본을 그대로 싣지 않고 <b>어디를 펴야 하는지</b>만
-     알려 드립니다. 직접 펴서 읽어 보십시오.</p>
+  <p class="small">여기서는 먼저 듣습니다. 누구든 오셔도 됩니다.</p>
   <p class="small">힘든 순간에는 혼자 견디지 마십시오 —
      자살예방 상담전화 <b>109</b> · 정신건강 상담전화 <b>1577-0199</b> (24시간)</p>
+  <nav class="deeper">{deeper}</nav>
   <p class="small">&copy; {E(BRAND)} {E(BRAND_EN)}</p>
 </footer>
 <script src="/static/app.js"></script>
@@ -117,109 +123,136 @@ def _ask_buttons(asks: Sequence[str]) -> str:
            f'<div class="ask-list">{btns}</div></section>'
 
 
-def _verse_box(v: verses_mod.Verse) -> str:
-    return (f'<aside class="verse"><div class="ref">{E(v.ref)}'
-            f'<span class="alt">개신교 표기 · {E(v.ref_protestant)}</span></div>'
+def _verse_box(v: verses_mod.Verse, label_traditions: bool = False) -> str:
+    """성경 대목 상자.
+
+    표기를 두 가지 다 보여 주되 **어느 교파 표기인지 써 붙이지 않는다**.
+    라벨을 붙이는 순간 그 페이지는 교파 이야기가 된다.
+    교파를 직접 다루는 페이지(41~50번)에서만 라벨을 붙인다.
+    """
+    ref = v.both if label_traditions else v.neutral
+    return (f'<aside class="verse"><div class="ref">{E(ref)}</div>'
             f'<p>{E(v.gist)}</p>'
             f'<p class="small">번역문은 싣지 않습니다. 직접 펴서 읽어 보십시오.</p></aside>')
 
 
 # ────────────────────────────────────────────────────────── 홈
+# 처음 화면에서는 교파도, 신앙 언어도 쓰지 않는다.
+# 여기 오는 사람은 설득당하러 오지 않는다. 힘들어서 온다.
+SURFACE_GATES = ("heart", "family", "love", "hope")
+DEEPER_GATES = ("faith", "bible", "church")
+
+
 def home(cfg: Config, card: daily_mod.Daily) -> str:
-    gates = "".join(
-        f'<a class="gate" href="{e.url}"><span class="icon">{e.icon}</span>'
-        f'<b>{E(e.label)}</b><span class="g-desc">{E(e.hero)}</span></a>'
-        for e in entries_mod.ENTRIES)
+    def gate_card(e) -> str:
+        return (f'<a class="gate" href="{e.url}"><span class="icon">{e.icon}</span>'
+                f'<b>{E(e.label)}</b><span class="g-desc">{E(e.hero)}</span></a>')
+
+    gates = "".join(gate_card(entries_mod.get(k)) for k in SURFACE_GATES)
+    deeper = "".join(
+        f'<a href="{entries_mod.get(k).url}">{E(entries_mod.get(k).title)}</a>'
+        for k in DEEPER_GATES)
 
     hero = f"""<section class="hero">
-  <p class="eyebrow">당신의 마음은 지금 무엇을 찾고 있습니까?</p>
-  <ul class="hero-q">
-    <li>지쳤습니까?</li><li>외롭습니까?</li><li>믿음에 질문이 있습니까?</li>
-    <li>교회를 떠났습니까?</li><li>다시 하느님을 찾고 있습니까?</li>
-  </ul>
-  <h1>{E(BRAND)}</h1>
-  <p class="tag">{E(TAGLINE)}</p>
-  <p class="lead">질문하고, 기도하고, 사랑을 실천하며 함께 걷습니다.</p>
+  <p class="eyebrow">오늘 마음이 어떠십니까?</p>
+  <h1>혼자 두지 않겠습니다</h1>
+  <p class="lead">지쳤거나, 외롭거나, 답이 안 보이거나.<br>
+     정리하지 않으셔도 됩니다. 한 문장이면 충분합니다.</p>
   <div class="cta">
-    <a class="btn primary" href="/counsel">마음을 이야기하기</a>
+    <a class="btn primary big" href="/counsel">지금 이야기하기</a>
     <a class="btn" href="/today">오늘의 3분</a>
-    <a class="btn" href="/believe">함께 믿는 50가지</a>
-    <a class="btn" href="/left-church">나는 교회를 떠났습니다</a>
   </div>
+  <p class="small quiet">이름도 연락처도 묻지 않습니다. 무료입니다.</p>
 </section>"""
 
     body = f"""
+<section>
+  <h2 class="section-title">어떤 이야기든 괜찮습니다</h2>
+  <div class="gates">{gates}</div>
+</section>
+
 <section class="card today-peek">
   <h2>오늘의 3분</h2>
-  <p class="muted">{E(card.day)} · 하루에 하나만 드립니다.</p>
+  <p class="muted">하루에 딱 하나만 드립니다. 3분이면 끝납니다.</p>
   <div class="grid4">
-    <div><b>오늘의 말씀</b><p>{E(card.verse_ref)}</p></div>
     <div><b>오늘의 질문</b><p>{E(card.question)}</p></div>
-    <div><b>오늘의 기도</b><p>{E(card.prayer)}</p></div>
-    <div><b>오늘의 사랑</b><p>{E(card.love)}</p></div>
+    <div><b>오늘의 한 걸음</b><p>{E(card.love)}</p></div>
   </div>
   <a class="btn primary" href="/today">3분 시작하기</a>
 </section>
 
-<section>
-  <h2 class="section-title">어디서부터 이야기할까요</h2>
-  <p class="muted">메뉴가 아니라 마음으로 들어오시면 됩니다.</p>
-  <div class="gates">{gates}</div>
+<section class="card">
+  <h2>이곳이 하는 일</h2>
+  <p>먼저 듣습니다. 조언은 그 다음입니다.</p>
+  <p>판단하지 않습니다. 무엇을 믿든, 믿지 않든 상관없습니다.</p>
+  <p>해결해 드리겠다고 약속하지 않습니다. 대신 밤에도 여기 있습니다.</p>
+  <p><a href="/about">이곳에 대하여 →</a></p>
 </section>
 
-<section class="card">
-  <h2>이곳은 이런 곳입니다</h2>
-  <p>먼저 듣습니다. 설교는 나중입니다.</p>
-  <p>질문을 환영합니다. 질문했다고 믿음이 약하다고 말하지 않습니다.</p>
-  <p>가톨릭과 개신교가 함께 고백할 수 있는 것을 먼저 이야기합니다.</p>
-  <p><a href="/about">더 알아보기 →</a></p>
+<section class="card quiet-links">
+  <h2>더 깊은 질문이 있으시다면</h2>
+  <p class="muted">삶의 의미나 믿음에 대한 질문을 오래 들여다본 글들도 있습니다.
+     필요하실 때 열어 보셔도 됩니다.</p>
+  <div class="links">{deeper}</div>
 </section>
 """
     jsonld = {
         "@context": "https://schema.org", "@type": "WebSite",
         "name": cfg.site_name, "url": cfg.site_url,
-        "description": "신앙에 질문이 있는 사람이라면 누구나 들어올 수 있는 공간.",
+        "description": "지치고 외롭고 답이 안 보일 때, 먼저 듣는 곳.",
         "inLanguage": "ko",
     }
-    return layout(cfg, title=f"{BRAND} — {TAGLINE}",
-                  desc="지쳤습니까? 외롭습니까? 믿음에 질문이 있습니까? "
-                       "먼저 듣고, 함께 질문하고, 매일 3분을 드립니다.",
+    return layout(cfg, title="혼자 두지 않겠습니다",
+                  desc="지쳤습니까? 외롭습니까? 답이 안 보이십니까? "
+                       "이름도 연락처도 묻지 않습니다. 먼저 듣겠습니다.",
                   path="/", body=body, hero=hero, jsonld=jsonld,
-                  keywords=("신앙 상담", "마음이 힘들 때", "기도", "성경", "가톨릭 개신교"))
+                  keywords=("마음이 힘들 때", "고민 상담", "무료 상담", "외로움",
+                            "번아웃", "익명 상담"))
 
 
 # ────────────────────────────────────────────────────────── 하루 3분
-def today(cfg: Config, card: daily_mod.Daily) -> str:
+def today(cfg: Config, card: daily_mod.Daily, faith: bool = False) -> str:
+    """하루 3분.
+
+    ``faith`` 는 방문자가 스스로 연 깊이다(counselor/depth.py).
+    아직 열지 않은 사람에게는 말씀·기도 칸을 아예 보여 주지 않는다.
+    같은 페이지가 사람에 따라 다르게 보인다.
+    """
+    blocks = [
+        f'<section class="step-card"><span class="num">①</span>'
+        f'<h2>오늘의 질문</h2><p class="big">{E(card.question)}</p>'
+        f'<textarea id="answer" rows="3" placeholder="여기에 적어 보셔도 됩니다.'
+        f' 이 글은 저장되지 않습니다."></textarea></section>'
+    ]
+
+    if faith:
+        blocks.insert(0,
+            f'<section class="step-card"><span class="num">·</span>'
+            f'<h2>오늘의 말씀</h2>'
+            f'<p class="ref">{E(card.verse_ref)}'
+            f'<span class="alt">{E(card.verse_ref_protestant)}</span></p>'
+            f'<p>{E(card.verse_gist)}</p>'
+            f'<p class="small">번역문은 싣지 않습니다. 직접 펴서 읽어 보십시오.</p>'
+            f'</section>')
+        blocks.append(
+            f'<section class="step-card"><span class="num">·</span>'
+            f'<h2>오늘의 기도</h2><p class="big">{E(card.prayer)}</p>'
+            f'<p class="small">30초면 충분합니다.</p></section>')
+
+    blocks.append(
+        f'<section class="step-card"><span class="num">②</span>'
+        f'<h2>오늘의 한 걸음</h2><p class="big">{E(card.love)}</p>'
+        f'<button class="btn primary" data-practice>오늘 했습니다</button>'
+        f'<p class="small" id="practice-msg"></p></section>')
+
+    tail = (f'<p><a class="btn" href="{card.belief_url}">오늘 이야기 더 읽기 — '
+            f'{E(card.belief_title)}</a></p>') if faith else ""
+
     body = f"""
 <article class="three">
-  <p class="muted">{E(card.day)} · {card.index % 50 + 1}번째 이야기</p>
+  <p class="muted">{E(card.day)}</p>
   <h1>오늘의 3분</h1>
-
-  <section class="step-card"><span class="num">①</span>
-    <h2>오늘의 말씀</h2>
-    <p class="ref">{E(card.verse_ref)} <span class="alt">({E(card.verse_ref_protestant)})</span></p>
-    <p>{E(card.verse_gist)}</p>
-    <p class="small">번역문은 싣지 않습니다. 성경을 직접 펴서 읽어 보십시오.</p>
-  </section>
-
-  <section class="step-card"><span class="num">②</span>
-    <h2>오늘의 질문</h2>
-    <p class="big">{E(card.question)}</p>
-    <textarea id="answer" rows="3" placeholder="여기에 적어 보셔도 됩니다. 이 글은 저장되지 않습니다."></textarea>
-  </section>
-
-  <section class="step-card"><span class="num">③</span>
-    <h2>오늘의 기도</h2>
-    <p class="big">{E(card.prayer)}</p>
-    <p class="small">30초면 충분합니다. 소리 내어 한 번 말해 보십시오.</p>
-  </section>
-
-  <section class="step-card"><span class="num">④</span>
-    <h2>오늘의 사랑</h2>
-    <p class="big">{E(card.love)}</p>
-    <button class="btn primary" data-practice>오늘 실천했습니다</button>
-    <p class="small" id="practice-msg"></p>
-  </section>
+  {"".join(blocks)}
 
   <section class="card">
     <h2>이번 주의 질문</h2>
@@ -227,17 +260,16 @@ def today(cfg: Config, card: daily_mod.Daily) -> str:
   </section>
 
   <section class="card next">
-    <p>{E(card.tomorrow_teaser)}</p>
-    <p class="big">내일 다시 만나요.</p>
-    <p><a class="btn" href="{card.belief_url}">오늘 이야기 더 읽기 — {E(card.belief_title)}</a></p>
-    <p><a class="btn" href="/counsel">마음을 더 이야기하기</a></p>
+    <p class="big">내일 또 오셔도 됩니다.</p>
+    {tail}
+    <p><a class="btn primary" href="/counsel">마음을 더 이야기하기</a></p>
   </section>
   <div id="streak" class="streak"></div>
 </article>"""
     return layout(cfg, title=f"오늘의 3분 — {card.day}",
-                  desc=f"오늘의 말씀·질문·기도·사랑 한 걸음. {card.question}",
+                  desc=f"질문 하나, 한 걸음 하나. 3분이면 끝납니다. {card.question}",
                   path="/today", body=body,
-                  keywords=("오늘의 말씀", "묵상", "짧은 기도", "하루 3분"))
+                  keywords=("오늘의 질문", "하루 3분", "마음 돌보기", "자기 성찰"))
 
 
 # ────────────────────────────────────────────────────────── 50가지
@@ -272,7 +304,7 @@ def believe_index(cfg: Config) -> str:
 
 
 def belief_page(cfg: Config, b: fifty.Belief) -> str:
-    vs = "".join(_verse_box(verses_mod.get(k)) for k in b.verses)
+    vs = "".join(_verse_box(verses_mod.get(k), b.no >= 41) for k in b.verses)
     prev_b = fifty.get(b.no - 1) if b.no > 1 else None
     next_b = fifty.get(b.no + 1) if b.no < 50 else None
     nav = []
@@ -356,34 +388,42 @@ def static_page(cfg: Config, p: pages_mod.Page) -> str:
                   body=body, hero=hero, keywords=p.keywords)
 
 
-# ────────────────────────────────────────────────────────── AI 상담
+# ────────────────────────────────────────────────────────── 상담
 def counsel_page(cfg: Config, prefill: str = "") -> str:
+    """상담 화면.
+
+    예전에는 여기 맨 위에 "이 상담사는 AI입니다"를 세 문단 띄웠다.
+    말을 걸기도 전에 읽는 고지문은 사람을 돌려보낸다. 그래서 내렸다.
+
+    대신 (1) 입력창 아래 조용한 한 줄, (2) 「이곳에 대하여」 페이지,
+    (3) 물어보면 즉시 정직하게 답하는 것 — 세 가지로 남긴다.
+    사람인 척하지는 않는다. 다만 먼저 떠들지도 않는다.
+    """
     chips = "".join(
         f'<button class="ask" data-q="{html.escape(a, quote=True)}">{E(a)}</button>'
-        for e in entries_mod.ENTRIES for a in e.asks[:1])
+        for k in ("heart", "family", "love", "hope")
+        for a in entries_mod.get(k).asks[:1])
     body = f"""
 <div class="chat" data-prefill="{html.escape(prefill, quote=True)}">
-  <h1>마음을 이야기해 보세요</h1>
-  <p class="lead">정리하지 않아도 됩니다. 한 문장이면 충분합니다.</p>
-  <div class="notice">
-    <p>이 상담사는 사람이 아니라 <b>AI</b>입니다. 숨기지 않습니다.
-       사제·목회자·의사·심리상담사의 상담을 대신하지 않습니다.</p>
-    <p>이름·연락처를 묻지 않습니다. 대화는 익명으로 처리됩니다.</p>
-    <p>지금 많이 위험하다고 느끼신다면 먼저 <b>109</b>(자살예방 상담전화)로 연락하십시오. 24시간 무료입니다.</p>
-  </div>
+  <h1>오늘 어떤 하루였습니까</h1>
+  <p class="lead">정리하지 않으셔도 됩니다. 한 문장이면 충분합니다.</p>
   <div class="chips">{chips}</div>
   <div id="log" class="log" aria-live="polite"></div>
   <form id="chat-form" class="chat-form">
     <textarea id="msg" rows="2" placeholder="지금 마음을 한 문장으로 적어 보세요." required></textarea>
     <button class="btn primary" type="submit">보내기</button>
   </form>
+  <p class="small quiet">이름도 연락처도 묻지 않습니다.
+     듣는 쪽은 사람이 아닙니다 — <a href="/about">자세히</a>.
+     위급하다고 느끼시면 <b>109</b>(24시간, 무료)로 연락하십시오.</p>
   <div id="streak" class="streak"></div>
 </div>"""
-    return layout(cfg, title="AI 상담사에게 마음을 이야기하기",
-                  desc="지치고 외롭고 믿음에 질문이 있을 때. 먼저 듣고, 함께 질문하고, "
-                       "오늘 할 수 있는 한 걸음을 찾습니다.",
+    return layout(cfg, title="지금 마음을 이야기해 보세요",
+                  desc="지치고 외롭고 답이 안 보일 때. 이름도 연락처도 묻지 않습니다. "
+                       "먼저 듣고, 함께 생각하고, 오늘 할 수 있는 한 걸음을 찾습니다.",
                   path="/counsel", body=body,
-                  keywords=("신앙 상담", "마음이 힘들 때", "고민 상담", "기도 요청"))
+                  keywords=("고민 상담", "무료 상담", "익명 상담", "마음이 힘들 때",
+                            "심리 상담", "혼자 힘들 때"))
 
 
 # ────────────────────────────────────────────────────────── 함께 기도

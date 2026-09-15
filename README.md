@@ -1,6 +1,6 @@
 > 이 저장소에는 두 개의 프로젝트가 있습니다.
 > **INDIA 2030**(아래) 과 **[하나의 길 — ONE WAY](README-ONEWAY.md)**
-> (AI 상담사가 있는 신앙 홈페이지 · `python3 -m oneway serve`).
+> (먼저 듣는 상담사가 있는 홈페이지 · `python3 -m oneway serve`).
 
 # INDIA 2030 — 60초 영상 100편 자동 생성기
 

@@ -178,3 +178,20 @@ textarea{
   .hero h1{font-size:32px}
   h1{font-size:25px}
 }
+
+/* ── 조용한 것들 ─────────────────────────────────────────────
+   처음 온 사람에게 보이는 것은 적을수록 좋다.
+   깊은 곳으로 가는 문은 있되, 소리치지 않는다. */
+.quiet{opacity:.75}
+.btn.big{padding:15px 28px; font-size:17px}
+.hero .lead{max-width:34em; margin-inline:auto}
+.quiet-links{background:transparent; border-style:dashed}
+.quiet-links h2{font-size:16px; color:var(--muted)}
+.deeper{display:flex; gap:14px; flex-wrap:wrap; justify-content:center;
+  margin:18px auto; max-width:var(--maxw); font-size:13px}
+.deeper a{color:var(--muted); text-decoration:none}
+.deeper a:hover{color:var(--accent)}
+.today-peek .grid4{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+.chat h1{margin-bottom:.2em}
+.chat .quiet{margin-top:18px; line-height:1.8}
+.typing{letter-spacing:.3em; font-size:20px; color:var(--muted)}

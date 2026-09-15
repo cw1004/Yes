@@ -60,7 +60,17 @@ class Verse:
         return f"{name} {self.where.replace(',', ':')}"
 
     @property
+    def neutral(self) -> str:
+        """어느 쪽 표기를 쓰는 사람이든 찾을 수 있게, 라벨 없이 둘 다.
+
+        "(개신교 표기: …)" 라고 써 붙이는 순간 그 페이지는 교파 이야기가 된다.
+        처음 온 사람에게는 그것부터 보이면 안 된다.
+        """
+        return f"{self.ref} · {self.ref_protestant}"
+
+    @property
     def both(self) -> str:
+        """교파를 **직접 물었을 때만** 쓰는, 라벨이 붙은 표기."""
         return f"{self.ref} (개신교 표기: {self.ref_protestant})"
 
 

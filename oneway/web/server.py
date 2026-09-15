@@ -167,7 +167,9 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/":
             return render.home(cfg, daily_mod.build())
         if path == "/today":
-            return render.today(cfg, daily_mod.build())
+            # 아직 신앙 언어를 꺼내지 않은 사람에게는 말씀·기도 칸을 보여 주지 않는다
+            return render.today(cfg, daily_mod.build(),
+                                faith=(v.depth >= 2 and not v.faith_blocked))
         if path == "/counsel":
             return render.counsel_page(cfg, (query.get("q") or [""])[0][:300])
         if path == "/believe":
