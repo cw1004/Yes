@@ -26,6 +26,7 @@ from .content import entries, fifty, pages as pages_mod
 from .content import paths as paths_mod
 from .book import content as book_content
 from .book import epub as epub_mod
+from .book import personal as personal_mod
 from .book import render as book_render
 from .counselor import llm
 from .counselor.engine import Counselor
@@ -202,21 +203,38 @@ def cmd_build(args: argparse.Namespace) -> int:
 def cmd_book(args: argparse.Namespace) -> int:
     """전자책을 만든다. EPUB / HTML / 마크다운."""
     cfg = build_config(args)
-    book = book_content.build_book(site_url=cfg.site_url, isbn=args.isbn or "")
+    stem = "혼자-두지-않겠습니다"
+
+    if args.session:
+        # 그 사람을 위한 책. 주제와 깊이만 쓰고 원문은 가져오지 않는다.
+        visitor = Store(cfg.sessions_dir).load(args.session)
+        if visitor is None:
+            print(f"  그런 세션이 없습니다: {args.session}")
+            return 1
+        profile = personal_mod.build_profile(visitor)
+        if not profile.enough:
+            print(f"  이야기가 아직 모자랍니다 "
+                  f"(주제 {len(profile.topics)}개 · 발화 {profile.turns}회).")
+            return 1
+        book = personal_mod.build_personal_book(profile, cfg.site_url)
+        stem = "당신을-위한-책"
+        print(f"\n  주제: {', '.join(profile.topics)} · 깊이 {profile.depth}")
+    else:
+        book = book_content.build_book(site_url=cfg.site_url, isbn=args.isbn or "")
+
     out = Path(args.out) if args.out else cfg.out_dir.parent / "book"
     out.mkdir(parents=True, exist_ok=True)
     made: List[Path] = []
 
     formats = args.format or ["epub", "html", "md"]
     if "epub" in formats:
-        made.append(epub_mod.write_epub(book, out / "혼자-두지-않겠습니다.epub",
-                                        cfg.site_url))
+        made.append(epub_mod.write_epub(book, out / f"{stem}.epub", cfg.site_url))
     if "html" in formats:
-        f = out / "혼자-두지-않겠습니다.html"
+        f = out / f"{stem}.html"
         f.write_text(book_render.single_html(book, cfg.site_url), encoding="utf-8")
         made.append(f)
     if "md" in formats:
-        f = out / "혼자-두지-않겠습니다.md"
+        f = out / f"{stem}.md"
         f.write_text(book_render.markdown(book, cfg.site_url), encoding="utf-8")
         made.append(f)
 
@@ -356,6 +374,7 @@ def make_parser() -> argparse.ArgumentParser:
     s.add_argument("--format", nargs="+", choices=("epub", "html", "md"),
                    help="만들 형식 (기본: 전부)")
     s.add_argument("--isbn", help="ISBN 이 있으면 넣으세요")
+    s.add_argument("--session", help="이 세션의 상담 내용에 맞춘 책을 만듭니다")
     s.set_defaults(func=cmd_book)
 
     s = common(sub.add_parser("ledger", help="판매·기부 장부 보기/기록"))

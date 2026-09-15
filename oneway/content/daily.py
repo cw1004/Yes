@@ -35,7 +35,7 @@ LOVE_30: List[str] = [
     "미안하다고 먼저 말하기",
     "식당이나 가게에서 일하는 분에게 눈 맞추며 인사하기",
     "잘한 일을 본 사람에게 그 자리에서 말해 주기",
-    "오늘 한 사람을 위해 30초 기도하기",
+    "오늘 한 사람을 30초 동안 마음에 담아 보기",
     "버스나 지하철에서 자리 양보하기",
     "혼자 있는 사람 옆에 가서 앉기",
     "거절당해도 기분 나빠하지 않기",
@@ -51,10 +51,76 @@ LOVE_30: List[str] = [
     "오늘 하루 휴대폰 없이 한 끼 먹기",
     "누군가를 위해 문을 잡아 주기",
     "칭찬을 아끼지 않기",
-    "생각만 해도 불편한 사람의 이름을 기도에 넣기",
+    "생각만 해도 불편한 사람의 안부를 한 번 궁금해해 보기",
     "오늘 도움받은 일을 기억해 두었다가 갚기",
     "가장 가까운 사람에게 사랑한다고 말하기",
 ]
+
+# 오늘의 질문 (깊이 0).
+# 「50가지」의 질문을 그대로 쓰면 50일 중 열흘은 신앙 언어가 나온다.
+# 처음 온 사람이 첫 화면에서 그걸 보면 거기서 끝난다. 그래서 따로 둔다.
+# 31개라서 30일 실천과 주기가 어긋나고, 같은 짝이 오래 반복되지 않는다.
+OPEN_QUESTIONS: List[str] = [
+    "오늘 하루 중 가장 마음에 걸렸던 순간은 언제였습니까?",
+    "요즘 가장 많은 힘을 빼앗아 가는 건 무엇입니까?",
+    "지금 걱정 중인 일 가운데 오늘 실제로 할 수 있는 건 무엇입니까?",
+    "최근에 '고맙다'는 말을 들은 게 언제였습니까?",
+    "요즘 내 이름을 제대로 불러 준 사람이 있었습니까?",
+    "오늘 하루에서 아주 작게라도 다행이었던 일 하나는 무엇입니까?",
+    "지금 가장 만나고 싶은 사람은 누구입니까?",
+    "미뤄 두고 있는 연락이 있습니까?",
+    "요즘 잠은 잘 주무십니까?",
+    "마지막으로 아무 목적 없이 쉰 날이 언제였습니까?",
+    "오늘 내가 지나쳐 간 사람이 있습니까?",
+    "지금 내 마음 상태에 이름을 붙인다면 뭐라고 하시겠습니까?",
+    "요즘 가장 자주 하는 혼잣말은 무엇입니까?",
+    "누구에게도 말하지 못한 일이 있습니까?",
+    "오늘 하루를 한 문장으로 적으면 뭐라고 쓰시겠습니까?",
+    "나는 내 값을 무엇으로 계산하고 있습니까?",
+    "그 기준은 누가 정해 준 것입니까?",
+    "지금 바꿀 수 있는 것과 바꿀 수 없는 것 중 어느 쪽이 더 큽니까?",
+    "오늘 누군가에게 하지 못하고 삼킨 말이 있습니까?",
+    "요즘 무엇이 당신을 웃게 했습니까?",
+    "1년 전의 나에게 한마디 한다면 무엇이라고 하시겠습니까?",
+    "지금 가장 두려운 것은 무엇입니까?",
+    "그 일이 정말 일어난다면 곁에 남아 줄 사람은 누구일까요?",
+    "오늘 내 시간은 주로 어디에 쓰였습니까?",
+    "요즘 몸은 어떻습니까? 마음 말고 몸이요.",
+    "마지막으로 진심을 말한 것은 언제였습니까?",
+    "지금 당장 도움이 필요한 사람이 주변에 있습니까?",
+    "오늘 스스로에게 해 주고 싶은 말이 있습니까?",
+    "지금 딱 한 가지만 달라진다면 무엇이 달라지면 좋겠습니까?",
+    "요즘 미루고 있는 아주 작은 일 하나는 무엇입니까?",
+    "오늘 하루, 당신은 무엇으로 버텼습니까?",
+]
+
+
+def question_of_day(index: int, faith: bool = False) -> str:
+    """오늘의 질문. 깊이 0 에서는 신앙 언어가 없는 쪽에서 고른다."""
+    if faith:
+        return fifty.of_the_day(index).question
+    return OPEN_QUESTIONS[index % len(OPEN_QUESTIONS)]
+
+
+# 신앙 언어를 스스로 연 사람에게만 바꿔서 보여 주는 항목.
+# 목록 전체를 두 벌 만들지 않고, 달라지는 날만 갈아 끼운다.
+LOVE_30_FAITH: Dict[int, str] = {
+    11: "오늘 한 사람을 위해 30초 기도하기",
+    27: "생각만 해도 불편한 사람의 이름을 기도에 넣기",
+}
+
+
+def love_of_day(index: int, faith: bool = False) -> str:
+    """오늘의 한 걸음.
+
+    깊이 0 인 사람에게는 종교 언어가 들어간 항목을 보여 주지 않는다.
+    같은 날이라도 사람에 따라 다른 문장이 나간다.
+    """
+    i = index % len(LOVE_30)
+    if faith and i in LOVE_30_FAITH:
+        return LOVE_30_FAITH[i]
+    return LOVE_30[i]
+
 
 # 이번 주의 질문 — 하루보다 조금 더 오래 머무는 질문.
 WEEKLY_QUESTIONS: List[str] = [
@@ -105,7 +171,8 @@ def _teaser(b: fifty.Belief) -> str:
     return f"내일은 「{b.title}」 — {b.seo_title.split('?')[0].strip()}"
 
 
-def build(on: Optional[date] = None) -> Daily:
+def build(on: Optional[date] = None, faith: bool = False) -> Daily:
+    """하루치 카드. ``faith`` 는 방문자가 스스로 연 깊이다."""
     on = on or date.today()
     idx = day_index(on)
     b = fifty.of_the_day(idx)
@@ -120,14 +187,14 @@ def build(on: Optional[date] = None) -> Daily:
         verse_ref=v.ref,
         verse_ref_protestant=v.ref_protestant,
         verse_gist=v.gist,
-        question=b.question,
+        question=question_of_day(idx, faith),
         prayer=b.prayer,
-        love=LOVE_30[idx % len(LOVE_30)],
+        love=love_of_day(idx, faith),
         weekly_question=WEEKLY_QUESTIONS[(idx // 7) % len(WEEKLY_QUESTIONS)],
         tomorrow_teaser=_teaser(tomorrow),
     )
 
 
-def range_days(start: date, days: int) -> List[Daily]:
+def range_days(start: date, days: int, faith: bool = False) -> List[Daily]:
     """정적 빌드/미리보기용 — 며칠치를 한 번에."""
-    return [build(start + timedelta(days=i)) for i in range(days)]
+    return [build(start + timedelta(days=i), faith) for i in range(days)]

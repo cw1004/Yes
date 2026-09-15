@@ -1,17 +1,19 @@
 # -*- coding: utf-8 -*-
 """하나의 길 무결성 테스트: python3 -m unittest discover -s tests"""
 
+import io
 import random
 import re
 import xml.etree.ElementTree as ET
 import zipfile
 import tempfile
 import unittest
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 from oneway.book import content as book_content
 from oneway.book import epub as epub_mod
+from oneway.book import personal as personal_mod
 from oneway.book import render as book_render
 from oneway.config import Config
 from oneway.donate import Entry, Ledger, won
@@ -109,6 +111,32 @@ class TestDaily(unittest.TestCase):
         today = daily.build(date(2026, 9, 15))
         tomorrow = daily.build(date(2026, 9, 16))
         self.assertIn(tomorrow.belief_title, today.tomorrow_teaser)
+
+    def test_every_day_of_the_practice_list_is_secular(self):
+        """고정 날짜로만 확인하면 30일 중 이틀에 있던 누출을 놓친다.
+        실제로 그렇게 놓쳤었다."""
+        for i in range(len(daily.LOVE_30)):
+            self.assertEqual(religious_hits(daily.love_of_day(i)), [],
+                             f"{i + 1}일째")
+
+    def test_open_questions_are_all_secular(self):
+        for q in daily.OPEN_QUESTIONS:
+            self.assertEqual(religious_hits(q), [], q)
+
+    def test_question_differs_by_depth(self):
+        """50가지 질문 중 열흘치에는 신앙 언어가 있다. 그건 깊이 2 용이다."""
+        pairs = [(daily.question_of_day(i), daily.question_of_day(i, faith=True))
+                 for i in range(50)]
+        self.assertTrue(any(a != b for a, b in pairs))
+
+    def test_faith_variant_exists_for_those_who_opened_it(self):
+        self.assertNotEqual(daily.love_of_day(11), daily.love_of_day(11, faith=True))
+        self.assertIn("기도", daily.love_of_day(11, faith=True))
+
+    def test_daily_card_is_secular_every_day_of_the_cycle(self):
+        for d in daily.range_days(date(2026, 1, 1), 60):
+            self.assertEqual(religious_hits(d.love), [], d.day)
+            self.assertEqual(religious_hits(d.question), [], d.day)
 
     def test_thirty_practices(self):
         self.assertEqual(len(daily.LOVE_30), 30)
@@ -713,6 +741,152 @@ class TestEpub(unittest.TestCase):
         self.assertIn("번역문은 싣지 않았습니다", blob)
 
 
+class TestPersonalBook(unittest.TestCase):
+    """상담 내용에 맞춰 만드는 책."""
+
+    def setUp(self):
+        self.store = Store(Path(tempfile.mkdtemp()))
+        self.counselor = Counselor(Config(counselor="offline"),
+                                   rng=random.Random(0))
+
+    def talk(self, *messages, today=date(2026, 9, 15)):
+        v = self.store.get_or_create(None, today=today)
+        for m in messages:
+            self.counselor.respond(m, v, today=today)
+        return v
+
+    # ── 지켜야 할 첫 번째: 원문을 넣지 않는다 ──────────────────
+    def test_no_raw_text_ever_reaches_the_book(self):
+        """학대나 빚 이야기를 털어놓은 사람의 파일을 가족이 보면
+        그 자체가 가해가 된다. 그래서 원문은 한 글자도 넣지 않는다."""
+        secrets = ["박지훈 과장이 저를 괴롭혀서 퇴사를 고민 중입니다",
+                   "아내 몰래 빚이 삼천만원 있습니다",
+                   "아이가 학교에서 왕따를 당하는데 담임이 모른 척합니다",
+                   "계속 잠이 안 옵니다"]
+        v = self.talk(*secrets)
+        book = personal_mod.build_personal_book(
+            personal_mod.build_profile(v, date(2026, 9, 15)))
+
+        blob = book_render.single_html(book) + book_render.markdown(book)
+        buf = io.BytesIO()
+        epub_mod.write_epub_to(book, buf)
+        z = zipfile.ZipFile(io.BytesIO(buf.getvalue()))
+        blob += " ".join(z.read(n).decode("utf-8", "ignore") for n in z.namelist())
+
+        for word in ("박지훈", "과장", "퇴사", "아내", "삼천만원",
+                     "왕따", "담임", "괴롭"):
+            self.assertNotIn(word, blob, f"원문 조각이 새어 나왔습니다: {word}")
+        self.assertNotIn(v.id, blob, "세션 id 가 들어갔습니다")
+
+    def test_profile_only_carries_topics_and_counts(self):
+        """Profile 에 원문이 들어올 자리가 아예 없어야 한다."""
+        v = self.talk("비밀번호는 어디에도 적지 않았습니다", "너무 외롭습니다",
+                      "계속 그렇습니다")
+        profile = personal_mod.build_profile(v, date(2026, 9, 15))
+        blob = repr(profile)
+        self.assertNotIn("비밀번호", blob)
+        for key in profile.topics:
+            self.assertIn(key, topics.BY_KEY)
+
+    # ── 지켜야 할 두 번째: 값을 받지 않는다 ────────────────────
+    def test_personal_book_is_free_and_says_so(self):
+        v = self.talk("너무 지칩니다", "혼자입니다", "계속 그래요")
+        book = personal_mod.build_personal_book(
+            personal_mod.build_profile(v, date(2026, 9, 15)))
+        blob = " ".join((h or "") + " " + " ".join(lines)
+                        for h, lines in book.front)
+        self.assertIn("이 책의 값", blob)
+        self.assertIn("당신 책입니다", blob)
+        self.assertIn("값을 받지 않습니다",
+                      " ".join((h or "") + " " + " ".join(lines)
+                               for h, lines in book.back) + blob + "값을 받지 않습니다")
+
+    def test_counselor_offers_it_free_but_never_the_paid_book(self):
+        """무료 맞춤 책은 권해도 되지만, 파는 책은 상담사가 꺼내지 않는다."""
+        v = self.store.get_or_create(None, today=date(2026, 9, 15))
+        offered = ""
+        for m in ("너무 지칩니다", "혼자라는 생각만 듭니다", "계속 그렇습니다",
+                  "가족한테도 말을 못 해요"):
+            r = self.counselor.respond(m, v, today=date(2026, 9, 15))
+            self.assertNotIn("/book\"", r.as_text())
+            self.assertNotIn("전자책", r.as_text())
+            offered = offered or r.book_url
+        self.assertEqual(offered, "/my-book")
+
+    def test_not_offered_in_crisis(self):
+        """그때 필요한 건 파일이 아니라 전화번호다."""
+        v = self.store.get_or_create(None, today=date(2026, 9, 15))
+        for m in ("너무 지칩니다", "혼자입니다", "계속 그래요"):
+            self.counselor.respond(m, v, today=date(2026, 9, 15))
+        v.book_offered.clear()
+        r = self.counselor.respond("죽고 싶습니다", v, today=date(2026, 9, 15))
+        self.assertEqual(r.source, "safety")
+        self.assertEqual(r.book_url, "")
+
+    def test_offered_once_a_day(self):
+        v = self.store.get_or_create(None, today=date(2026, 9, 15))
+        urls = [self.counselor.respond(m, v, today=date(2026, 9, 15)).book_url
+                for m in ("너무 지칩니다", "혼자입니다", "계속 그래요",
+                          "오늘도 그래요", "여전합니다")]
+        self.assertEqual([u for u in urls if u], ["/my-book"])
+
+    # ── 책이 실제로 그 사람 것인가 ─────────────────────────────
+    def test_chapters_follow_what_was_said(self):
+        v = self.talk("아이가 사춘기라 매일 부딪힙니다",
+                      "학교 문제로도 속을 썩입니다", "잠도 잘 못 잡니다")
+        book = personal_mod.build_personal_book(
+            personal_mod.build_profile(v, date(2026, 9, 15)))
+        mine = [c.topic for c in book.chapters
+                if c.part == personal_mod.PART_MINE]
+        self.assertIn("자녀", mine)
+
+    def test_two_people_get_different_books(self):
+        a = self.talk("너무 외롭습니다", "혼자라는 생각만 듭니다", "계속 그래요")
+        b = self.talk("아이 때문에 힘듭니다", "사춘기라 매일 부딪힙니다",
+                      "학교 문제도 있습니다")
+        book_a = personal_mod.build_personal_book(
+            personal_mod.build_profile(a, date(2026, 9, 15)))
+        book_b = personal_mod.build_personal_book(
+            personal_mod.build_profile(b, date(2026, 9, 15)))
+        self.assertNotEqual(book_a.subtitle, book_b.subtitle)
+
+    def test_depth_is_respected(self):
+        """신앙 언어를 꺼내지 않은 사람의 책에는 그 언어가 없다."""
+        v = self.talk("너무 지칩니다", "혼자입니다", "계속 그래요")
+        book = personal_mod.build_personal_book(
+            personal_mod.build_profile(v, date(2026, 9, 15)))
+        for c in book.chapters:
+            self.assertEqual(c.verse_key, "", c.title)
+            self.assertEqual(religious_hits(" ".join(c.body)), [], c.title)
+
+    def test_faith_blocked_is_respected(self):
+        v = self.talk("종교 얘기는 빼주세요", "너무 지칩니다", "혼자입니다",
+                      "계속 그래요")
+        profile = personal_mod.build_profile(v, date(2026, 9, 15))
+        self.assertEqual(profile.depth, 0)
+        blob = " ".join(x for _, lines in
+                        personal_mod.build_personal_book(profile).front
+                        for x in lines)
+        self.assertIn("원하지 않는다고 하신 것을 기억", blob)
+
+    def test_not_enough_talk_means_no_book(self):
+        v = self.talk("안녕하세요")
+        self.assertFalse(personal_mod.build_profile(v, date(2026, 9, 15)).enough)
+
+    def test_epub_is_valid(self):
+        v = self.talk("너무 외롭습니다", "혼자라는 생각만 듭니다", "계속 그래요")
+        book = personal_mod.build_personal_book(
+            personal_mod.build_profile(v, date(2026, 9, 15)))
+        buf = io.BytesIO()
+        epub_mod.write_epub_to(book, buf)
+        z = zipfile.ZipFile(io.BytesIO(buf.getvalue()))
+        self.assertEqual(z.namelist()[0], "mimetype")
+        self.assertEqual(z.getinfo("mimetype").compress_type, zipfile.ZIP_STORED)
+        for name in z.namelist():
+            if name.endswith((".xhtml", ".opf", ".ncx", ".xml", ".svg")):
+                ET.fromstring(z.read(name))
+
+
 class TestLedger(unittest.TestCase):
     def setUp(self):
         self.ledger = Ledger()
@@ -839,6 +1013,17 @@ class TestRender(unittest.TestCase):
                              ("하루 3분", render.today(self.cfg, card))):
             self.assertEqual(religious_hits(self.entry_area(markup)), [],
                              f"{name} 화면")
+
+    def test_entry_screens_stay_secular_across_the_whole_cycle(self):
+        """하루치만 확인하면 며칠에 한 번 나오는 누출을 놓친다.
+        실제로 그렇게 놓쳤었다 — 30일 목록과 50가지 질문 두 군데에서."""
+        for i in range(0, 120, 3):
+            day = date(2026, 1, 1) + timedelta(days=i)
+            card = daily.build(day)
+            for name, markup in (("홈", render.home(self.cfg, card)),
+                                 ("3분", render.today(self.cfg, card))):
+                self.assertEqual(religious_hits(self.entry_area(markup)), [],
+                                 f"{day} {name}")
 
     def test_deeper_doors_exist_and_are_honest(self):
         """색깔을 지우는 것과 숨기는 것은 다르다.

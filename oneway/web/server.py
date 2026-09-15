@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import io
 import json
 import logging
 import mimetypes
@@ -21,6 +22,9 @@ from urllib.parse import parse_qs, unquote, urlparse
 
 from .. import __version__
 from ..book import content as book_content
+from ..book import epub as epub_mod
+from ..book import personal as personal_mod
+from ..book import render as book_render
 from ..config import Config
 from ..donate import Ledger
 from ..content import daily as daily_mod
@@ -157,6 +161,9 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/healthz":
             return self.json_out({"ok": True, "version": __version__})
 
+        if path in ("/my-book.epub", "/my-book.html"):
+            return self.serve_my_book(path)
+
         if path.startswith("/api/"):
             return self.api_get(path)
 
@@ -176,9 +183,10 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/":
             return render.home(cfg, daily_mod.build())
         if path == "/today":
-            # 아직 신앙 언어를 꺼내지 않은 사람에게는 말씀·기도 칸을 보여 주지 않는다
-            return render.today(cfg, daily_mod.build(),
-                                faith=(v.depth >= 2 and not v.faith_blocked))
+            # 아직 신앙 언어를 꺼내지 않은 사람에게는 말씀·기도 칸은 물론
+            # '오늘의 한 걸음' 에서도 종교 언어가 나오지 않게 한다
+            faith = v.depth >= 2 and not v.faith_blocked
+            return render.today(cfg, daily_mod.build(faith=faith), faith=faith)
         if path == "/counsel":
             return render.counsel_page(cfg, (query.get("q") or [""])[0][:300])
         if path == "/believe":
@@ -189,6 +197,11 @@ class Handler(BaseHTTPRequestHandler):
             return render.book_page(cfg, self.site.book, cfg.book_stores)
         if path == "/book/ledger":
             return render.ledger_page(cfg, self.site.ledger())
+        if path == "/my-book":
+            profile = personal_mod.build_profile(v)
+            book = (personal_mod.build_personal_book(profile, cfg.site_url)
+                    if profile.enough else None)
+            return render.my_book_page(cfg, profile, book)
 
         m = PATH_RE.match(path)
         if m:
@@ -268,6 +281,46 @@ class Handler(BaseHTTPRequestHandler):
             return self.json_out({"progress": v.progress()}, sid=new_sid)
 
         self.json_out({"error": "not_found"}, 404)
+
+    def serve_my_book(self, path: str) -> None:
+        """맞춤 책 내려받기.
+
+        요청할 때마다 그 자리에서 만든다. 서버에 파일로 남기지 않는다.
+        남기면 그 파일이 곧 개인정보가 된다.
+        """
+        cfg = self.site.cfg
+        v, new_sid = self.visitor()
+        profile = personal_mod.build_profile(v)
+        if not profile.enough:
+            self.site.store.save(v)
+            return self.html(render.my_book_page(cfg, profile, None), 200, new_sid)
+
+        book = personal_mod.build_personal_book(profile, cfg.site_url)
+        self.site.store.save(v)
+
+        if path.endswith(".html"):
+            body = book_render.single_html(book, cfg.site_url).encode("utf-8")
+            return self._send(200, body, "text/html; charset=utf-8", new_sid)
+
+        buf = io.BytesIO()
+        epub_mod.write_epub_to(book, buf, cfg.site_url)
+        data = buf.getvalue()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/epub+zip")
+        self.send_header("Content-Length", str(len(data)))
+        self.send_header("Content-Disposition",
+                         'attachment; filename="my-book.epub"; '
+                         "filename*=UTF-8''%EB%8B%B9%EC%8B%A0%EC%9D%84-"
+                         "%EC%9C%84%ED%95%9C-%EC%B1%85.epub")
+        self.send_header("Cache-Control", "no-store")
+        if new_sid:
+            self.send_header(
+                "Set-Cookie",
+                f"{COOKIE}={new_sid}; Path=/; Max-Age={COOKIE_MAX_AGE}; "
+                "HttpOnly; SameSite=Lax")
+        self.end_headers()
+        if self.command != "HEAD":
+            self.wfile.write(data)
 
     # ------------------------------------------------------------ 정적 파일
     def serve_static(self, path: str) -> None:

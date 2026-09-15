@@ -192,14 +192,16 @@ def _cover(book: Book) -> str:
 """
 
 
-def write_epub(book: Book, target, site_url: str = "") -> Path:
-    """EPUB 파일 하나를 만든다."""
-    target = Path(target)
-    target.parent.mkdir(parents=True, exist_ok=True)
+def write_epub_to(book: Book, fileobj, site_url: str = "") -> None:
+    """열려 있는 대상(파일·메모리 버퍼)에 EPUB 을 쓴다.
+
+    맞춤 책은 내려받을 때마다 메모리에서 만들고 디스크에 남기지 않는다.
+    남기면 그 파일이 곧 개인정보가 된다.
+    """
     pages = _pages(book, site_url)
     modified = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
-    with zipfile.ZipFile(target, "w") as z:
+    with zipfile.ZipFile(fileobj, "w") as z:
         # mimetype 은 반드시 첫 번째, 압축하지 않고
         z.writestr(zipfile.ZipInfo("mimetype"), "application/epub+zip",
                    compress_type=zipfile.ZIP_STORED)
@@ -217,4 +219,12 @@ def write_epub(book: Book, target, site_url: str = "") -> Path:
         for name, _, markup in pages:
             z.writestr(f"OEBPS/{name}", markup,
                        compress_type=zipfile.ZIP_DEFLATED)
+
+
+def write_epub(book: Book, target, site_url: str = "") -> Path:
+    """EPUB 파일 하나를 만든다."""
+    target = Path(target)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with open(target, "wb") as f:
+        write_epub_to(book, f, site_url)
     return target

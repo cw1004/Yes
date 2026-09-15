@@ -40,6 +40,7 @@ class Chapter:
     step: str = ""
     closing: str = ""
     verse_key: str = ""    # 깊이 2 장에서만
+    topic: str = ""        # counselor/topics.py 의 주제 키 (맞춤 책에서 고를 때 쓴다)
 
     @property
     def slug(self) -> str:
@@ -135,7 +136,7 @@ Chapter(1, PART1, "지친 사람에게",
    "하지 마십시오. 그냥 앉아 있으십시오. 그게 오늘의 일입니다."),
   question="마지막으로 아무 목적 없이 쉰 날이 언제였습니까?",
   step="오늘 할 일 목록에서 한 가지를 내일로 미뤄 보세요.",
-  closing="쉬어도 됩니다. 조건 없이."),
+  closing="쉬어도 됩니다. 조건 없이.", topic="지침"),
 
 Chapter(2, PART1, "혼자라고 느끼는 밤에",
   ("외로움은 사람이 없어서 생기는 게 아닙니다. 나를 아는 사람이 없어서 "
@@ -153,7 +154,7 @@ Chapter(2, PART1, "혼자라고 느끼는 밤에",
    "'잘 지내?' 네 글자면 충분합니다."),
   question="요즘 내 이름을 제대로 불러 준 사람이 있었습니까?",
   step="연락이 끊긴 사람 한 명에게 안부 한 줄을 보내 보세요.",
-  closing="외로움은 옅어집니다. 대개 한 사람에서 시작합니다."),
+  closing="외로움은 옅어집니다. 대개 한 사람에서 시작합니다.", topic="외로움"),
 
 Chapter(3, PART1, "잠이 오지 않을 때",
   ("불안한 사람은 미래를 두 번 삽니다. 한 번은 침대에서 상상으로, "
@@ -173,7 +174,7 @@ Chapter(3, PART1, "잠이 오지 않을 때",
    "지치지 않고 계속 가는 방법입니다."),
   question="지금 걱정 중인 일 가운데 오늘 실제로 할 수 있는 건 무엇입니까?",
   step="걱정을 '오늘 할 수 있는 것'과 '오늘 못 하는 것'으로 나눠 적어 보세요.",
-  closing="새벽 세 시의 생각은 믿지 마십시오."),
+  closing="새벽 세 시의 생각은 믿지 마십시오.", topic="불안"),
 
 Chapter(4, PART1, "아무것도 하기 싫은 날",
   ("아무것도 하기 싫은 날이 며칠 이어지면, 사람은 자기를 미워하기 "
@@ -191,7 +192,7 @@ Chapter(4, PART1, "아무것도 하기 싫은 날",
    "오늘은 버티는 게 목표여도 충분합니다. 그것도 하루치 일입니다."),
   question="오늘 하루에서 아주 작게라도 다행이었던 일 하나는 무엇입니까?",
   step="커튼을 열고 햇빛을 10분만 쬐어 보세요.",
-  closing="지금 상태는 당신의 성격이 아니라 당신이 지나는 구간입니다."),
+  closing="지금 상태는 당신의 성격이 아니라 당신이 지나는 구간입니다.", topic="우울"),
 
 Chapter(5, PART1, "보고 싶은 사람이 있을 때",
   ("떠나보낸 사람이 있는 분들은 압니다. 시간이 지나면 괜찮아진다는 말이 "
@@ -209,7 +210,7 @@ Chapter(5, PART1, "보고 싶은 사람이 있을 때",
    "오늘은 그냥 보고 싶어 하셔도 됩니다."),
   question="그분에게 아직 하지 못한 말이 있습니까?",
   step="못 한 말을 편지로 써 보세요. 부치지 않아도 됩니다.",
-  closing="그리워해도 됩니다. 기한은 없습니다."),
+  closing="그리워해도 됩니다. 기한은 없습니다.", topic="상실"),
 
 Chapter(6, PART1, "가족이 가장 어려운 자리입니다",
   ("가족 이야기는 남에게 하기가 제일 어렵습니다. 말하면 우리 집 흉을 "
@@ -227,7 +228,7 @@ Chapter(6, PART1, "가족이 가장 어려운 자리입니다",
    "그것도 안 되는 날이 있습니다. 그런 날은 그냥 넘기셔도 됩니다."),
   question="가족 중 떠올리면 마음이 가장 무거워지는 사람은 누구입니까?",
   step="오늘 한 번, 평소보다 한 톤 낮춰 말해 보세요.",
-  closing="가족이라고 다 이해할 수 있는 건 아닙니다. 그래도 괜찮습니다."),
+  closing="가족이라고 다 이해할 수 있는 건 아닙니다. 그래도 괜찮습니다.", topic="가족"),
 
 Chapter(7, PART1, "용서가 안 될 때",
   ("용서하라는 말이 폭력처럼 들릴 때가 있습니다. 상처가 아직 아물지도 "
@@ -246,7 +247,7 @@ Chapter(7, PART1, "용서가 안 될 때",
    "오늘은 '오늘은 여기까지'라고만 적어 두십시오. 내일 또 하면 됩니다."),
   question="그 일에서 가장 아팠던 지점은 무엇이었습니까?",
   step="그 사람 이름을 적고 '오늘은 여기까지'라고 써 보세요.",
-  closing="미워하는 마음이 남아 있다고 당신이 나쁜 사람이 되는 건 아닙니다."),
+  closing="미워하는 마음이 남아 있다고 당신이 나쁜 사람이 되는 건 아닙니다.", topic="용서"),
 
 Chapter(8, PART1, "그 일로 자신을 벌하고 있다면",
   ("누구에게도 말하지 못한 일이 하나쯤 있습니다. 몇 년이 지나도 문득 "
@@ -264,7 +265,7 @@ Chapter(8, PART1, "그 일로 자신을 벌하고 있다면",
    "후회하고 있다는 것 자체가 이미 그때와 다른 사람이 되었다는 뜻입니다."),
   question="그 일로 스스로에게 내린 판결문이 있다면 무엇입니까?",
   step="자신에게 한 문장을 써 보세요. '그 일로 나를 계속 벌하지 않겠다.'",
-  closing="당신은 그 일보다 큽니다."),
+  closing="당신은 그 일보다 큽니다.", topic="죄책감"),
 
 Chapter(9, PART1, "내 값이 줄어든 것 같을 때",
   ("세상은 사람을 쓸모로 셈합니다. 얼마를 버는지, 어디에 다니는지, "
@@ -282,7 +283,7 @@ Chapter(9, PART1, "내 값이 줄어든 것 같을 때",
    "오늘 아무것도 못 하셨어도 괜찮습니다. 값은 그대로입니다."),
   question="나는 내 값을 무엇으로 계산하고 있습니까? 그 기준은 누가 정했습니까?",
   step="오늘 자신에게 한 문장만 다르게 말해 보세요. '그래도 잘 버텼다.'",
-  closing="값이 먼저 있고, 쓸모는 그 다음입니다."),
+  closing="값이 먼저 있고, 쓸모는 그 다음입니다.", topic="자존감"),
 
 Chapter(10, PART1, "왜 사는지 모르겠을 때",
   ("이 질문이 올라오는 시기가 있습니다. 대체로 조용해진 자리에 옵니다. "
@@ -302,7 +303,7 @@ Chapter(10, PART1, "왜 사는지 모르겠을 때",
    "아직 살아 보려 한다는 뜻입니다."),
   question="요즘 '왜 사는지 모르겠다'는 생각이 든 순간이 언제였습니까?",
   step="오늘 하루 중 '살아 있어서 다행이었다' 싶은 1분을 찾아 적어 보세요.",
-  closing="이 질문을 하고 있다는 건 아직 살아 보려 한다는 뜻입니다."),
+  closing="이 질문을 하고 있다는 건 아직 살아 보려 한다는 뜻입니다.", topic="의미"),
 ]
 
 
@@ -352,8 +353,9 @@ PART3_INTRO = (
 )
 
 
-def _practice_chapter(no: int) -> Chapter:
-    lines = tuple(f"{i + 1}일째 — {x}" for i, x in enumerate(daily_mod.LOVE_30))
+def _practice_chapter(no: int, faith: bool = False) -> Chapter:
+    lines = tuple(f"{i + 1}일째 — {daily_mod.love_of_day(i, faith)}"
+                  for i in range(len(daily_mod.LOVE_30)))
     return Chapter(
         no=no, part=PART3, title="30일, 한 걸음씩",
         body=("하루에 하나씩, 순서대로 하지 않으셔도 됩니다.",) + lines,
@@ -441,7 +443,7 @@ def build_book(site_url: str = "", isbn: str = "") -> Book:
     chapters = list(ESSAYS)
     chapters += _journey_chapters(len(ESSAYS) + 1)
     n = len(chapters)
-    chapters.append(_practice_chapter(n + 1))
+    chapters.append(_practice_chapter(n + 1, faith=True))
     chapters.append(_weekly_chapter(n + 2))
 
     back = BACK
@@ -474,8 +476,12 @@ def build_book(site_url: str = "", isbn: str = "") -> Book:
 BOOK = build_book()
 
 
+# 부 도입글. 맞춤 책(personal.py)이 자기 부를 여기에 등록한다.
+PART_INTROS: Dict[str, tuple] = {PART2: PART2_INTRO, PART3: PART3_INTRO}
+
+
 def part_intro(part: str) -> tuple:
-    return {PART2: PART2_INTRO, PART3: PART3_INTRO}.get(part, ())
+    return PART_INTROS.get(part, ())
 
 
 def verse_line(key: str) -> str:

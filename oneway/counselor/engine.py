@@ -21,6 +21,7 @@ from ..config import Config
 from ..content import daily as daily_mod
 from ..content import entries as entries_mod
 from ..content import fifty
+from ..book import personal as personal_mod
 from ..content import paths as paths_mod
 from ..content import verses as verses_mod
 from . import depth as depth_mod
@@ -83,6 +84,7 @@ class Reply:
     follow_up: str = ""                # 다시 올 이유
     note: str = ""                     # 필요할 때만 붙는 안내 (매번 붙이지 않는다)
     path_url: str = ""                 # 여러 날에 걸쳐 갈 길을 권할 때
+    book_url: str = ""                 # 그 사람을 위한 책 (무료)
 
     def to_dict(self) -> Dict:
         d = asdict(self)
@@ -149,6 +151,7 @@ class Counselor:
         self._warn_about_pressure(reply, message, level)
         self._attach_links(reply, topic, risk, level, blocked)
         self._offer_path(reply, topic, turn_no, visitor, risk)
+        self._offer_personal_book(reply, visitor, risk, today)
         reply.follow_up = self._follow_up(visitor, today, level, turn_no, blocked)
 
         if visitor:
@@ -341,6 +344,27 @@ class Counselor:
             f"「{path.title}」이라고, 하루에 한 걸음씩 가는 길을 만들어 뒀습니다. "
             f"하루 3분이면 되고, 중간에 멈추셔도 됩니다."])
         reply.links.insert(0, Link(path.title, path.url, "path"))
+
+    def _offer_personal_book(self, reply: Reply, visitor: Optional[Visitor],
+                             risk: safety.Risk, today: date) -> None:
+        """이야기가 쌓이면 그 사람을 위한 책을 만들어 준다.
+
+        위기 상황에서는 권하지 않는다. 그때 필요한 건 파일이 아니라 전화번호다.
+        값은 받지 않는다. 마음을 쏟아낸 직후에 값을 붙이는 건 상담이 아니다.
+        """
+        if risk.urgent or not visitor:
+            return
+        profile = personal_mod.build_profile(visitor, today)
+        if not profile.enough:
+            return
+        if not visitor.offer_book(today):
+            return
+        reply.book_url = "/my-book"
+        reply.text = persona.join([reply.text,
+            "여기까지 하신 이야기로 책을 한 권 묶어 두었습니다. "
+            "당신이 꺼낸 이야기만 골라 담았고, 당신이 쓴 문장은 "
+            "한 글자도 넣지 않았습니다. 값은 없습니다."])
+        reply.links.insert(0, Link("당신을 위한 책 (무료)", "/my-book", "book"))
 
     def _set_verse(self, reply: Reply, key: str, topic: topics_mod.Topic,
                    turn_no: int, level: int) -> None:

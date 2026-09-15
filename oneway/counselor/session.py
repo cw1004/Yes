@@ -86,6 +86,8 @@ class Visitor:
     paths: Dict[str, int] = field(default_factory=dict)
     # 이미 권한 여정 — 같은 사람에게 두 번 권하지 않는다
     paths_offered: List[str] = field(default_factory=list)
+    # 맞춤 책을 권한 날짜들. 이야기가 쌓이면 다시 권할 수 있다.
+    book_offered: List[str] = field(default_factory=list)
 
     # ---------------------------------------------------------------- 기록
     def touch(self, today: Optional[date] = None) -> None:
@@ -148,6 +150,18 @@ class Visitor:
         if path_slug in self.paths_offered or path_slug in self.paths:
             return False
         self.paths_offered.append(path_slug)
+        return True
+
+    def offer_book(self, today: Optional[date] = None) -> bool:
+        """맞춤 책을 권해도 되는지 묻고, 권했다고 기록한다.
+
+        하루에 한 번까지만. 매번 권하면 상담이 아니라 배포가 된다.
+        """
+        iso = (today or date.today()).isoformat()
+        if iso in self.book_offered:
+            return False
+        self.book_offered.append(iso)
+        self.book_offered = self.book_offered[-30:]
         return True
 
     def block_faith(self) -> None:
@@ -238,6 +252,7 @@ class Visitor:
             faith_blocked=bool(d.get("faith_blocked", False)),
             paths={k: int(v) for k, v in (d.get("paths") or {}).items()},
             paths_offered=list(d.get("paths_offered", [])),
+            book_offered=list(d.get("book_offered", [])),
         )
 
 

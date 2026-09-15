@@ -734,6 +734,82 @@ def ledger_page(cfg: Config, ledger) -> str:
                   keywords=("기부 내역 공개", "수익금 전액 기부", "투명 기부"))
 
 
+# ────────────────────────────────────────────────────────── 당신을 위한 책
+def my_book_page(cfg: Config, profile, book=None) -> str:
+    """상담 내용에 맞춰 만든 책을 받아 가는 자리.
+
+    이야기가 아직 모자라면 책 대신 '조금 더 이야기해 보자'고 말한다.
+    """
+    if book is None:
+        body = f"""
+<h1>당신을 위한 책</h1>
+<p class="lead">아직 이야기가 조금 모자랍니다.</p>
+<section class="card">
+  <p>이 책은 당신이 꺼낸 이야기로 만듭니다.
+     그래서 몇 마디는 더 나눠야 만들 수 있습니다.</p>
+  <p class="muted">지금까지 {profile.turns}번 말씀해 주셨습니다.
+     세 번쯤 더 이야기하시면 만들어 드리겠습니다.</p>
+  <p><a class="btn primary" href="/counsel">이야기하러 가기</a></p>
+</section>"""
+        return layout(cfg, title="당신을 위한 책",
+                      desc="상담에서 나눈 이야기에 맞춰 책을 만들어 드립니다. 무료입니다.",
+                      path="/my-book", body=body)
+
+    toc = "".join(
+        f'<li><span class="no">{c.no:02d}</span>'
+        f'<span class="t">{E(c.title)}</span>'
+        f'<span class="s">{E(c.part)}</span></li>' for c in book.chapters)
+    labels = "".join(f'<span class="ask">{E(k)}</span>' for k in book.keywords)
+
+    body = f"""
+<h1>당신을 위한 책</h1>
+<p class="lead">{E(book.subtitle)}</p>
+
+<section class="card give">
+  <h2>어떻게 고른 책인가</h2>
+  <p>당신이 가장 많이 꺼낸 이야기부터 담았습니다.</p>
+  <div class="chips">{labels}</div>
+  <p class="muted">{len(book.chapters)}장 · 한 장에 3분</p>
+  <p><a class="btn primary big" href="/my-book.epub">EPUB 받기</a>
+     <a class="btn" href="/my-book.html">브라우저에서 읽기</a></p>
+  <p class="small">EPUB 은 휴대폰·태블릿·전자책 단말기에서 읽으실 수 있습니다.
+     HTML 은 열어서 '인쇄 → PDF 로 저장'을 누르면 PDF 가 됩니다.</p>
+</section>
+
+<section class="card">
+  <h2>적지 않은 것</h2>
+  <p><b>당신이 쓴 문장은 이 책에 한 글자도 들어 있지 않습니다.</b></p>
+  <p>무엇에 대해 이야기했는지만 남기고, 무슨 말을 했는지는 가져오지
+     않았습니다. 이 파일을 다른 사람이 열어도 당신의 이야기는 알 수 없습니다.</p>
+  <p>이름도, 연락처도, 아이디도 없습니다. 원래 받지 않았습니다.</p>
+  <p class="small">파일은 받으실 때마다 그 자리에서 만들어집니다.
+     서버에 저장해 두지 않습니다.</p>
+</section>
+
+<section class="card">
+  <h2>값은 없습니다</h2>
+  <p>당신 책입니다. 값을 받지 않습니다.</p>
+  <p class="small">이 사이트에는 파는 책이 하나 따로 있고, 그 수익은 전쟁으로
+     부모를 잃은 아이들과 남겨진 가족들에게 전액 전달됩니다.
+     마음이 생기시면 그때 보시면 됩니다. 지금은 아닙니다.</p>
+</section>
+
+<section>
+  <h2 class="section-title">차례</h2>
+  <ol class="belief-list book-toc">{toc}</ol>
+</section>
+
+<section class="card next">
+  <p>이야기가 쌓이면 이 책도 달라집니다. 다음에 만들면 다른 장이 들어옵니다.</p>
+  <p><a class="btn primary" href="/counsel">더 이야기하기</a>
+     <a class="btn" href="/today">오늘의 3분</a></p>
+</section>"""
+    return layout(cfg, title="당신을 위한 책",
+                  desc="상담에서 나눈 이야기에 맞춰 만든 책입니다. "
+                       "당신이 쓴 문장은 들어 있지 않습니다. 무료입니다.",
+                  path="/my-book", body=body)
+
+
 def not_found(cfg: Config) -> str:
     body = ('<h1>여기에는 아무것도 없습니다</h1>'
             '<p class="lead">길을 잘못 드셨어도 괜찮습니다.</p>'
