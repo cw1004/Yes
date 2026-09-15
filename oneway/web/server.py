@@ -23,6 +23,7 @@ from .. import __version__
 from ..config import Config
 from ..content import daily as daily_mod
 from ..content import entries, fifty, pages as pages_mod
+from ..content import paths as paths_mod
 from ..counselor.engine import Counselor
 from ..counselor.session import Store, Visitor
 from ..seo import robots_txt, sitemap_xml
@@ -34,6 +35,7 @@ COOKIE = "ow_sid"
 COOKIE_MAX_AGE = 60 * 60 * 24 * 365
 STATIC_DIR = Path(__file__).parent / "static"
 BELIEF_RE = re.compile(r"^/believe/(\d{1,2})-([a-z0-9\-]+)$")
+PATH_RE = re.compile(r"^/path/([a-z0-9\-]+)(?:/(\d{1,2}))?$")
 MAX_BODY = 64 * 1024
 
 
@@ -154,7 +156,7 @@ class Handler(BaseHTTPRequestHandler):
         v, new_sid = self.visitor()
         try:
             markup = self.page(path, query, v)
-        except KeyError:
+        except (KeyError, ValueError):
             self.site.store.save(v)
             return self.html(render.not_found(cfg), 404, new_sid)
         self.site.store.save(v)
@@ -176,6 +178,18 @@ class Handler(BaseHTTPRequestHandler):
             return render.believe_index(cfg)
         if path == "/pray":
             return render.pray_page(cfg, self.site.pray_count())
+
+        m = PATH_RE.match(path)
+        if m:
+            journey = paths_mod.get(m.group(1))
+            if m.group(2) is None:
+                return render.path_index(cfg, journey, v.path_step(journey.slug))
+            step = journey.step(int(m.group(2)))     # 범위 밖이면 ValueError
+            v.walk(journey.slug, step.no)
+            # 여정 뒷부분은 신앙의 언어를 쓴다. 거기까지 걸어온 것이 곧 동의다.
+            if step.depth >= 2 and not v.faith_blocked:
+                v.open_depth(step.depth)
+            return render.path_step(cfg, journey, step)
 
         m = BELIEF_RE.match(path)
         if m:

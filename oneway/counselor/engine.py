@@ -21,10 +21,19 @@ from ..config import Config
 from ..content import daily as daily_mod
 from ..content import entries as entries_mod
 from ..content import fifty
+from ..content import paths as paths_mod
 from ..content import verses as verses_mod
 from . import depth as depth_mod
 from . import llm, persona, safety, topics as topics_mod
 from .session import Visitor
+
+
+# 날짜·집단 압박 신호를 받았을 때 되묻는 말.
+# 이럴 때는 일반적인 상담 질문보다 이쪽이 먼저다.
+PRESSURE_QUESTION = {
+    "date": "그 말을 들었을 때 어떤 기분이 드셨습니까? 안심이 되던가요, 더 조급해지던가요?",
+    "group": "그 모임 밖에, 지금 상황을 그대로 말할 수 있는 사람이 한 명이라도 있습니까?",
+}
 
 
 # 신앙 색을 띈 입구들. 깊이 0 에서는 이쪽으로 안내하지 않는다.
@@ -73,6 +82,7 @@ class Reply:
     verse_gist: str = ""
     follow_up: str = ""                # 다시 올 이유
     note: str = ""                     # 필요할 때만 붙는 안내 (매번 붙이지 않는다)
+    path_url: str = ""                 # 여러 날에 걸쳐 갈 길을 권할 때
 
     def to_dict(self) -> Dict:
         d = asdict(self)
@@ -134,7 +144,11 @@ class Counselor:
                      or self._offline_reply(topic, turn_no, level, risk))
 
         reply.depth = level
+        # 날짜를 정해 주거나 통제하는 집단의 신호는 깊이와 무관하게 다룬다.
+        # 안전 문제라서 깊이 0 에서도 그대로 나간다.
+        self._warn_about_pressure(reply, message, level)
         self._attach_links(reply, topic, risk, level, blocked)
+        self._offer_path(reply, topic, turn_no, visitor, risk)
         reply.follow_up = self._follow_up(visitor, today, level, turn_no, blocked)
 
         if visitor:
@@ -270,6 +284,64 @@ class Counselor:
         return reply
 
     # ------------------------------------------------------------ 보조
+    def _warn_about_pressure(self, reply: Reply, message: str, level: int) -> None:
+        """날짜를 정해 주는 사람, 통제하는 집단에 대한 경고.
+
+        이 사이트는 두려움으로 사람을 모으지 않는다. 그래서 반대로 경고한다.
+        위기 응답에는 덧붙이지 않는다. 그때는 다른 것이 먼저다.
+        """
+        if reply.source == "safety":
+            return
+        pressure = safety.assess_pressure(message)
+        if not pressure.any:
+            return
+        lines = safety.pressure_message(pressure)
+        if pressure.date_setting and level >= depth_mod.FAITH:
+            lines.append(
+                "성경 자체가 그날과 그 시간은 아무도 모른다고 못 박습니다. "
+                "천사도 모르고 아들도 모른다고 합니다. "
+                "가톨릭도 개신교도 이 점에서는 갈리지 않습니다.")
+        lines.append(PRESSURE_QUESTION[
+            "group" if pressure.group_pressure else "date"])
+
+        # 일반 상담 내용 뒤에 붙이면 정작 중요한 말이 다섯 문단 뒤로 밀린다.
+        # 받아 주는 첫 문단만 남기고 곧바로 이 이야기를 한다.
+        opening = reply.text.split("\n\n")[0] if reply.text else ""
+        reply.text = persona.join([opening] + lines)
+        reply.note = persona.SOFT_NOTE
+
+    def _offer_path(self, reply: Reply, topic: topics_mod.Topic, turn_no: int,
+                    visitor: Optional[Visitor], risk: safety.Risk) -> None:
+        """한 번에 정리되지 않는 고민에는 여러 날에 걸쳐 갈 길을 권한다.
+
+        한 번만 권한다. 두 번 권하면 광고가 된다.
+        대화가 한 번은 오간 뒤에 권한다. 첫마디부터 링크를 내미는 건 상담이 아니다.
+        """
+        if risk.urgent or turn_no < 2:
+            return
+        path = paths_mod.for_topic(topic.key)
+        if not path:
+            return
+        if visitor:
+            walked = visitor.path_step(path.slug)
+            if walked:
+                # 이미 걷고 있는 사람에게는 다음 걸음을 가리킨다
+                if walked < path.days:
+                    nxt = walked + 1
+                    reply.path_url = path.step_url(nxt)
+                    reply.links.insert(0, Link(
+                        f"{nxt}번째 걸음 — {path.step(nxt).title}",
+                        reply.path_url, "path"))
+                return
+            if not visitor.offer_path(path.slug):
+                return
+        reply.path_url = path.url
+        reply.text = persona.join([reply.text,
+            f"이건 한 번에 정리되는 이야기가 아닙니다. "
+            f"「{path.title}」이라고, 하루에 한 걸음씩 가는 길을 만들어 뒀습니다. "
+            f"하루 3분이면 되고, 중간에 멈추셔도 됩니다."])
+        reply.links.insert(0, Link(path.title, path.url, "path"))
+
     def _set_verse(self, reply: Reply, key: str, topic: topics_mod.Topic,
                    turn_no: int, level: int) -> None:
         """성경 주소는 **깊이 2 이상에서만** 붙는다.

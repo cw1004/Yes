@@ -195,3 +195,28 @@ textarea{
 .chat h1{margin-bottom:.2em}
 .chat .quiet{margin-top:18px; line-height:1.8}
 .typing{letter-spacing:.3em; font-size:20px; color:var(--muted)}
+
+/* ── 여정 ────────────────────────────────────────────────────
+   한 번에 정리되지 않는 고민을 여러 날에 걸쳐 가는 길. */
+.path-list{list-style:none; padding:0; margin:18px 0; counter-reset:step}
+.path-list li{border:1px solid var(--line); border-radius:var(--radius);
+  margin:10px 0; background:var(--card)}
+.path-list a{display:grid; grid-template-columns:40px 1fr; gap:2px 12px;
+  padding:16px 18px; text-decoration:none}
+.path-list .no{grid-row:1/4; align-self:start; width:30px; height:30px;
+  border-radius:50%; background:var(--soft); color:var(--muted);
+  display:flex; align-items:center; justify-content:center;
+  font-weight:700; font-size:14px}
+.path-list .t{font-weight:650}
+.path-list .s{color:var(--muted); font-size:13.5px; line-height:1.65}
+.path-list .muted{font-size:12px}
+.path-list li.done{opacity:.6}
+.path-list li.done .no{background:var(--accent); color:var(--accent-ink)}
+.path-list li.next{border-color:var(--accent); border-width:2px}
+.path-list li.next .no{background:var(--accent); color:var(--accent-ink)}
+.path-step .bar{margin:10px 0 22px}
+.closing-line{font-size:19px; font-weight:650; color:var(--accent);
+  border-top:1px solid var(--line); padding-top:20px; margin-top:26px}
+.links a[href^="/path/"]{border-color:var(--accent); color:var(--accent)}
+.journey-peek{border-color:var(--accent); border-width:2px}
+.journey-peek h2{margin-top:.2em; font-size:22px}

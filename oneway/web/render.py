@@ -20,7 +20,9 @@ from .. import BRAND, BRAND_EN, TAGLINE
 from ..config import Config
 from ..content import daily as daily_mod
 from ..content import entries as entries_mod
-from ..content import fifty, pages as pages_mod, verses as verses_mod
+from ..content import fifty, pages as pages_mod
+from ..content import paths as paths_mod
+from ..content import verses as verses_mod
 
 E = html.escape
 
@@ -149,6 +151,7 @@ def home(cfg: Config, card: daily_mod.Daily) -> str:
                 f'<b>{E(e.label)}</b><span class="g-desc">{E(e.hero)}</span></a>')
 
     gates = "".join(gate_card(entries_mod.get(k)) for k in SURFACE_GATES)
+    journey = paths_mod.PATHS[0]
     deeper = "".join(
         f'<a href="{entries_mod.get(k).url}">{E(entries_mod.get(k).title)}</a>'
         for k in DEEPER_GATES)
@@ -169,6 +172,15 @@ def home(cfg: Config, card: daily_mod.Daily) -> str:
 <section>
   <h2 class="section-title">어떤 이야기든 괜찮습니다</h2>
   <div class="gates">{gates}</div>
+</section>
+
+<section class="card journey-peek">
+  <p class="muted">{journey.days}일 · 하루 3분</p>
+  <h2>{E(journey.hero)}</h2>
+  <p>전쟁, 지진, 기후. 요즘 그런 생각이 드는 분이 정말 많습니다.</p>
+  <p class="muted">한 번에 정리되지 않는 이야기라서 {journey.days}일로 나눴습니다.
+     중간에 멈추셔도 됩니다.</p>
+  <a class="btn primary" href="{journey.url}">첫 걸음 보기</a>
 </section>
 
 <section class="card today-peek">
@@ -424,6 +436,110 @@ def counsel_page(cfg: Config, prefill: str = "") -> str:
                   path="/counsel", body=body,
                   keywords=("고민 상담", "무료 상담", "익명 상담", "마음이 힘들 때",
                             "심리 상담", "혼자 힘들 때"))
+
+
+# ────────────────────────────────────────────────────────── 여정
+# 한 번에 정리되지 않는 고민은 여러 날에 걸쳐 간다.
+# 걸음마다 깊이가 깊어지고, 각 걸음은 다음 걸음을 예고해 다시 오게 만든다.
+def path_index(cfg: Config, path: paths_mod.Path, walked: int = 0) -> str:
+    def row(st: paths_mod.Step) -> str:
+        done = "done" if st.no <= walked else ""
+        nxt = "next" if st.no == walked + 1 else ""
+        mark = "✓" if st.no <= walked else str(st.no)
+        deep = ("", " · 오래된 이야기", " · 신앙의 언어")[st.depth]
+        return (f'<li class="{done} {nxt}"><a href="{path.step_url(st.no)}">'
+                f'<span class="no">{mark}</span>'
+                f'<span class="t">{E(st.title)}</span>'
+                f'<span class="s">{E(st.description)}</span>'
+                f'<span class="muted">{st.no}번째 걸음{E(deep)}</span></a></li>')
+
+    steps = "".join(row(st) for st in path.steps)
+    start = walked + 1 if walked < path.days else path.days
+    label = "이어서 걷기" if walked else "첫 걸음 시작하기"
+    hero = (f'<section class="hero small-hero"><p class="eyebrow">'
+            f'하루 한 걸음 · {path.days}일</p><h1>{E(path.hero)}</h1></section>')
+    jsonld = {
+        "@context": "https://schema.org", "@type": "HowTo",
+        "name": path.title, "description": path.description,
+        "totalTime": f"P{path.days}D", "inLanguage": "ko",
+        "step": [{"@type": "HowToStep", "position": st.no, "name": st.title,
+                  "url": cfg.site_url.rstrip("/") + path.step_url(st.no)}
+                 for st in path.steps],
+    }
+    body = f"""
+<section class="card lead-block">{_p(path.intro)}</section>
+<p><a class="btn primary big" href="{path.step_url(start)}">{E(label)}</a></p>
+<ol class="path-list">{steps}</ol>
+<section class="card next">
+  <p>지금 바로 이야기하고 싶으시면 그렇게 하셔도 됩니다.</p>
+  <p><a class="btn primary" href="/counsel">지금 이야기하기</a>
+     <a class="btn" href="/today">오늘의 3분</a></p>
+</section>"""
+    return layout(cfg, title=path.seo_title, desc=path.description,
+                  path=path.url, body=body, hero=hero,
+                  keywords=path.keywords, jsonld=jsonld)
+
+
+def path_step(cfg: Config, path: paths_mod.Path, st: paths_mod.Step) -> str:
+    paras = "".join(
+        f'<p>{E(x)}</p>' if "\n" not in x
+        else '<p>' + "<br>".join(E(line) for line in x.split("\n")) + '</p>'
+        for x in st.body)
+
+    verses = ""
+    if st.verses:
+        verses = "".join(_verse_box(verses_mod.get(k)) for k in st.verses)
+
+    prayer = ""
+    if st.prayer:
+        prayer = (f'<section class="step-card"><h2>30초 기도</h2>'
+                  f'<p class="big">{E(st.prayer)}</p></section>')
+
+    nxt = ""
+    if st.no < path.days:
+        nxt = (f'<p class="big">{E(st.teaser)}</p>'
+               f'<p><a class="btn primary" href="{path.step_url(st.no + 1)}">'
+               f'다음 걸음 — {E(path.step(st.no + 1).title)}</a></p>'
+               f'<p class="small">내일 오셔도 됩니다. 오늘은 여기까지가 좋습니다.</p>')
+    else:
+        nxt = (f'<p class="big">{E(st.teaser)}</p>'
+               f'<p><a class="btn primary" href="/today">오늘의 3분</a>'
+               f'<a class="btn" href="/counsel">더 이야기하기</a></p>')
+
+    prev_link = (f'<a href="{path.step_url(st.no - 1)}">← {st.no - 1}번째 걸음</a>'
+                 if st.no > 1 else f'<a href="{path.url}">← 전체 보기</a>')
+    next_link = (f'<a href="{path.step_url(st.no + 1)}">{st.no + 1}번째 걸음 →</a>'
+                 if st.no < path.days else "")
+
+    jsonld = {
+        "@context": "https://schema.org", "@type": "Article",
+        "headline": st.seo_title, "description": st.description,
+        "inLanguage": "ko", "isPartOf": {"@type": "HowTo", "name": path.title},
+        "url": cfg.site_url.rstrip("/") + path.step_url(st.no),
+    }
+    body = f"""
+<article class="path-step" data-path="{E(path.slug)}" data-step="{st.no}">
+  <p class="muted"><a href="{path.url}">{E(path.title)}</a> ·
+     {st.no} / {path.days}번째 걸음</p>
+  <div class="bar"><i style="width:{int(st.no / path.days * 100)}%"></i></div>
+  <h1>{E(st.title)}</h1>
+  {paras}
+  {verses}
+  <section class="step-card"><h2>오늘의 질문</h2>
+    <p class="big">{E(st.question)}</p>
+    <textarea rows="3" placeholder="적어 보셔도 됩니다. 저장되지 않습니다."></textarea>
+  </section>
+  <section class="step-card"><h2>오늘의 한 걸음</h2>
+    <p class="big">{E(st.action)}</p>
+  </section>
+  {prayer}
+  <p class="closing-line">{E(st.closing)}</p>
+  <section class="card next">{nxt}</section>
+  <nav class="pager">{prev_link}{next_link}</nav>
+</article>"""
+    return layout(cfg, title=st.seo_title, desc=st.description,
+                  path=path.step_url(st.no), body=body,
+                  keywords=st.keywords, jsonld=jsonld)
 
 
 # ────────────────────────────────────────────────────────── 함께 기도

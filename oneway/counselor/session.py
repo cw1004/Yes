@@ -82,6 +82,10 @@ class Visitor:
     depth: int = 0
     # "종교 이야기는 하지 말아 달라"고 한 적이 있는가. 한 번 참이면 되돌리지 않는다.
     faith_blocked: bool = False
+    # 여정(content/paths.py) 진행 — {여정 slug: 마지막으로 읽은 걸음}
+    paths: Dict[str, int] = field(default_factory=dict)
+    # 이미 권한 여정 — 같은 사람에게 두 번 권하지 않는다
+    paths_offered: List[str] = field(default_factory=list)
 
     # ---------------------------------------------------------------- 기록
     def touch(self, today: Optional[date] = None) -> None:
@@ -127,6 +131,24 @@ class Visitor:
             self.depth = 0
             return
         self.depth = max(self.depth, min(int(level), 2))
+
+    def walk(self, path_slug: str, step_no: int) -> None:
+        """여정을 한 걸음 걸었다. 뒤로 돌아가 읽어도 최고 기록은 유지한다."""
+        self.paths[path_slug] = max(self.paths.get(path_slug, 0), int(step_no))
+
+    def path_step(self, path_slug: str) -> int:
+        """지금까지 몇 걸음까지 왔는지. 시작 안 했으면 0."""
+        return int(self.paths.get(path_slug, 0))
+
+    def offer_path(self, path_slug: str) -> bool:
+        """여정을 권해도 되는지 묻고, 권했다고 기록한다.
+
+        두 번 권하면 광고가 된다. 한 번만 권한다.
+        """
+        if path_slug in self.paths_offered or path_slug in self.paths:
+            return False
+        self.paths_offered.append(path_slug)
+        return True
 
     def block_faith(self) -> None:
         """종교 이야기를 원하지 않는다고 말했다. 두 번 묻지 않는다."""
@@ -193,6 +215,7 @@ class Visitor:
             "practices_done": len(self.done_practices),
             "practices_total": 30,
             "main_topic": self.main_topic,
+            "paths": dict(self.paths),
         }
 
     # ---------------------------------------------------------------- 직렬화
@@ -213,6 +236,8 @@ class Visitor:
             nickname=d.get("nickname", ""),
             depth=int(d.get("depth", 0)),
             faith_blocked=bool(d.get("faith_blocked", False)),
+            paths={k: int(v) for k, v in (d.get("paths") or {}).items()},
+            paths_offered=list(d.get("paths_offered", [])),
         )
 
 

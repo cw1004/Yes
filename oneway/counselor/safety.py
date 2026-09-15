@@ -137,3 +137,90 @@ def crisis_message(risk: Risk, region: str = "KR") -> List[str]:
 def disclaimer() -> str:
     return ("이 상담은 AI가 드리는 것으로, 의료·심리 치료나 사제·목회자의 상담을 "
             "대신하지 않습니다.")
+
+
+# ══════════════════════════════════════════════════════════════════════
+# 종말 불안을 노리는 집단으로부터의 보호
+#
+# 재난이 이어지면 반드시 날짜를 말하는 사람들이 나타난다.
+# 불안한 사람에게 확실한 숫자를 주기 때문에 이상하게 설득력이 있다.
+# 이 사이트는 사람을 두려움으로 모으지 않는다. 그래서 반대로 경고한다.
+#
+# 역사상 날짜를 정한 사람들은 전부 틀렸고, 그 과정에서 사람들이
+# 집을 팔고 학교를 그만두고 가족과 끊겼다. 날짜는 틀렸지만 피해는 남았다.
+# ══════════════════════════════════════════════════════════════════════
+
+# 누군가 '언제'를 정해 주었다는 신호
+DATE_SETTING_PATTERNS: List[str] = [
+    r"\d{4}\s*년.{0,10}(종말|끝난|끝나|멸망|심판|재림|휴거)",
+    r"(종말|재림|휴거|심판).{0,10}\d{4}\s*년",
+    r"(몇|\d+)\s*년\s*(안에|밖에|안\s*남|못\s*남|남았)",
+    r"날짜(를|가)?\s*(받|정해|계산|나왔|안다|알려)",
+    r"때가\s*(정해|찼|이르렀)", r"예언(대로|이\s*맞)", r"마지막\s*때라",
+    r"시한부", r"그날이\s*(왔|온다|가까)",
+]
+
+# 통제하는 집단의 신호 — 신앙이 아니라 지배다
+GROUP_PRESSURE_PATTERNS: List[str] = [
+    r"(헌금|재산|집|전 재산).{0,12}(다|전부|바치|팔|내라|내놓)",
+    r"(팔아|바치)라고\s*(해|합|했|함)",
+    r"가족(과|을|하고).{0,10}(끊|버리|떠나|연락하지)",
+    r"(학교|직장|일).{0,6}그만두라",
+    r"나가면.{0,10}(벌|저주|지옥|망)",
+    r"질문(하면|을 하면).{0,10}(안 |혼|못하게)",
+    r"밖에\s*나가지\s*말", r"다른\s*사람(한테|에게)\s*말하지\s*말",
+    r"여기\s*아니면\s*구원", r"우리만\s*(구원|진리|참)",
+]
+
+
+@dataclass
+class Pressure:
+    """종말 날짜·집단 압박 신호."""
+    date_setting: bool = False
+    group_pressure: bool = False
+    matched: tuple = ()
+
+    @property
+    def any(self) -> bool:
+        return self.date_setting or self.group_pressure
+
+    def to_dict(self) -> Dict:
+        return asdict(self)
+
+
+def assess_pressure(text: str) -> Pressure:
+    """날짜를 정해 주거나 통제하는 집단의 신호가 있는지 본다."""
+    if not text:
+        return Pressure()
+    dates = _hits(text, DATE_SETTING_PATTERNS)
+    group = _hits(text, GROUP_PRESSURE_PATTERNS)
+    return Pressure(date_setting=bool(dates), group_pressure=bool(group),
+                    matched=tuple(dates + group))
+
+
+def pressure_message(p: Pressure) -> List[str]:
+    """날짜 이야기를 들은 사람에게 해 줘야 할 말.
+
+    신앙 언어를 쓸 수 있는 깊이에서는 engine 이 성경 근거를 덧붙인다.
+    깊이 0 에서도 이 경고만은 그대로 나간다. 안전 문제이기 때문이다.
+    """
+    out: List[str] = []
+    if p.date_setting:
+        out.append(
+            "그런데 한 가지는 분명히 말씀드리고 싶습니다. "
+            "끝나는 날짜를 정해서 말한 사람들은 지금까지 전부 틀렸습니다. "
+            "한 번도 맞은 적이 없습니다.")
+        out.append(
+            "그 과정에서 사람들이 집을 팔았고, 학교를 그만뒀고, 가족과 끊겼습니다. "
+            "날짜는 틀렸지만 그 피해는 되돌아오지 않았습니다. "
+            "날짜를 말하며 서두르라는 곳은 일단 한 걸음 물러나서 보셔도 됩니다.")
+    if p.group_pressure:
+        out.append(
+            "말씀하신 걸 들으니 마음에 걸리는 게 있습니다. "
+            "재산을 요구하거나, 가족과 끊으라 하거나, 나가면 벌을 받는다고 하거나, "
+            "질문을 막는 곳이라면 — 그건 믿음이 아니라 통제에 가깝습니다.")
+        out.append(
+            "거기서 나오셔도 됩니다. 그건 배신이 아닙니다. "
+            "혼자 결정하기 어려우시면 바깥의 믿을 만한 사람 한 명에게 "
+            "지금 상황을 그대로 말해 보십시오. 그 한 사람이 중요합니다.")
+    return out

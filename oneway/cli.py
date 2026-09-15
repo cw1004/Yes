@@ -23,6 +23,7 @@ from . import BRAND, BRAND_EN, TAGLINE, __version__
 from .config import Config
 from .content import daily as daily_mod
 from .content import entries, fifty, pages as pages_mod
+from .content import paths as paths_mod
 from .counselor import llm
 from .counselor.engine import Counselor
 from .counselor.session import Store, Visitor
@@ -121,6 +122,9 @@ def cmd_check(args: argparse.Namespace) -> int:
           f"입구 {len(entries.ENTRIES)}개 · 고정 페이지 {len(pages_mod.PAGES)}개")
     print(f"  상담 주제      : {len(topics_mod.TOPICS)}개 "
           f"(종교 언어 없이 답할 수 있는 주제 {surface}개)")
+    for j in paths_mod.PATHS:
+        print(f"  여정          : {j.title} — {j.days}걸음 "
+              f"(종교 언어 없는 걸음 {sum(1 for x in j.steps if x.depth < 2)}개)")
     print(f"  색인 대상 URL  : {len(all_urls())}개")
     print()
     if not key:
@@ -167,6 +171,10 @@ def cmd_build(args: argparse.Namespace) -> int:
         write(e.url, render.gate_page(cfg, e))
     for p in pages_mod.PAGES:
         write(p.url, render.static_page(cfg, p))
+    for j in paths_mod.PATHS:
+        write(j.url, render.path_index(cfg, j))
+        for st in j.steps:
+            write(j.step_url(st.no), render.path_step(cfg, j, st))
 
     (out / "404.html").write_text(render.not_found(cfg), encoding="utf-8")
     (out / "sitemap.xml").write_text(sitemap_xml(cfg), encoding="utf-8")

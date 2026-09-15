@@ -11,7 +11,7 @@ from datetime import date
 from typing import List, Tuple
 
 from .config import Config
-from .content import entries, fifty, pages
+from .content import entries, fifty, pages, paths
 
 # (경로, 우선순위, 변경주기)
 def all_urls() -> List[Tuple[str, str, str]]:
@@ -25,6 +25,10 @@ def all_urls() -> List[Tuple[str, str, str]]:
     urls += [(e.url, "0.8", "monthly") for e in entries.ENTRIES]
     urls += [(b.url, "0.7", "monthly") for b in fifty.BELIEFS]
     urls += [(p.url, "0.7", "monthly") for p in pages.PAGES]
+    # 여정 — 재난·종말 불안은 검색량이 크고 경쟁이 적은 영역이다
+    for j in paths.PATHS:
+        urls.append((j.url, "0.9", "monthly"))
+        urls += [(j.step_url(s.no), "0.7", "monthly") for s in j.steps]
     return urls
 
 

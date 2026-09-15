@@ -9,7 +9,7 @@ from datetime import date
 from pathlib import Path
 
 from oneway.config import Config
-from oneway.content import daily, entries, fifty, pages, verses
+from oneway.content import daily, entries, fifty, pages, paths, verses
 from oneway.counselor import depth, persona, safety, topics
 from oneway.counselor.engine import Counselor
 from oneway.counselor.session import Store, Visitor, valid_id
@@ -107,6 +107,97 @@ class TestDaily(unittest.TestCase):
     def test_thirty_practices(self):
         self.assertEqual(len(daily.LOVE_30), 30)
         self.assertEqual(len(set(daily.LOVE_30)), 30)
+
+
+class TestPaths(unittest.TestCase):
+    def setUp(self):
+        self.path = paths.get("anxious-times")
+
+    def test_structure(self):
+        self.assertEqual(self.path.days, 9)
+        self.assertEqual([s.no for s in self.path.steps], list(range(1, 10)))
+        self.assertEqual(len({s.slug for s in self.path.steps}), 9)
+
+    def test_depth_only_increases(self):
+        """여정은 얕은 데서 시작해 깊어진다. 거꾸로 가면 안 된다."""
+        depths = [s.depth for s in self.path.steps]
+        self.assertEqual(depths, sorted(depths))
+        self.assertEqual(depths[0], 0)
+        self.assertEqual(depths[-1], 2)
+
+    def test_shallow_steps_are_secular(self):
+        """앞부분은 종교 이야기 없이 혼자서도 도움이 되어야 한다."""
+        for st in self.path.steps:
+            if st.depth >= 2:
+                continue
+            blob = " ".join((st.title, st.seo_title, st.description,
+                             st.question, st.action, st.closing) + st.body)
+            self.assertEqual(religious_hits(blob), [], f"{st.no}걸음: {st.title}")
+
+    def test_deep_steps_have_their_material(self):
+        for st in self.path.steps:
+            if st.depth < 2:
+                self.assertEqual(st.verses, (), f"{st.no}걸음")
+                self.assertEqual(st.prayer, "", f"{st.no}걸음")
+            else:
+                self.assertTrue(st.verses and st.prayer, f"{st.no}걸음")
+                for k in st.verses:
+                    verses.get(k)
+
+    def test_every_step_pulls_to_the_next(self):
+        """다음 걸음 예고가 없으면 다시 올 이유가 없다."""
+        for st in self.path.steps:
+            self.assertTrue(st.teaser.strip(), f"{st.no}걸음")
+
+    def test_the_date_warning_is_in_the_journey(self):
+        """종말 불안은 날짜를 정하는 집단이 사람을 끌어가는 통로다.
+        그 경고가 빠지면 이 여정은 오히려 위험해진다."""
+        st = self.path.step(8)
+        blob = " ".join(st.body)
+        self.assertIn("아무도 모른다", blob)
+        self.assertIn("전부 틀렸습니다", blob)
+        self.assertIn("통제", blob)
+        self.assertIn("가톨릭과 개신교", blob)
+
+    def test_topic_lookup(self):
+        self.assertEqual(paths.for_topic("종말").slug, "anxious-times")
+        self.assertIsNone(paths.for_topic("자녀"))
+
+    def test_bad_step_raises(self):
+        with self.assertRaises(ValueError):
+            self.path.step(99)
+        with self.assertRaises(KeyError):
+            paths.get("nope")
+
+
+class TestPressure(unittest.TestCase):
+    """날짜를 정해 주는 사람과 통제하는 집단으로부터의 보호."""
+
+    def test_date_setting_detected(self):
+        for t in ("2027년에 종말이 온다고 하던데요",
+                  "몇 년 안 남았다고 하더라고요",
+                  "날짜를 받았다고 합니다",
+                  "시한부 종말론이라던데요"):
+            self.assertTrue(safety.assess_pressure(t).date_setting, t)
+
+    def test_group_pressure_detected(self):
+        for t in ("재산을 다 바치라고 합니다",
+                  "가족과 연락 끊으라고 해요",
+                  "나가면 지옥 간다고 합니다",
+                  "질문하면 안 된다고 하네요"):
+            self.assertTrue(safety.assess_pressure(t).group_pressure, t)
+
+    def test_ordinary_worry_is_not_flagged(self):
+        for t in ("요즘 전쟁 날까 봐 무섭습니다",
+                  "지진 뉴스를 보면 불안해요",
+                  "교회에 헌금을 얼마나 해야 할지 모르겠어요"):
+            self.assertFalse(safety.assess_pressure(t).any, t)
+
+    def test_message_names_the_history(self):
+        msg = " ".join(safety.pressure_message(
+            safety.assess_pressure("2027년에 끝난다고 합니다")))
+        self.assertIn("전부 틀렸습니다", msg)
+        self.assertNotIn("**", msg)          # 말풍선은 평문이다
 
 
 class TestSafety(unittest.TestCase):
@@ -389,6 +480,49 @@ class TestCounselor(unittest.TestCase):
             r = self.counselor.respond(message, v)
             self.assertEqual(r.depth, depth.OPEN, message)
             self.assertEqual(religious_hits(r.as_text()), [], message)
+
+    # ── 한 번에 끝나지 않는 고민 ───────────────────────────────
+    def test_apocalyptic_anxiety_stays_secular_first(self):
+        r = self.talk("요즘 전쟁 날까 봐 잠이 안 옵니다")
+        self.assertEqual(r.topic, "종말")
+        self.assertEqual(r.depth, depth.OPEN)
+        self.assertEqual(religious_hits(r.as_text()), [])
+
+    def test_journey_is_offered_once_and_not_on_the_first_word(self):
+        v = self.store.get_or_create(None)
+        first = self.counselor.respond("지진 뉴스만 보면 불안합니다", v)
+        self.assertEqual(first.path_url, "", "첫마디부터 링크를 내미는 건 상담이 아니다")
+        second = self.counselor.respond("자꾸 그 생각이 납니다", v)
+        self.assertEqual(second.path_url, "/path/anxious-times")
+        third = self.counselor.respond("오늘도 그래요", v)
+        self.assertEqual(third.path_url, "", "두 번 권하면 광고가 된다")
+
+    def test_journey_points_to_the_next_step(self):
+        v = self.store.get_or_create(None)
+        v.walk("anxious-times", 3)
+        self.counselor.respond("전쟁이 무섭습니다", v)
+        r = self.counselor.respond("계속 생각이 납니다", v)
+        self.assertEqual(r.path_url, "/path/anxious-times/4")
+
+    def test_date_setting_warning_leads_the_reply(self):
+        """중요한 말이 다섯 문단 뒤에 있으면 읽히지 않는다."""
+        r = self.talk("어떤 모임에서 2027년에 끝난다고, 재산 다 바치라고 합니다")
+        paras = r.text.split("\n\n")
+        self.assertIn("전부 틀렸습니다", paras[1])
+        self.assertIn("통제", r.text)
+        self.assertTrue(r.note)
+
+    def test_date_warning_works_even_at_depth_zero(self):
+        """안전 문제라서 종교 언어를 못 쓰는 깊이에서도 그대로 나간다."""
+        r = self.talk("친구가 몇 년 안 남았다고 자꾸 그럽니다")
+        self.assertEqual(r.depth, depth.OPEN)
+        self.assertIn("전부 틀렸습니다", r.text)
+        self.assertEqual(religious_hits(r.text), [])
+
+    def test_crisis_beats_the_date_warning(self):
+        r = self.talk("2027년에 끝난다는데 그냥 죽고 싶습니다")
+        self.assertEqual(r.source, "safety")
+        self.assertNotIn("전부 틀렸습니다", r.text)
 
     # ── 사람인 척하지 않는다 ───────────────────────────────────
     def test_identity_answered_honestly(self):
