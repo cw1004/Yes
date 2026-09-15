@@ -17,12 +17,16 @@ import json
 from typing import Dict, Iterable, List, Optional, Sequence
 
 from .. import BRAND, BRAND_EN, TAGLINE
+from .. import donate as donate_mod
 from ..config import Config
 from ..content import daily as daily_mod
 from ..content import entries as entries_mod
 from ..content import fifty, pages as pages_mod
 from ..content import paths as paths_mod
 from ..content import verses as verses_mod
+
+# 장부 페이지에서 책 이름을 쓰기 위해
+BOOK_TITLE = "혼자 두지 않겠습니다"
 
 E = html.escape
 
@@ -66,6 +70,7 @@ NAV = [
 
 # 깊은 곳으로 가는 문. 페이지 아래쪽에만 조용히 둔다.
 DEEPER = [
+    ("/book", "전자책 · 수익 전액 기부"),
     ("/believe", "우리가 함께 믿는 50가지"),
     ("/left-church", "나는 교회를 떠났습니다"),
     ("/pray", "함께 기도"),
@@ -566,6 +571,167 @@ def pray_page(cfg: Config, count_today: int = 0) -> str:
                   desc="혼자 기도하기 힘든 날, 한 줄만 맡겨 두십시오. 공개되지 않습니다.",
                   path="/pray", body=body,
                   keywords=("기도 요청", "중보기도", "기도 지향"))
+
+
+# ────────────────────────────────────────────────────────── 전자책
+def book_page(cfg: Config, book, stores: Sequence = ()) -> str:
+    """책 소개 겸 판매 페이지.
+
+    한 가지 원칙: **사지 못하는 사람이 미안해지지 않게 한다.**
+    같은 내용을 사이트에서 무료로 읽을 수 있다고 분명히 적는다.
+    이 책은 여유가 있는 분이 여유가 없는 분을 돕는 방식이다.
+    """
+    toc = "".join(
+        f'<li><span class="no">{c.no:02d}</span>'
+        f'<span class="t">{E(c.title)}</span></li>'
+        for c in book.chapters[:10])
+    buy = "".join(
+        f'<a class="btn primary" href="{E(u)}" rel="noopener">{E(n)}</a>'
+        for n, u in stores) or \
+        '<p class="muted">판매처는 준비되는 대로 여기에 올리겠습니다.</p>'
+
+    hero = f"""<section class="hero small-hero">
+  <p class="eyebrow">전자책</p>
+  <h1>{E(book.title)}</h1>
+  <p class="tag">{E(book.subtitle)}</p>
+</section>"""
+
+    jsonld = {
+        "@context": "https://schema.org", "@type": "Book",
+        "name": book.title, "author": {"@type": "Organization", "name": book.author},
+        "inLanguage": "ko", "description": book.description,
+        "numberOfPages": len(book.chapters),
+        "url": cfg.site_url.rstrip("/") + "/book",
+    }
+    body = f"""
+<section class="card lead-block">
+  <p>이 책은 해결책을 주려고 쓴 책이 아닙니다.</p>
+  <p>지금 힘든 당신이 잠깐 앉아 있을 자리를 만들려고 썼습니다.</p>
+  <p class="muted">{len(book.chapters)}장 · 한 장에 3분 · 하루 한 장씩 읽으면 한 달</p>
+</section>
+
+<section class="card give">
+  <h2>이 책을 산 돈은 저자가 가져가지 않습니다</h2>
+  <p>플랫폼 수수료와 세금을 제외하고 <b>실제로 정산되어 들어온 금액 전부</b>를
+     전쟁으로 부모를 잃은 아이들, 남겨진 가족들, 가난한 이웃을 돕는 단체에
+     전달합니다.</p>
+  <p>말로 끝나지 않도록 판매 부수와 정산 금액, 전달한 날짜와 단체 이름을
+     공개된 장부에 적습니다. 누구나 확인할 수 있습니다.</p>
+  <p><a class="btn" href="/book/ledger">공개 장부 보기</a></p>
+</section>
+
+<section class="card">
+  <h2>사지 않으셔도 됩니다</h2>
+  <p>형편이 여의치 않으시면 사지 마십시오. 같은 내용을 이 사이트에서
+     <b>무료로</b> 읽으실 수 있습니다.</p>
+  <p>이 책은 여유가 있는 분이 여유가 없는 분을 돕는 방식으로 만들어졌습니다.
+     당신이 지금 도움이 필요한 쪽이라면, 그냥 받으시면 됩니다.</p>
+  <p><a class="btn" href="/counsel">지금 이야기하기</a>
+     <a class="btn" href="/path/anxious-times">불안한 시대를 지나는 9일</a></p>
+</section>
+
+<section>
+  <h2 class="section-title">이런 이야기가 들어 있습니다</h2>
+  <ol class="belief-list book-toc">{toc}</ol>
+  <p class="muted">그리고 「불안한 시대를 지나는 9일」 전문과
+     「30일, 한 걸음씩」이 함께 실려 있습니다.</p>
+</section>
+
+<section class="card next">
+  <h2>사기</h2>
+  {buy}
+  <p class="small">EPUB 파일입니다. 휴대폰·태블릿·전자책 단말기에서 읽으실 수 있습니다.</p>
+</section>
+
+<section class="card">
+  <h2>이 책에 대해 밝혀 둘 것</h2>
+  <p class="small">이 책은 치료나 진료를 대신하지 않습니다.
+     많이 위험하다고 느끼시면 먼저 109(자살예방 상담전화, 24시간 무료)로
+     연락하십시오.</p>
+  <p class="small">성경 번역본의 문장은 한 줄도 싣지 않았습니다.
+     어느 대목인지 주소만 적고, 내용은 직접 풀어 썼습니다.</p>
+</section>"""
+    return layout(cfg, title=f"{book.title} — {book.subtitle}",
+                  desc=book.description, path="/book", body=body, hero=hero,
+                  keywords=book.keywords, jsonld=jsonld)
+
+
+def ledger_page(cfg: Config, ledger) -> str:
+    """공개 장부. 숫자를 숨기지 않는 것이 이 페이지의 전부다."""
+    s = ledger.summary()
+
+    def row(e) -> str:
+        if e.kind == "sale":
+            return (f'<tr><td>{E(e.date)}</td><td>판매</td>'
+                    f'<td>{E(e.channel)}</td>'
+                    f'<td class="num">{e.copies:,}부</td>'
+                    f'<td class="num">{donate_mod.won(e.settled)}</td></tr>')
+        return (f'<tr class="give-row"><td>{E(e.date)}</td><td>전달</td>'
+                f'<td>{E(e.to)}{" · " + E(e.receipt) if e.receipt else ""}</td>'
+                f'<td class="num">—</td>'
+                f'<td class="num">{donate_mod.won(e.amount)}</td></tr>')
+
+    rows = "".join(row(e) for e in sorted(ledger.entries,
+                                          key=lambda x: x.date, reverse=True))
+    if not rows:
+        rows = ('<tr><td colspan="5" class="muted">'
+                '아직 판매가 시작되지 않았습니다.</td></tr>')
+
+    causes = "".join(f"<li>{E(c)}</li>" for c in s["causes"])
+    by_cause = "".join(
+        f'<li>{E(to)} — <b>{donate_mod.won(amount)}</b></li>'
+        for to, amount in s["by_cause"].items())
+
+    body = f"""
+<h1>공개 장부</h1>
+<p class="lead">「{E(BOOK_TITLE)}」를 판 돈이 어디로 갔는지 그대로 적습니다.</p>
+
+<section class="card give">
+  <h2>약속</h2>
+  <p>{E(s['promise'])}를 아래 분들에게 전달합니다.</p>
+  <ul>{causes}</ul>
+  <p class="small">정가 기준 매출이 아니라 <b>실제로 통장에 들어온 정산금</b>을
+     기준으로 합니다. 전자책 플랫폼은 보통 30~40%를 가져가기 때문에,
+     정가 기준으로 약속하면 지킬 수 없는 약속이 됩니다.</p>
+</section>
+
+<section class="card">
+  <h2>지금까지</h2>
+  <div class="grid4">
+    <div><b>판매 부수</b><p>{s['copies']:,}부</p></div>
+    <div><b>실제 정산금</b><p>{donate_mod.won(s['settled'])}</p></div>
+    <div><b>전달한 금액</b><p>{donate_mod.won(s['donated'])}</p></div>
+    <div><b>저자가 가져간 돈</b><p>0원</p></div>
+  </div>
+  <p class="small">이행률 {s['percent']}%</p>
+  <div class="bar"><i style="width:{s['percent']}%"></i></div>
+  <p class="small">표시 매출(정가 × 부수)은 {donate_mod.won(s['gross'])}입니다.
+     이 중 실제로 들어온 돈이 {donate_mod.won(s['settled'])}이고,
+     그 전부가 전달 대상입니다.</p>
+</section>
+
+{'<section class="card"><h2>전달한 곳</h2><ul class="give-list">' + by_cause + '</ul></section>' if by_cause else ''}
+
+<section>
+  <h2 class="section-title">내역</h2>
+  <div class="table-wrap">
+    <table class="ledger">
+      <thead><tr><th>날짜</th><th>구분</th><th>내용</th>
+                 <th class="num">부수</th><th class="num">금액</th></tr></thead>
+      <tbody>{rows}</tbody>
+    </table>
+  </div>
+  <p class="small">마지막 갱신 {E(s['updated'] or '—')}</p>
+</section>
+
+<section class="card next">
+  <p><a class="btn" href="/book">책 소개로</a>
+     <a class="btn primary" href="/counsel">지금 이야기하기</a></p>
+</section>"""
+    return layout(cfg, title="공개 장부 — 책을 판 돈은 어디로 갔는가",
+                  desc="판매 부수, 실제 정산금, 전달한 금액과 단체를 그대로 공개합니다.",
+                  path="/book/ledger", body=body,
+                  keywords=("기부 내역 공개", "수익금 전액 기부", "투명 기부"))
 
 
 def not_found(cfg: Config) -> str:

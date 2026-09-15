@@ -46,12 +46,22 @@ class Config:
     google_verify: str = ""        # 구글 서치콘솔 소유확인 코드
     contact_email: str = ""
 
+    # --- 전자책 ---
+    # 판매처 [(이름, 주소), ...]. 준비되는 대로 채워 넣으세요.
+    book_stores: List[tuple] = field(default_factory=list)
+    book_isbn: str = ""
+
     # --- 안전 ---
     crisis_region: str = "KR"      # 위기 상황 안내에 사용할 지역 코드
 
     @property
     def sessions_dir(self) -> Path:
         return self.data_dir / "sessions"
+
+    @property
+    def ledger_file(self) -> Path:
+        """판매·기부 장부. 공개 페이지가 이 파일을 그대로 읽는다."""
+        return self.data_dir / "ledger.json"
 
     def api_key(self) -> Optional[str]:
         key = os.environ.get(self.api_key_env, "").strip()
@@ -66,6 +76,8 @@ class Config:
                 continue
             if k in ("data_dir", "out_dir"):
                 v = Path(v)
+            if k == "book_stores":
+                v = [tuple(x) for x in v]
             setattr(cfg, k, v)
         return cfg
 

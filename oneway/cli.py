@@ -24,9 +24,13 @@ from .config import Config
 from .content import daily as daily_mod
 from .content import entries, fifty, pages as pages_mod
 from .content import paths as paths_mod
+from .book import content as book_content
+from .book import epub as epub_mod
+from .book import render as book_render
 from .counselor import llm
 from .counselor.engine import Counselor
 from .counselor.session import Store, Visitor
+from .donate import Ledger, won
 from .seo import all_urls, robots_txt, sitemap_xml
 from .web import render
 
@@ -165,6 +169,9 @@ def cmd_build(args: argparse.Namespace) -> int:
     write("/counsel", render.counsel_page(cfg))
     write("/believe", render.believe_index(cfg))
     write("/pray", render.pray_page(cfg))
+    book = book_content.build_book(cfg.site_url, cfg.book_isbn)
+    write("/book", render.book_page(cfg, book, cfg.book_stores))
+    write("/book/ledger", render.ledger_page(cfg, Ledger.load(cfg.ledger_file)))
     for b in fifty.BELIEFS:
         write(b.url, render.belief_page(cfg, b))
     for e in entries.ENTRIES:
@@ -188,6 +195,87 @@ def cmd_build(args: argparse.Namespace) -> int:
     print("  ※ AI 상담사와 기도 지향은 서버(API)가 필요합니다.")
     print("     `python3 -m oneway serve` 로 함께 띄우거나,")
     print("     정적 호스팅 + 상담 API 서버를 따로 두십시오.\n")
+    return 0
+
+
+# ------------------------------------------------------------------ book
+def cmd_book(args: argparse.Namespace) -> int:
+    """전자책을 만든다. EPUB / HTML / 마크다운."""
+    cfg = build_config(args)
+    book = book_content.build_book(site_url=cfg.site_url, isbn=args.isbn or "")
+    out = Path(args.out) if args.out else cfg.out_dir.parent / "book"
+    out.mkdir(parents=True, exist_ok=True)
+    made: List[Path] = []
+
+    formats = args.format or ["epub", "html", "md"]
+    if "epub" in formats:
+        made.append(epub_mod.write_epub(book, out / "혼자-두지-않겠습니다.epub",
+                                        cfg.site_url))
+    if "html" in formats:
+        f = out / "혼자-두지-않겠습니다.html"
+        f.write_text(book_render.single_html(book, cfg.site_url), encoding="utf-8")
+        made.append(f)
+    if "md" in formats:
+        f = out / "혼자-두지-않겠습니다.md"
+        f.write_text(book_render.markdown(book, cfg.site_url), encoding="utf-8")
+        made.append(f)
+
+    chars = sum(len("".join(c.body)) for c in book.chapters)
+    print(f"\n  「{book.title}」 — {book.subtitle}")
+    print(f"  {len(book.chapters)}장 · 본문 약 {chars:,}자\n")
+    for f in made:
+        print(f"  {f.resolve()}  ({f.stat().st_size:,} 바이트)")
+    print("\n  PDF 가 필요하면 HTML 을 브라우저에서 열고 '인쇄 → PDF 로 저장'을")
+    print("  누르십시오. 인쇄용 여백과 쪽나눔이 이미 들어 있습니다.\n")
+    return 0
+
+
+# ------------------------------------------------------------------ ledger
+def cmd_ledger(args: argparse.Namespace) -> int:
+    """판매·기부 장부를 보거나 기록한다.
+
+    "수익금 전액 기부"는 확인할 방법이 없으면 아무 의미가 없다.
+    그래서 장부를 파일로 두고 공개 페이지로 그대로 내보낸다.
+    """
+    cfg = build_config(args)
+    path = Path(args.file) if args.file else cfg.data_dir / "ledger.json"
+    ledger = Ledger.load(path)
+
+    if args.sale:
+        on, channel, copies, gross, settled = args.sale
+        ledger.add_sale(on, channel, int(copies), int(gross), int(settled))
+        ledger.save(path)
+        print(f"  판매 기록: {on} {channel} {copies}부 정산 {won(int(settled))}")
+    if args.donate:
+        on, to, amount = args.donate[:3]
+        receipt = args.donate[3] if len(args.donate) > 3 else ""
+        ledger.add_donation(on, to, int(amount), receipt)
+        ledger.save(path)
+        print(f"  기부 기록: {on} {to} {won(int(amount))}")
+
+    s = ledger.summary()
+    print(f"\n  장부 — {path.resolve()}")
+    print(f"  약속: {s['promise']}")
+    print(f"  받는 곳: {', '.join(s['causes'])}\n")
+    print(f"  판매 부수      : {s['copies']:,}부")
+    print(f"  표시 매출      : {won(s['gross'])}  (정가 기준)")
+    print(f"  실제 정산금    : {won(s['settled'])}  ← 약속의 기준")
+    print(f"  전달한 금액    : {won(s['donated'])}")
+    print(f"  아직 전달 안 함 : {won(s['pending'])}")
+    print(f"  이행률         : {s['percent']}%")
+    if s["by_cause"]:
+        print("\n  전달한 곳:")
+        for to, amount in s["by_cause"].items():
+            print(f"    {to} — {won(amount)}")
+    problems = ledger.problems()
+    print()
+    if problems:
+        print("  점검할 것:")
+        for x in problems:
+            print(f"    · {x}")
+    else:
+        print("  점검 결과: 문제 없습니다. 약속대로입니다.")
+    print()
     return 0
 
 
@@ -262,6 +350,22 @@ def make_parser() -> argparse.ArgumentParser:
     s.add_argument("--out", help="출력 폴더 (기본 out/site)")
     s.add_argument("--clean", action="store_true", help="기존 출력 폴더를 지우고 다시")
     s.set_defaults(func=cmd_build)
+
+    s = common(sub.add_parser("book", help="전자책 만들기 (EPUB/HTML/마크다운)"))
+    s.add_argument("--out", help="출력 폴더 (기본 out/book)")
+    s.add_argument("--format", nargs="+", choices=("epub", "html", "md"),
+                   help="만들 형식 (기본: 전부)")
+    s.add_argument("--isbn", help="ISBN 이 있으면 넣으세요")
+    s.set_defaults(func=cmd_book)
+
+    s = common(sub.add_parser("ledger", help="판매·기부 장부 보기/기록"))
+    s.add_argument("--file", help="장부 파일 (기본 data/ledger.json)")
+    s.add_argument("--sale", nargs=5,
+                   metavar=("날짜", "판매처", "부수", "표시매출", "정산금"),
+                   help="판매 기록 추가")
+    s.add_argument("--donate", nargs="+",
+                   metavar="날짜 단체 금액 [증빙]", help="기부 기록 추가")
+    s.set_defaults(func=cmd_ledger)
 
     s = common(sub.add_parser("sitemap", help="sitemap.xml 출력"))
     s.set_defaults(func=cmd_sitemap)

@@ -20,7 +20,9 @@ from typing import Callable, Dict, Optional, Tuple
 from urllib.parse import parse_qs, unquote, urlparse
 
 from .. import __version__
+from ..book import content as book_content
 from ..config import Config
+from ..donate import Ledger
 from ..content import daily as daily_mod
 from ..content import entries, fifty, pages as pages_mod
 from ..content import paths as paths_mod
@@ -47,7 +49,12 @@ class Site:
         self.store = Store(cfg.sessions_dir)
         self.counselor = Counselor(cfg)
         self.pray_counts = cfg.data_dir / "pray_counts.json"
+        self.book = book_content.build_book(cfg.site_url, cfg.book_isbn)
         cfg.data_dir.mkdir(parents=True, exist_ok=True)
+
+    def ledger(self) -> Ledger:
+        """매번 새로 읽는다 — 서버를 다시 띄우지 않고도 장부를 갱신할 수 있게."""
+        return Ledger.load(self.cfg.ledger_file)
 
     # 오늘 맡겨진 지향 수 — 내용이 아니라 '개수'만 공개한다
     def bump_pray_count(self, today: Optional[date] = None) -> int:
@@ -178,6 +185,10 @@ class Handler(BaseHTTPRequestHandler):
             return render.believe_index(cfg)
         if path == "/pray":
             return render.pray_page(cfg, self.site.pray_count())
+        if path == "/book":
+            return render.book_page(cfg, self.site.book, cfg.book_stores)
+        if path == "/book/ledger":
+            return render.ledger_page(cfg, self.site.ledger())
 
         m = PATH_RE.match(path)
         if m:

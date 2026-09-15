@@ -220,3 +220,19 @@ textarea{
 .links a[href^="/path/"]{border-color:var(--accent); color:var(--accent)}
 .journey-peek{border-color:var(--accent); border-width:2px}
 .journey-peek h2{margin-top:.2em; font-size:22px}
+
+/* ── 책과 장부 ───────────────────────────────────────────────
+   숫자를 숨기지 않는 것이 장부 페이지의 전부다. */
+.give{border-color:var(--accent); border-width:2px}
+.give ul,.give-list{margin:.6em 0; padding-left:1.2em}
+.give-list li{margin:.4em 0}
+.book-toc li a,.book-toc li{display:grid; grid-template-columns:44px 1fr;
+  gap:10px; padding:11px 4px}
+.table-wrap{overflow-x:auto; margin:14px 0}
+table.ledger{width:100%; border-collapse:collapse; font-size:14px;
+  min-width:520px}
+table.ledger th,table.ledger td{padding:11px 10px; text-align:left;
+  border-bottom:1px solid var(--line)}
+table.ledger th{color:var(--muted); font-weight:600; font-size:13px}
+table.ledger .num{text-align:right; font-variant-numeric:tabular-nums}
+table.ledger tr.give-row{color:var(--accent); font-weight:650}

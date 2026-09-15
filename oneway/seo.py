@@ -21,6 +21,8 @@ def all_urls() -> List[Tuple[str, str, str]]:
         ("/counsel", "0.9", "weekly"),
         ("/believe", "0.8", "weekly"),
         ("/pray", "0.6", "weekly"),
+        ("/book", "0.8", "monthly"),
+        ("/book/ledger", "0.5", "weekly"),
     ]
     urls += [(e.url, "0.8", "monthly") for e in entries.ENTRIES]
     urls += [(b.url, "0.7", "monthly") for b in fifty.BELIEFS]

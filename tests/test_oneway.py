@@ -3,12 +3,18 @@
 
 import random
 import re
+import xml.etree.ElementTree as ET
+import zipfile
 import tempfile
 import unittest
 from datetime import date
 from pathlib import Path
 
+from oneway.book import content as book_content
+from oneway.book import epub as epub_mod
+from oneway.book import render as book_render
 from oneway.config import Config
+from oneway.donate import Entry, Ledger, won
 from oneway.content import daily, entries, fifty, pages, paths, verses
 from oneway.counselor import depth, persona, safety, topics
 from oneway.counselor.engine import Counselor
@@ -524,6 +530,17 @@ class TestCounselor(unittest.TestCase):
         self.assertEqual(r.source, "safety")
         self.assertNotIn("전부 틀렸습니다", r.text)
 
+    def test_counselor_never_sells_the_book(self):
+        """힘들다고 온 사람에게 물건을 파는 건 상담이 아니다.
+        책은 사이트 하단에만 두고, 상담사는 절대 꺼내지 않는다."""
+        for message in ("요즘 너무 지칩니다", "전쟁 날까 봐 무섭습니다",
+                        "아무것도 하기 싫어요", "죽고 싶습니다"):
+            r = self.talk(message)
+            blob = r.as_text()
+            self.assertNotIn("/book", blob, message)
+            self.assertNotIn("전자책", blob, message)
+            self.assertNotIn("구매", blob, message)
+
     # ── 사람인 척하지 않는다 ───────────────────────────────────
     def test_identity_answered_honestly(self):
         r = self.talk("사람이세요?")
@@ -599,6 +616,157 @@ class TestCounselor(unittest.TestCase):
         self.assertIn("2일째", r.follow_up)
 
 
+class TestBook(unittest.TestCase):
+    def setUp(self):
+        self.book = book_content.build_book("https://example.org")
+
+    def test_structure(self):
+        self.assertEqual(len(self.book.chapters), 21)
+        self.assertEqual(len(self.book.parts), 3)
+        self.assertEqual([c.no for c in self.book.chapters], list(range(1, 22)))
+
+    def test_chapters_are_written_not_dumped(self):
+        """1부는 상담 자료를 옮긴 게 아니라 새로 쓴 산문이어야 한다."""
+        for c in self.book.part_chapters(book_content.PART1):
+            self.assertGreaterEqual(len(c.body), 4, c.title)
+            self.assertGreater(len("".join(c.body)), 400, c.title)
+            self.assertTrue(c.question and c.step and c.closing, c.title)
+
+    def test_part_one_is_secular(self):
+        """서점에서 집어 든 사람이 첫 장을 넘길 수 있어야 한다."""
+        for c in self.book.part_chapters(book_content.PART1):
+            blob = " ".join((c.title, c.question, c.step, c.closing) + c.body)
+            self.assertEqual(religious_hits(blob), [], c.title)
+
+    def test_depth_rises_in_part_two(self):
+        deep = [c for c in self.book.part_chapters(book_content.PART2)
+                if c.verse_key]
+        self.assertEqual(len(deep), 3, "마지막 세 걸음에만 구절이 붙는다")
+        for c in deep:
+            verses.get(c.verse_key)
+
+    def test_front_matter_states_the_promise(self):
+        blob = " ".join(x for _, lines in self.book.front for x in lines)
+        self.assertIn("저자가 가져가지 않습니다", blob)
+        self.assertIn("109", blob)
+
+    def test_back_matter_says_you_may_read_free(self):
+        """사지 못하는 사람이 미안해지지 않게 한다."""
+        blob = " ".join(x for _, lines in self.book.back for x in lines)
+        self.assertIn("무료로", blob)
+        self.assertIn("사지 않으셔도 됩니다", blob)
+
+    def test_appendix_carries_the_safety_material(self):
+        blob = " ".join(x for _, lines in self.book.appendix for x in lines)
+        self.assertIn("109", blob)
+        self.assertIn("전부 틀렸습니다", blob)
+        self.assertIn("번역본", blob)
+
+    def test_html_and_markdown(self):
+        h = book_render.single_html(self.book, "https://example.org")
+        self.assertTrue(h.startswith("<!doctype html>"))
+        self.assertIn("@media print", h)
+        for c in self.book.chapters:
+            self.assertIn(f'id="{c.slug}"', h)
+        m = book_render.markdown(self.book)
+        self.assertIn(f"# {self.book.title}", m)
+        self.assertIn("30일, 한 걸음씩", m)
+
+
+class TestEpub(unittest.TestCase):
+    def setUp(self):
+        self.book = book_content.build_book("https://example.org")
+        self.path = Path(tempfile.mkdtemp()) / "book.epub"
+        epub_mod.write_epub(self.book, self.path, "https://example.org")
+        self.zip = zipfile.ZipFile(self.path)
+
+    def test_mimetype_is_first_and_uncompressed(self):
+        """EPUB 의 가장 흔한 실수. 이게 틀리면 서점이 파일을 거부한다."""
+        self.assertEqual(self.zip.namelist()[0], "mimetype")
+        info = self.zip.getinfo("mimetype")
+        self.assertEqual(info.compress_type, zipfile.ZIP_STORED)
+        self.assertEqual(self.zip.read("mimetype").decode(), "application/epub+zip")
+
+    def test_required_files(self):
+        for name in ("META-INF/container.xml", "OEBPS/content.opf",
+                     "OEBPS/nav.xhtml", "OEBPS/toc.ncx", "OEBPS/style.css",
+                     "OEBPS/cover.svg"):
+            self.assertIn(name, self.zip.namelist(), name)
+
+    def test_every_xml_file_parses(self):
+        for name in self.zip.namelist():
+            if name.endswith((".xhtml", ".opf", ".ncx", ".xml", ".svg")):
+                ET.fromstring(self.zip.read(name))
+
+    def test_every_chapter_is_in_the_spine(self):
+        opf = self.zip.read("OEBPS/content.opf").decode()
+        for c in self.book.chapters:
+            self.assertIn(f'idref="{c.slug}"', opf)
+            self.assertIn(f"OEBPS/{c.slug}.xhtml", self.zip.namelist())
+
+    def test_no_scripture_translation_text(self):
+        """번역본 문장을 실으면 발행처 허락 없이 팔 수 없다."""
+        opf = self.zip.read("OEBPS/content.opf").decode()
+        self.assertIn("<dc:title>", opf)
+        blob = " ".join(self.zip.read(n).decode()
+                        for n in self.zip.namelist() if n.endswith(".xhtml"))
+        self.assertIn("번역문은 싣지 않았습니다", blob)
+
+
+class TestLedger(unittest.TestCase):
+    def setUp(self):
+        self.ledger = Ledger()
+        self.ledger.add_sale("2026-03-01", "예시서점", 120, 540000, 315000)
+
+    def test_settled_is_the_promise_not_gross(self):
+        """정가 기준으로 '전액'을 약속하면 지킬 수 없다.
+        플랫폼이 30~40%를 가져가기 때문이다."""
+        self.assertEqual(self.ledger.gross, 540000)
+        self.assertEqual(self.ledger.settled, 315000)
+        self.assertLess(self.ledger.settled, self.ledger.gross)
+        self.assertIn("정산", self.ledger.promise)
+
+    def test_unfulfilled_until_donated(self):
+        self.assertFalse(self.ledger.fulfilled)
+        self.assertEqual(self.ledger.pending, 315000)
+        self.assertEqual(self.ledger.kept, 315000)
+        self.assertTrue(self.ledger.problems())
+
+    def test_fulfilled_after_donating(self):
+        self.ledger.add_donation("2026-04-01", "예시단체", 315000, "R-1")
+        self.assertTrue(self.ledger.fulfilled)
+        self.assertEqual(self.ledger.kept, 0)
+        self.assertEqual(self.ledger.percent(), 100)
+        self.assertEqual(self.ledger.problems(), [])
+
+    def test_problems_catch_sloppy_records(self):
+        bad = Ledger(entries=[
+            Entry(date="2026/01/01", kind="sale"),
+            Entry(date="2026-01-02", kind="donation", to="", amount=0),
+            Entry(date="2026-01-03", kind="something"),
+        ])
+        found = " ".join(bad.problems())
+        self.assertIn("날짜 형식", found)
+        self.assertIn("어디에 전달", found)
+        self.assertIn("알 수 없는 종류", found)
+
+    def test_roundtrip(self):
+        path = Path(tempfile.mkdtemp()) / "ledger.json"
+        self.ledger.add_donation("2026-04-01", "예시단체", 315000)
+        self.ledger.save(path)
+        again = Ledger.load(path)
+        self.assertEqual(again.summary()["donated"], 315000)
+        self.assertTrue(again.updated)
+
+    def test_missing_file_is_an_empty_ledger(self):
+        empty = Ledger.load(Path(tempfile.mkdtemp()) / "nope.json")
+        self.assertEqual(empty.settled, 0)
+        self.assertEqual(empty.percent(), 0)
+
+    def test_won(self):
+        self.assertEqual(won(1234567), "1,234,567원")
+
+
 class TestSeo(unittest.TestCase):
     def test_urls_cover_content(self):
         paths = {p for p, _, _ in all_urls()}
@@ -629,6 +797,12 @@ class TestRender(unittest.TestCase):
         markup += [render.belief_page(self.cfg, b) for b in fifty.BELIEFS]
         markup += [render.gate_page(self.cfg, e) for e in entries.ENTRIES]
         markup += [render.static_page(self.cfg, p) for p in pages.PAGES]
+        book = book_content.build_book(self.cfg.site_url)
+        markup += [render.book_page(self.cfg, book, [("예시", "https://e.org")]),
+                   render.ledger_page(self.cfg, Ledger())]
+        journey = paths.PATHS[0]
+        markup += [render.path_index(self.cfg, journey)]
+        markup += [render.path_step(self.cfg, journey, st) for st in journey.steps]
         for m in markup:
             self.assertTrue(m.startswith("<!doctype html>"))
             self.assertIn("<title>", m)
@@ -695,6 +869,22 @@ class TestRender(unittest.TestCase):
         markup = render.home(self.cfg, daily.build(date(2026, 9, 15)))
         title = re.search(r"<title>(.*?)</title>", markup).group(1)
         self.assertEqual(title.count("하나의 길"), 1, title)
+
+    def test_ledger_page_shows_the_gap(self):
+        """표시 매출과 실제 정산금의 차이를 숨기면 약속이 흐려진다."""
+        led = Ledger()
+        led.add_sale("2026-03-01", "예시", 120, 540000, 315000)
+        markup = render.ledger_page(self.cfg, led)
+        self.assertIn("540,000원", markup)
+        self.assertIn("315,000원", markup)
+        self.assertIn("저자가 가져간 돈", markup)
+
+    def test_book_page_does_not_pressure(self):
+        book = book_content.build_book(self.cfg.site_url)
+        markup = render.book_page(self.cfg, book)
+        self.assertIn("사지 않으셔도 됩니다", markup)
+        self.assertIn("무료로", markup)
+        self.assertIn("/book/ledger", markup)
 
     def test_crisis_line_in_every_footer(self):
         """어느 페이지에서 이탈하든 긴급 연락처는 보여야 한다."""
