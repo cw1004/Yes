@@ -162,15 +162,40 @@ def home(cfg: Config, card: daily_mod.Daily) -> str:
         for k in DEEPER_GATES)
 
     hero = f"""<section class="hero">
-  <p class="eyebrow">오늘 마음이 어떠십니까?</p>
-  <h1>혼자 두지 않겠습니다</h1>
+  <div class="hero-mark" aria-hidden="true"><i></i><i></i><i></i></div>
+
+  <h1 id="hero-line">
+    <span class="l1">말할 데가 없을 때</span>
+    <span class="l2">혼자 두지 않겠습니다</span>
+  </h1>
+
   <p class="lead">지쳤거나, 외롭거나, 답이 안 보이거나.<br>
      정리하지 않으셔도 됩니다. 한 문장이면 충분합니다.</p>
-  <div class="cta">
-    <a class="btn primary big" href="/counsel">지금 이야기하기</a>
-    <a class="btn" href="/today">오늘의 3분</a>
+
+  <!-- 자바스크립트가 없어도 그대로 동작합니다.
+       /counsel?q= 로 넘어가면 상담사가 바로 답을 시작합니다. -->
+  <form class="hero-form" action="/counsel" method="get">
+    <textarea id="hero-input" name="q" rows="1" maxlength="300"
+      placeholder="지금 마음을 한 문장으로 적어 보세요."
+      aria-label="지금 마음"></textarea>
+    <button class="btn primary" type="submit">이야기 시작</button>
+  </form>
+
+  <div class="hero-chips">
+    <button type="button" data-fill="요즘 너무 지쳐서 아무것도 하기 싫어요">
+      너무 지쳤어요</button>
+    <button type="button" data-fill="혼자라는 생각이 자꾸 듭니다">
+      혼자인 것 같아요</button>
+    <button type="button" data-fill="걱정 때문에 잠이 안 옵니다">
+      잠이 안 와요</button>
+    <button type="button" data-fill="앞날이 어떻게 될지 몰라 무섭습니다">
+      앞날이 무서워요</button>
   </div>
-  <p class="small quiet">이름도 연락처도 묻지 않습니다. 무료입니다.</p>
+
+  <p class="hero-trust">
+    <span>이름 안 물음</span><span>연락처 안 물음</span>
+    <span>로그인 없음</span><span>무료</span><span>24시간</span>
+  </p>
 </section>"""
 
     body = f"""

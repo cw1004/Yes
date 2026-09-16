@@ -23,6 +23,76 @@
     return n;
   };
 
+  /* ---------------------------------------------------------- 첫 화면 */
+  /* 서버는 시간에 좌우되지 않는 문구를 그린다. 여기서 방문자의 시계를 보고
+     지금 시간에 맞는 말로 바꾼다. 자바스크립트가 없어도 그대로 자연스럽다. */
+  var HERO_LINES = [
+    { until: 6,  l1: "새벽 세 시에도",          l2: "여기 있습니다" },
+    { until: 11, l1: "오늘도 버텨야 하는 아침에", l2: "잠깐 앉았다 가세요" },
+    { until: 18, l1: "괜찮은 척하느라 지쳤다면",  l2: "여기서는 안 그러셔도 됩니다" },
+    { until: 24, l1: "하루를 겨우 끝냈다면",     l2: "혼자 삼키지 마세요" }
+  ];
+
+  var PLACEHOLDERS = [
+    "지금 마음을 한 문장으로 적어 보세요.",
+    "정리하지 않으셔도 됩니다.",
+    "오늘 무슨 일이 있으셨습니까.",
+    "어디서부터 말해야 할지 모르겠다면, 그렇게 쓰셔도 됩니다."
+  ];
+
+  function initHero() {
+    var line = document.getElementById("hero-line");
+    var input = document.getElementById("hero-input");
+    if (!line && !input) return;
+
+    if (line) {
+      var hour = new Date().getHours();
+      for (var i = 0; i < HERO_LINES.length; i++) {
+        if (hour < HERO_LINES[i].until) {
+          var l1 = line.querySelector(".l1");
+          var l2 = line.querySelector(".l2");
+          if (l1) l1.textContent = HERO_LINES[i].l1;
+          if (l2) l2.textContent = HERO_LINES[i].l2;
+          break;
+        }
+      }
+    }
+
+    if (!input) return;
+
+    /* 한 줄에서 시작해 쓰는 만큼 늘어난다 */
+    function grow() {
+      input.style.height = "auto";
+      input.style.height = Math.min(input.scrollHeight, 180) + "px";
+    }
+    input.addEventListener("input", grow);
+
+    /* 엔터로 보낸다. 줄바꿈은 Shift+Enter. */
+    input.addEventListener("keydown", function (ev) {
+      if (ev.key === "Enter" && !ev.shiftKey) {
+        ev.preventDefault();
+        if (input.value.trim()) input.form.submit();
+      }
+    });
+
+    /* 지금 상태를 한 번에 고르는 단추 */
+    document.querySelectorAll(".hero-chips [data-fill]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        input.value = b.getAttribute("data-fill");
+        input.focus();
+        grow();
+      });
+    });
+
+    /* 안내 문구를 천천히 돌린다. 입력 중에는 건드리지 않는다. */
+    var n = 0;
+    setInterval(function () {
+      if (document.activeElement === input || input.value) return;
+      n = (n + 1) % PLACEHOLDERS.length;
+      input.placeholder = PLACEHOLDERS[n];
+    }, 5000);
+  }
+
   /* ---------------------------------------------------------- 상담 대화 */
   /* 답변은 한 덩어리의 말로 온다. 소제목이나 딱지를 붙이지 않는다. */
   function renderReply(log, r) {
@@ -100,8 +170,12 @@
     });
 
     var prefill = chat && chat.getAttribute("data-prefill");
-    if (prefill) { input.value = prefill; send(prefill); }
-    else { input.focus(); }
+    if (prefill) {
+      input.value = "";
+      send(prefill);            /* 첫 화면에서 쓴 말이 바로 이어진다 */
+    } else {
+      input.focus();
+    }
   }
 
   /* ------------------------------------------------- 연속 방문·진행 상황 */
@@ -189,6 +263,7 @@
   }
 
   document.addEventListener("DOMContentLoaded", function () {
+    initHero();
     initChat();
     initProgress();
     initBeliefRead();

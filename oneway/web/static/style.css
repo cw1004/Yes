@@ -236,3 +236,93 @@ table.ledger th,table.ledger td{padding:11px 10px; text-align:left;
 table.ledger th{color:var(--muted); font-weight:600; font-size:13px}
 table.ledger .num{text-align:right; font-variant-numeric:tabular-nums}
 table.ledger tr.give-row{color:var(--accent); font-weight:650}
+
+/* ── 첫 화면 ─────────────────────────────────────────────────
+   여기서 결정됩니다. 원칙 세 가지.
+   1. 말을 걸기까지 클릭이 0번이어야 한다 — 입력창이 여기 있다
+   2. 요란하면 안 된다 — 힘든 사람이 오는 곳이지 판촉 페이지가 아니다
+   3. 묻지 않는다는 사실이 바로 보여야 한다 */
+.hero{
+  position:relative; overflow:hidden;
+  padding:clamp(48px,11vh,96px) 20px clamp(40px,8vh,72px);
+}
+.hero:before{                       /* 아주 옅은 빛. 색이 아니라 온도에 가깝게 */
+  content:""; position:absolute; inset:-40% 0 auto; height:150%;
+  background:radial-gradient(60% 50% at 50% 0%,
+    color-mix(in srgb, var(--accent) 13%, transparent), transparent 70%);
+  pointer-events:none;
+}
+.hero > *{position:relative}
+
+/* 브랜드 마크 — 표지와 같은 동심원 */
+.hero-mark{
+  width:58px; height:58px; margin:0 auto 26px; position:relative;
+}
+.hero-mark i{
+  position:absolute; inset:0; margin:auto; border-radius:50%;
+  border:1.5px solid var(--accent); opacity:.35;
+}
+.hero-mark i:nth-child(2){inset:12px; opacity:.6}
+.hero-mark i:nth-child(3){inset:24px; background:var(--accent); border:0; opacity:1}
+
+.hero h1{
+  font-size:clamp(30px,7.2vw,50px); line-height:1.24; margin:0 0 20px;
+  letter-spacing:-.035em; font-weight:800;
+}
+.hero h1 .l1,.hero h1 .l2{display:block}
+.hero h1 .l1{color:var(--muted); font-weight:700;
+  font-size:.62em; letter-spacing:-.02em; margin-bottom:.22em}
+
+.hero .lead{
+  font-size:clamp(15px,3.9vw,18px); color:var(--muted);
+  max-width:29em; margin:0 auto 30px; line-height:1.75;
+}
+
+/* 입력창 — 첫 화면의 주인공 */
+.hero-form{
+  display:flex; gap:9px; align-items:flex-end;
+  max-width:33em; margin:0 auto 16px;
+}
+.hero-form textarea{
+  flex:1; min-height:56px; padding:16px 18px; font-size:16px;
+  border:1.5px solid var(--line); border-radius:16px; resize:none;
+  background:var(--card); box-shadow:0 10px 30px -18px rgba(0,0,0,.4);
+  transition:border-color .15s ease;
+}
+.hero-form textarea:focus{outline:none; border-color:var(--accent)}
+.hero-form .btn{white-space:nowrap; padding:16px 20px; border-radius:16px}
+
+.hero-chips{
+  display:flex; gap:7px; flex-wrap:wrap; justify-content:center;
+  max-width:33em; margin:0 auto 26px;
+}
+.hero-chips button{
+  padding:8px 14px; border-radius:999px; font:inherit; font-size:13.5px;
+  border:1px solid var(--line); background:transparent; color:var(--muted);
+  cursor:pointer; transition:all .12s ease;
+}
+.hero-chips button:hover,.hero-chips button:focus-visible{
+  border-color:var(--accent); color:var(--accent); background:var(--card);
+}
+
+/* 묻지 않는다는 사실 — 이게 이 사이트의 가장 큰 차별점이다 */
+.hero-trust{
+  display:flex; gap:7px 16px; flex-wrap:wrap; justify-content:center;
+  margin:0; font-size:12.5px; color:var(--muted); letter-spacing:.01em;
+}
+.hero-trust span{display:inline-flex; align-items:center; gap:6px}
+.hero-trust span:before{
+  content:""; width:5px; height:5px; border-radius:50%;
+  background:var(--accent); opacity:.65;
+}
+
+@media (max-width:480px){
+  .hero{padding:38px 16px 34px}
+  .hero-mark{width:48px; height:48px; margin-bottom:20px}
+  .hero-form{flex-direction:column; align-items:stretch}
+  .hero-form .btn{width:100%}
+  .hero-trust{font-size:12px; gap:6px 12px}
+}
+@media (prefers-reduced-motion:reduce){
+  .hero-chips button{transition:none}
+}

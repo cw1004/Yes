@@ -1169,6 +1169,36 @@ class TestRender(unittest.TestCase):
                 self.assertEqual(religious_hits(self.entry_area(markup)), [],
                                  f"{day} {name}")
 
+    def test_hero_lets_you_talk_without_clicking_away(self):
+        """말을 걸기까지 클릭이 한 번이라도 필요하면 거기서 사람이 빠진다.
+        입력창이 첫 화면에 있어야 한다."""
+        markup = render.home(self.cfg, daily.build(date(2026, 9, 15)))
+        hero = markup[markup.index('<section class="hero">'):
+                      markup.index("</section>", markup.index("hero-trust"))]
+        self.assertIn('<form class="hero-form"', hero)
+        self.assertIn('action="/counsel"', hero)
+        self.assertIn('name="q"', hero)
+
+    def test_hero_works_without_javascript(self):
+        """자바스크립트가 없어도 폼이 그대로 제출되어야 한다."""
+        markup = render.home(self.cfg, daily.build(date(2026, 9, 15)))
+        self.assertIn('method="get"', markup)
+        # /counsel 은 q 를 받아 바로 대화를 시작한다
+        self.assertIn('data-prefill=', render.counsel_page(self.cfg, "안녕"))
+
+    def test_hero_states_what_is_not_asked(self):
+        """이름·연락처를 묻지 않는다는 것이 이 사이트의 가장 큰 차별점이다."""
+        markup = render.home(self.cfg, daily.build(date(2026, 9, 15)))
+        for word in ("이름 안 물음", "연락처 안 물음", "로그인 없음", "무료"):
+            self.assertIn(word, markup, word)
+
+    def test_hero_default_line_is_time_neutral(self):
+        """서버는 시간에 좌우되지 않는 문구를 그린다.
+        시간별 문구는 방문자 시계를 보는 자바스크립트가 바꾼다."""
+        markup = render.home(self.cfg, daily.build(date(2026, 9, 15)))
+        self.assertIn("혼자 두지 않겠습니다", markup)
+        self.assertNotIn("새벽 세 시에도", markup)
+
     def test_deeper_doors_exist_and_are_honest(self):
         """색깔을 지우는 것과 숨기는 것은 다르다.
         문은 있어야 하고, 그 문에는 정직한 이름이 붙어야 한다."""
