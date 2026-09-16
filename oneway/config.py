@@ -23,6 +23,27 @@ DEFAULT_MAX_TOKENS = 2000
 DEFAULT_EFFORT = "medium"
 
 
+# 컨테이너에서는 설정 파일 대신 환경변수를 쓰는 편이 편하다.
+# ONEWAY_SITE_URL, ONEWAY_DATA … 식으로 이름이 붙는다.
+ENV_MAP: Dict[str, str] = {
+    "ONEWAY_SITE_URL": "site_url",
+    "ONEWAY_SITE_NAME": "site_name",
+    "ONEWAY_HOST": "host",
+    "ONEWAY_PORT": "port",
+    "ONEWAY_DATA": "data_dir",
+    "ONEWAY_OUT": "out_dir",
+    "ONEWAY_COUNSELOR": "counselor",
+    "ONEWAY_MODEL": "model",
+    "ONEWAY_EFFORT": "effort",
+    "ONEWAY_RATE_LIMIT": "rate_limit",
+    "ONEWAY_TRUST_PROXY": "trust_proxy",
+    "ONEWAY_NAVER_VERIFY": "naver_verify",
+    "ONEWAY_GOOGLE_VERIFY": "google_verify",
+    "ONEWAY_CONTACT_EMAIL": "contact_email",
+    "ONEWAY_BOOK_ISBN": "book_isbn",
+}
+
+
 @dataclass
 class Config:
     # --- 사이트 ---
@@ -51,6 +72,10 @@ class Config:
     book_stores: List[tuple] = field(default_factory=list)
     book_isbn: str = ""
 
+    # --- 운영/보호 ---
+    rate_limit: bool = True        # 요청 제한 (Claude API 비용 폭주 방지)
+    trust_proxy: bool = False      # nginx 등 신뢰하는 프록시 뒤에 있을 때만 켠다
+
     # --- 안전 ---
     crisis_region: str = "KR"      # 위기 상황 안내에 사용할 지역 코드
 
@@ -66,6 +91,44 @@ class Config:
     def api_key(self) -> Optional[str]:
         key = os.environ.get(self.api_key_env, "").strip()
         return key or None
+
+    def apply_env(self, env: Optional[Dict[str, str]] = None) -> "Config":
+        """환경변수를 덮어쓴다. 설정 파일보다 환경변수가 우선이다."""
+        env = os.environ if env is None else env
+        for name, field_name in ENV_MAP.items():
+            raw = env.get(name)
+            if raw is None or raw == "":
+                continue
+            current = getattr(self, field_name)
+            if isinstance(current, bool):
+                value = raw.strip().lower() in ("1", "true", "yes", "on")
+            elif isinstance(current, int):
+                try:
+                    value = int(raw)
+                except ValueError:
+                    continue
+            elif isinstance(current, Path):
+                value = Path(raw)
+            else:
+                value = raw
+            setattr(self, field_name, value)
+        return self
+
+    @classmethod
+    def load(cls, path=None, env: Optional[Dict[str, str]] = None) -> "Config":
+        """설정을 읽는다.
+
+        순서는 기본값 → 설정 파일 → 환경변수다.
+        경로를 주지 않으면 ONEWAY_CONFIG 를 보고, 그것도 없으면 기본값으로 간다.
+        **파일이 없다고 죽지 않는다.** 컨테이너 첫 실행이 설정 파일 하나 때문에
+        실패하면 안 되기 때문이다.
+        """
+        env = os.environ if env is None else env
+        path = path or env.get("ONEWAY_CONFIG") or None
+        cfg = cls()
+        if path and Path(path).exists():
+            cfg = cls.from_file(path)
+        return cfg.apply_env(env)
 
     @classmethod
     def from_file(cls, path) -> "Config":

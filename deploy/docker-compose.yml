@@ -1,0 +1,87 @@
+# 하나의 길 — ONE WAY  ·  서버 한 대 구성
+#
+#   docker compose up -d
+#
+# 처음 한 번은 HTTPS 인증서를 받아야 합니다. deploy/README.md 3단계를 보세요.
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: oneway:latest
+    restart: unless-stopped
+    volumes:
+      - oneway-data:/data                     # 방문 기록·기도 지향·장부
+      - ./config:/app/config:ro               # config.json (없어도 뜹니다)
+    expose:
+      - "8000"                                # 바깥으로 열지 않습니다
+    environment:
+      # 키가 없어도 동작합니다. 넣으면 상담 품질이 올라갑니다.
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      # .env 파일에 적거나 아래를 직접 고치십시오.
+      ONEWAY_SITE_URL: ${ONEWAY_SITE_URL:-https://example.kr}
+      ONEWAY_NAVER_VERIFY: ${ONEWAY_NAVER_VERIFY:-}
+      ONEWAY_GOOGLE_VERIFY: ${ONEWAY_GOOGLE_VERIFY:-}
+    healthcheck:
+      test: ["CMD", "python3", "-c",
+             "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/healthz',timeout=4).status==200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "5" }
+
+  web:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/oneway.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/oneway_proxy.inc:/etc/nginx/conf.d/oneway_proxy.inc:ro
+      - certbot-conf:/etc/letsencrypt:ro
+      - certbot-www:/var/www/certbot:ro
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "5" }
+
+  # 인증서 자동 갱신. 12시간마다 확인하고 만료가 가까우면 갱신합니다.
+  certbot:
+    image: certbot/certbot:latest
+    restart: unless-stopped
+    volumes:
+      - certbot-conf:/etc/letsencrypt
+      - certbot-www:/var/www/certbot
+    entrypoint: >
+      sh -c "trap exit TERM;
+             while :; do certbot renew --webroot -w /var/www/certbot --quiet;
+             sleep 12h & wait $${!}; done"
+
+  # 매일 새벽: 오래된 방문 기록 삭제 + 백업
+  maintenance:
+    image: oneway:latest
+    restart: unless-stopped
+    depends_on:
+      - app
+    volumes:
+      - oneway-data:/data
+      - ./config:/app/config:ro
+      - oneway-backup:/backup
+    entrypoint: ["/bin/sh", "-c"]
+    command: >
+      "while :; do
+         sleep 86400;
+         python3 -m oneway purge --days 180 --data /data || true;
+         tar czf /backup/oneway-$$(date +%%Y%%m%%d).tar.gz -C / data || true;
+         find /backup -name 'oneway-*.tar.gz' -mtime +30 -delete || true;
+       done"
+
+volumes:
+  oneway-data:
+  oneway-backup:
+  certbot-conf:
+  certbot-www:

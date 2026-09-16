@@ -1,0 +1,9 @@
+[Unit]
+Description=매일 새벽 4시에 정리합니다
+
+[Timer]
+OnCalendar=*-*-* 04:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

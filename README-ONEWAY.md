@@ -521,26 +521,48 @@ python3 -m oneway purge --days 180
 
 ## 13. 배포
 
-### 가장 간단한 방법 — 서버 하나
+**[`deploy/README.md`](deploy/README.md) 에 단계별 안내가 있습니다.**
+서버를 처음 다뤄 본다는 전제로 썼습니다. 전체 1~2시간, 월 1만 원 안쪽입니다.
 
 ```bash
-python3 -m oneway serve --host 0.0.0.0 --port 8000 --site-url https://내도메인.kr
+cp deploy/.env.example deploy/.env       # 도메인·키 적기
+sed -i 's/example.kr/내도메인.kr/g' deploy/nginx/oneway.conf
+cd deploy && docker compose up -d --build
 ```
 
-앞에 nginx 를 두고 HTTPS 를 붙이면 됩니다. 표준 라이브러리 서버라 트래픽이 아주
-커지면 WSGI/ASGI 로 옮기십시오. 그때 바뀌는 파일은 `web/server.py` 하나입니다.
+들어 있는 것:
 
-### 정적 + API 분리 (검색 노출에 유리)
+| 파일 | 하는 일 |
+| --- | --- |
+| `Dockerfile` | 의존성 거의 없는 가벼운 이미지. **루트로 돌지 않음**, 헬스체크 포함 |
+| `deploy/docker-compose.yml` | 앱 + nginx + 인증서 자동갱신 + 매일 정리·백업 |
+| `deploy/nginx/` | HTTPS, HSTS, CSP, 요청 제한, gzip |
+| `deploy/systemd/` | 도커 없이 올릴 때 |
+| `deploy/scripts/preflight.sh` | **공개 전 점검** — 전화번호·설정·개인정보 |
+| `deploy/scripts/maintenance.sh` | 오래된 기록 삭제 + 백업 (매일 자동) |
+| `deploy/scripts/restore.sh` | 백업에서 되돌리기 |
 
-```bash
-python3 -m oneway build --clean --site-url https://내도메인.kr
-# → out/site/ 66개 페이지 + sitemap.xml + robots.txt + 404.html
-```
+설정은 **기본값 → 설정 파일 → 환경변수 → 명령줄** 순으로 덮어씁니다.
+컨테이너는 `ONEWAY_*` 환경변수만으로 뜨고, **설정 파일이 없다고 죽지 않습니다.**
 
-`out/site` 를 Netlify·Vercel·GitHub Pages 에 올리고, 상담 API(`/api/*`)만
-서버로 띄우면 됩니다.
+### 비용이 새어 나가지 않게
 
----
+상담 한 번이 Claude API 한 번이고, 그건 돈입니다. 그래서 두 겹으로 막습니다.
+
+* **nginx** — 분당 20회 (`limit_req zone=counsel`)
+* **앱** — 시간당 40회 (`oneway/web/ratelimit.py`)
+
+서버 앞단이 바뀌어도 앱이 스스로를 지킬 수 있어야 하기 때문입니다.
+
+**막을 때도 문은 닫지 않습니다.** 429 응답에도 상담 전화번호가 들어갑니다.
+그리고 **위기 신호가 있는 요청은 제한하지 않습니다** — 급한 사람을 막으면 안 됩니다.
+
+### 얼마나 버티나
+
+표준 라이브러리 HTTP 서버라 한 대로 동시 접속 수백 명 수준입니다.
+더 커지면 바뀌는 파일은 `web/server.py` 하나이고,
+`ratelimit.py` 의 `RateLimiter` 를 Redis 로 바꾸면 여러 대로 늘릴 수 있습니다
+(인터페이스는 `check()` 하나뿐).
 
 ## 14. 명령어 정리
 
@@ -560,15 +582,21 @@ python3 -m oneway build --clean --site-url https://내도메인.kr
 | `python3 -m oneway ledger --sale …` | 판매 기록 추가 |
 | `python3 -m oneway ledger --donate …` | 전달 기록 추가 |
 | `python3 -m oneway purge --days 180` | 오래된 방문 기록 삭제 |
+| `make preflight` | 공개 전 점검 |
+| `make up` / `make logs` / `make down` | 서버에 띄우기 / 로그 / 내리기 |
 
 ---
 
 ## 15. 다음 단계
 
-1. **도메인과 실제 문구 확정** — `config.py` 의 `site_url`, `oneway/content/` 의 글
-2. **전화번호 최신화** — `counselor/safety.py` 의 `HOTLINES_KR`
-3. **상표 검색** — 「하나의 길」 · 「ONE WAY」 · 로고
-4. **Claude 연결** — `ANTHROPIC_API_KEY` 설정 후 상담 품질 비교
+**코드는 다 되어 있습니다. 남은 것은 사람이 해야 하는 일입니다.**
+
+1. **전화번호 확인** — `counselor/safety.py` 의 `HOTLINES_KR`.
+   틀린 번호로 공개하면 사람이 다칩니다. 무조건 1순위입니다
+2. **도메인 구입 + 배포** — [`deploy/README.md`](deploy/README.md)
+3. **상표 검색** — 「하나의 길」 · 「ONE WAY」 · 로고.
+   알리고 나서 이름을 못 쓰게 되면 처음부터 다시입니다
+4. **Claude 연결** (선택) — 없이 먼저 열고 반응을 본 뒤 붙여도 됩니다
 5. **숏폼 연결** — 여정 9걸음과 50가지를 15~30초 영상 대본으로.
    특히 8걸음(날짜를 말하는 사람 조심)은 그 자체로 공익적 콘텐츠입니다
    (이 저장소의 `india2030` 파이프라인 구조를 재사용할 수 있습니다)

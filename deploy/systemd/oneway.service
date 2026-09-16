@@ -1,0 +1,46 @@
+# 도커 없이 서버에 바로 올릴 때 쓰는 설정입니다.
+#
+#   sudo useradd --system --home /srv/oneway --shell /usr/sbin/nologin oneway
+#   sudo mkdir -p /srv/oneway /var/lib/oneway
+#   sudo chown -R oneway:oneway /srv/oneway /var/lib/oneway
+#   (코드를 /srv/oneway 에 두고)
+#   sudo cp deploy/systemd/oneway.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now oneway
+
+[Unit]
+Description=하나의 길 — ONE WAY
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=oneway
+Group=oneway
+WorkingDirectory=/srv/oneway
+Environment=PYTHONUNBUFFERED=1
+# 키가 없어도 동작합니다. 넣으려면 아래 파일에 ANTHROPIC_API_KEY=sk-ant-... 한 줄.
+EnvironmentFile=-/etc/oneway.env
+ExecStart=/usr/bin/python3 -m oneway serve \
+    --host 127.0.0.1 --port 8000 \
+    --config /etc/oneway/config.json
+Restart=always
+RestartSec=3
+
+# ── 이 서비스가 할 수 없는 일들 ──────────────────────────────
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+# 방문 기록을 쓸 수 있는 곳은 여기 하나뿐입니다.
+ReadWritePaths=/var/lib/oneway
+
+[Install]
+WantedBy=multi-user.target

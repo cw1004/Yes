@@ -8,7 +8,8 @@ CAPTION ?=            # 비우면 내레이션과 동일 (예: CAPTION=ko)
 LANG_OPT = --lang $(NARRATION) $(if $(CAPTION),--caption-lang $(CAPTION),)
 
 .PHONY: help setup check scripts all hindi fast test clean \
-        oneway serve ask today site sitemap purge
+        oneway serve ask today site sitemap purge \
+        book ledger preflight up down logs
 
 help:            ## 사용 가능한 명령 보기
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -48,7 +49,7 @@ today:           ## 오늘의 3분 보기
 oneway:          ## 상담사·콘텐츠 환경 점검
 	$(PY) -m oneway check
 
-site:            ## 정적 사이트 내보내기 (SEO 페이지 66개)
+site:            ## 정적 사이트 내보내기 (SEO 페이지 78개)
 	$(PY) -m oneway build --clean --site-url $(SITE_URL)
 
 sitemap:         ## sitemap.xml 출력
@@ -56,6 +57,24 @@ sitemap:         ## sitemap.xml 출력
 
 purge:           ## 180일 넘은 방문 기록 삭제
 	$(PY) -m oneway purge --days 180
+
+book:            ## 전자책 만들기 (EPUB/HTML/마크다운)
+	$(PY) -m oneway book
+
+ledger:          ## 판매·기부 장부 보기
+	$(PY) -m oneway ledger
+
+preflight:       ## 공개 전 점검 (전화번호·설정·개인정보)
+	sh deploy/scripts/preflight.sh
+
+up:              ## 서버에 띄우기 (도커)
+	cd deploy && docker compose up -d --build
+
+down:            ## 내리기
+	cd deploy && docker compose down
+
+logs:            ## 로그 보기
+	cd deploy && docker compose logs -f app
 
 test:            ## 테스트 실행
 	$(PY) -m unittest discover -s tests

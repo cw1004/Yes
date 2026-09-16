@@ -30,9 +30,11 @@ from ..donate import Ledger
 from ..content import daily as daily_mod
 from ..content import entries, fifty, pages as pages_mod
 from ..content import paths as paths_mod
+from ..counselor import safety
 from ..counselor.engine import Counselor
 from ..counselor.session import Store, Visitor
 from ..seo import robots_txt, sitemap_xml
+from .ratelimit import RateLimiter, too_many_message
 from . import render
 
 log = logging.getLogger("oneway.web")
@@ -54,6 +56,7 @@ class Site:
         self.counselor = Counselor(cfg)
         self.pray_counts = cfg.data_dir / "pray_counts.json"
         self.book = book_content.build_book(cfg.site_url, cfg.book_isbn)
+        self.limiter = RateLimiter()
         cfg.data_dir.mkdir(parents=True, exist_ok=True)
 
     def ledger(self) -> Ledger:
@@ -88,6 +91,8 @@ class Site:
 class Handler(BaseHTTPRequestHandler):
     site: Site = None           # serve() 에서 주입
     server_version = f"OneWay/{__version__}"
+    protocol_version = "HTTP/1.1"          # nginx 와 연결을 재사용한다
+    timeout = 30                           # 죽은 연결이 스레드를 붙잡지 않게
 
     # ------------------------------------------------------------ 응답 유틸
     def _send(self, code: int, body: bytes, ctype: str,
@@ -116,6 +121,41 @@ class Handler(BaseHTTPRequestHandler):
 
     def text(self, body: str, ctype: str = "text/plain; charset=utf-8") -> None:
         self._send(200, body.encode("utf-8"), ctype, cache="public, max-age=3600")
+
+    # ------------------------------------------------------------ 제한
+    def client_key(self) -> str:
+        """요청자 식별. 세션이 있으면 세션, 없으면 주소.
+
+        nginx 뒤에서는 실제 주소가 X-Forwarded-For 에 온다. 신뢰할 수 있는
+        프록시 뒤에 있을 때만 의미가 있으므로 cfg.trust_proxy 로 켠다.
+        """
+        sid = self.read_sid()
+        if sid:
+            return f"s:{sid}"
+        if self.site.cfg.trust_proxy:
+            fwd = self.headers.get("X-Forwarded-For", "")
+            if fwd:
+                return "ip:" + fwd.split(",")[0].strip()
+        return "ip:" + self.client_address[0]
+
+    def limited(self, bucket: str) -> bool:
+        """제한에 걸렸으면 응답까지 보내고 True 를 돌려준다."""
+        if not self.site.cfg.rate_limit:
+            return False
+        d = self.site.limiter.check(bucket, self.client_key())
+        if d.allowed:
+            return False
+        body = json.dumps(too_many_message(d.retry_after),
+                          ensure_ascii=False).encode("utf-8")
+        self.send_response(429)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Retry-After", str(d.retry_after))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        if self.command != "HEAD":
+            self.wfile.write(body)
+        return True
 
     # ------------------------------------------------------------ 세션
     def read_sid(self) -> Optional[str]:
@@ -162,6 +202,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.json_out({"ok": True, "version": __version__})
 
         if path in ("/my-book.epub", "/my-book.html"):
+            if self.limited("book"):
+                return
             return self.serve_my_book(path)
 
         if path.startswith("/api/"):
@@ -250,12 +292,17 @@ class Handler(BaseHTTPRequestHandler):
 
         if path == "/api/counsel":
             message = str(data.get("message", ""))[:2000]
+            # 위기 신호는 제한하지 않는다. 급한 사람을 막으면 안 된다.
+            if not safety.assess(message).urgent and self.limited("counsel"):
+                return
             reply = self.site.counselor.respond(message, v)
             self.site.store.save(v)
             return self.json_out({"reply": reply.to_dict(),
                                   "progress": v.progress()}, sid=new_sid)
 
         if path == "/api/intention":
+            if self.limited("write"):
+                return
             text = str(data.get("text", "")).strip()[:500]
             if not text:
                 return self.json_out({"error": "empty"}, 400, sid=new_sid)
@@ -341,6 +388,7 @@ def serve(cfg: Config) -> None:
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     Handler.site = Site(cfg)
     httpd = ThreadingHTTPServer((cfg.host, cfg.port), Handler)
+    httpd.daemon_threads = True
     print(f"  하나의 길 — ONE WAY  가 떴습니다")
     print(f"  http://{cfg.host}:{cfg.port}  (Ctrl+C 로 종료)")
     print(f"  상담 엔진: {Handler.site.counselor.cfg.counselor} "

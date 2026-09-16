@@ -1,0 +1,22 @@
+{
+  "site_url": "https://example.kr",
+  "site_name": "하나의 길 — ONE WAY",
+
+  "data_dir": "/data",
+
+  "counselor": "auto",
+  "model": "claude-opus-5",
+  "effort": "medium",
+
+  "rate_limit": true,
+  "trust_proxy": true,
+
+  "naver_verify": "",
+  "google_verify": "",
+  "analytics_snippet": "",
+
+  "book_isbn": "",
+  "book_stores": [],
+
+  "crisis_region": "KR"
+}

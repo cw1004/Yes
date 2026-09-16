@@ -1,0 +1,9 @@
+[Unit]
+Description=하나의 길 — 오래된 방문 기록 삭제와 백업
+
+[Service]
+Type=oneshot
+User=oneway
+Group=oneway
+WorkingDirectory=/srv/oneway
+ExecStart=/srv/oneway/deploy/scripts/maintenance.sh

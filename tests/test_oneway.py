@@ -2,6 +2,7 @@
 """하나의 길 무결성 테스트: python3 -m unittest discover -s tests"""
 
 import io
+import json
 import random
 import re
 import xml.etree.ElementTree as ET
@@ -23,6 +24,7 @@ from oneway.counselor.engine import Counselor
 from oneway.counselor.session import Store, Visitor, valid_id
 from oneway.seo import all_urls, robots_txt, sitemap_xml
 from oneway.web import render
+from oneway.web.ratelimit import RateLimiter, too_many_message
 
 
 class TestVerses(unittest.TestCase):
@@ -939,6 +941,148 @@ class TestLedger(unittest.TestCase):
 
     def test_won(self):
         self.assertEqual(won(1234567), "1,234,567원")
+
+
+class TestRateLimit(unittest.TestCase):
+    """공개 서버에서 가장 먼저 생기는 문제는 악의가 아니라 비용이다.
+    상담 한 번이 Claude API 한 번이고, 그건 돈이다."""
+
+    def setUp(self):
+        self.limiter = RateLimiter({"counsel": (3, 60), "page": (10, 60)})
+
+    def test_allows_then_blocks(self):
+        now = 1000.0
+        self.assertEqual(
+            [self.limiter.check("counsel", "a", now + i).allowed for i in range(4)],
+            [True, True, True, False])
+
+    def test_one_person_does_not_block_another(self):
+        now = 1000.0
+        for i in range(3):
+            self.limiter.check("counsel", "a", now + i)
+        self.assertTrue(self.limiter.check("counsel", "b", now).allowed)
+
+    def test_window_reopens(self):
+        now = 1000.0
+        for i in range(3):
+            self.limiter.check("counsel", "a", now + i)
+        self.assertFalse(self.limiter.check("counsel", "a", now + 10).allowed)
+        self.assertTrue(self.limiter.check("counsel", "a", now + 61).allowed)
+
+    def test_retry_after_is_useful(self):
+        now = 1000.0
+        for i in range(3):
+            self.limiter.check("counsel", "a", now)
+        d = self.limiter.check("counsel", "a", now + 10)
+        self.assertFalse(d.allowed)
+        self.assertGreater(d.retry_after, 0)
+        self.assertLessEqual(d.retry_after, 60)
+
+    def test_buckets_are_separate(self):
+        now = 1000.0
+        for i in range(3):
+            self.limiter.check("counsel", "a", now)
+        self.assertTrue(self.limiter.check("page", "a", now).allowed)
+
+    def test_block_message_still_gives_the_hotline(self):
+        """막을 때도 문은 닫지 않는다."""
+        msg = too_many_message(600)
+        self.assertIn("109", msg["reply"]["text"])
+        self.assertTrue(msg["reply"]["hotlines"])
+        self.assertEqual(msg["reply"]["risk"], "none")
+
+    def test_old_entries_are_swept(self):
+        """방문자가 늘어도 기록이 무한히 쌓이면 그것도 장애다."""
+        from oneway.web.ratelimit import SWEEP_AFTER
+        limiter = RateLimiter({"page": (5, 60)})
+        for i in range(500):
+            limiter.check("page", f"ip:{i}", 1000.0 + i)
+        self.assertEqual(len(limiter._hits), 500)
+        limiter.check("page", "new", 1000.0 + 500 + SWEEP_AFTER + 1)
+        self.assertEqual(len(limiter._hits), 1, "오래된 기록이 정리되어야 합니다")
+
+
+class TestConfigLoading(unittest.TestCase):
+    """컨테이너 첫 실행이 설정 파일 하나 때문에 실패하면 안 된다."""
+
+    def test_env_only(self):
+        cfg = Config.load(None, {"ONEWAY_SITE_URL": "https://a.kr",
+                                 "ONEWAY_PORT": "9000",
+                                 "ONEWAY_TRUST_PROXY": "true",
+                                 "ONEWAY_DATA": "/data"})
+        self.assertEqual(cfg.site_url, "https://a.kr")
+        self.assertEqual(cfg.port, 9000)
+        self.assertTrue(cfg.trust_proxy)
+        self.assertEqual(cfg.data_dir, Path("/data"))
+
+    def test_missing_file_does_not_crash(self):
+        cfg = Config.load("/nope/config.json", {})
+        self.assertTrue(cfg.site_url)
+
+    def test_env_wins_over_file(self):
+        path = Path(tempfile.mkdtemp()) / "c.json"
+        path.write_text(json.dumps({"site_url": "https://file.kr",
+                                    "rate_limit": False}), encoding="utf-8")
+        cfg = Config.load(str(path), {"ONEWAY_SITE_URL": "https://env.kr"})
+        self.assertEqual(cfg.site_url, "https://env.kr")
+        self.assertFalse(cfg.rate_limit, "파일에만 있는 값은 그대로 남아야 한다")
+
+    def test_empty_env_values_are_ignored(self):
+        cfg = Config.load(None, {"ONEWAY_SITE_URL": ""})
+        self.assertNotEqual(cfg.site_url, "")
+
+    def test_bad_number_is_ignored(self):
+        cfg = Config.load(None, {"ONEWAY_PORT": "여덟천"})
+        self.assertEqual(cfg.port, Config().port)
+
+
+class TestDeployFiles(unittest.TestCase):
+    """배포 설정이 빠진 채 커밋되는 것을 막는다."""
+
+    ROOT = Path(__file__).resolve().parent.parent
+
+    def test_files_exist(self):
+        for rel in ("Dockerfile", ".dockerignore",
+                    "deploy/README.md", "deploy/docker-compose.yml",
+                    "deploy/nginx/oneway.conf", "deploy/nginx/oneway_proxy.inc",
+                    "deploy/systemd/oneway.service",
+                    "deploy/scripts/maintenance.sh",
+                    "deploy/scripts/restore.sh",
+                    "deploy/scripts/preflight.sh",
+                    "deploy/config/config.example.json",
+                    "deploy/.env.example"):
+            self.assertTrue((self.ROOT / rel).exists(), rel)
+
+    def test_container_does_not_run_as_root(self):
+        text = (self.ROOT / "Dockerfile").read_text(encoding="utf-8")
+        self.assertIn("USER oneway", text)
+        self.assertIn("HEALTHCHECK", text)
+
+    def test_nginx_has_tls_and_limits(self):
+        text = (self.ROOT / "deploy/nginx/oneway.conf").read_text(encoding="utf-8")
+        for needle in ("ssl_certificate", "limit_req zone=counsel",
+                       "Strict-Transport-Security", "Content-Security-Policy",
+                       "X-Forwarded-Proto"):
+            self.assertIn(needle, text + (self.ROOT / "deploy/nginx/oneway_proxy.inc")
+                          .read_text(encoding="utf-8"), needle)
+
+    def test_app_is_not_exposed_directly(self):
+        """앱은 nginx 뒤에만 있어야 한다. 포트를 바깥으로 열면 안 된다."""
+        text = (self.ROOT / "deploy/docker-compose.yml").read_text(encoding="utf-8")
+        app = text[text.index("  app:"):text.index("  web:")]
+        self.assertIn("expose:", app)
+        self.assertNotIn("ports:", app)
+
+    def test_secrets_are_gitignored(self):
+        text = (self.ROOT / ".gitignore").read_text(encoding="utf-8")
+        self.assertIn("deploy/.env", text)
+        self.assertIn("deploy/config/config.json", text)
+
+    def test_example_config_is_valid_json(self):
+        cfg = json.loads((self.ROOT / "deploy/config/config.example.json")
+                         .read_text(encoding="utf-8"))
+        self.assertTrue(cfg["rate_limit"])
+        self.assertTrue(cfg["trust_proxy"])
 
 
 class TestSeo(unittest.TestCase):

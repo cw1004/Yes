@@ -15,3 +15,7 @@ assets/stock/*
 data/
 # 정적 빌드 결과
 out/site/
+
+# 배포 비밀값
+deploy/.env
+deploy/config/config.json

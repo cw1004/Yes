@@ -37,7 +37,11 @@ from .web import render
 
 
 def build_config(args: argparse.Namespace) -> Config:
-    cfg = Config.from_file(args.config) if getattr(args, "config", None) else Config()
+    # 기본값 → 설정 파일 → 환경변수 → 명령줄 옵션 순으로 덮어쓴다
+    path = getattr(args, "config", None)
+    if path and not Path(path).exists():
+        raise SystemExit(f"  설정 파일이 없습니다: {path}")
+    cfg = Config.load(path)
     for arg, field in (("host", "host"), ("port", "port"), ("site_url", "site_url"),
                        ("model", "model"), ("counselor", "counselor"),
                        ("effort", "effort"), ("data", "data_dir"), ("out", "out_dir")):
