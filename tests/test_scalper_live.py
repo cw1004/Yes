@@ -518,5 +518,98 @@ class TestRunner(unittest.TestCase):
                              f"틱당 호출 과다: {self.client.calls}")
 
 
+class TestPreflight(unittest.TestCase):
+    """투입 전 점검 — 가장 중요한 성질은 '주문을 내지 않는다' 입니다."""
+
+    def setUp(self):
+        self.bars = make_bars()
+        self.price = self.bars[-1]["c"]
+        base = dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=5 * len(self.bars))
+        for i, b in enumerate(self.bars):
+            b["t"] = (base + dt.timedelta(minutes=5 * i)).isoformat()
+
+    def _run(self, client, equity):
+        from scalper.live import preflight
+        return preflight.run(client, ["NVDA"], RiskConfig(equity=equity))
+
+    def test_places_no_orders_ever(self):
+        c = FakeAlpaca(equity=50_000, price=self.price, bars=self.bars)
+        self._run(c, 50_000)
+        self.assertEqual(c.orders, {}, "점검이 주문을 냈습니다")
+        self.assertEqual(c.positions_db, {})
+        self.assertNotIn("POST /v2/orders", c.calls)
+
+    def test_healthy_account_is_go(self):
+        rep = self._run(FakeAlpaca(equity=50_000, price=self.price, bars=self.bars),
+                        50_000)
+        self.assertTrue(rep.go, [c.title for c in rep.failures])
+        self.assertTrue(rep.plans and rep.plans[0]["qty"] >= 1)
+
+    def test_tiny_account_is_no_go_with_required_equity(self):
+        rep = self._run(FakeAlpaca(equity=300, price=self.price, bars=self.bars), 300)
+        self.assertFalse(rep.go)
+        fail = next(c for c in rep.failures if "1주" in c.title)
+        self.assertIn("$ 이상이어야", fail.fix)
+
+    def test_pdt_exhausted_is_no_go(self):
+        rep = self._run(FakeAlpaca(equity=8_000, daytrade_count=3,
+                                   price=self.price, bars=self.bars), 8_000)
+        self.assertFalse(rep.go)
+        self.assertTrue(any("PDT" in c.title for c in rep.failures))
+
+    def test_pdt_under_limit_is_only_a_warning(self):
+        rep = self._run(FakeAlpaca(equity=8_000, daytrade_count=1,
+                                   price=self.price, bars=self.bars), 8_000)
+        self.assertTrue(any("PDT" in c.title for c in rep.warnings))
+        self.assertFalse(any("PDT" in c.title for c in rep.failures))
+
+    def test_blocked_account_is_no_go(self):
+        c = FakeAlpaca(equity=50_000, price=self.price, bars=self.bars)
+        c.trading_blocked = True
+        rep = self._run(c, 50_000)
+        self.assertFalse(rep.go)
+
+    def test_stale_bars_warn_about_feed(self):
+        old = make_bars()
+        # 마지막 봉이 8시간 전이 되도록 전체를 과거로 옮깁니다.
+        last = dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=8)
+        base = last - dt.timedelta(minutes=5 * (len(old) - 1))
+        for i, b in enumerate(old):
+            b["t"] = (base + dt.timedelta(minutes=5 * i)).isoformat()
+        rep = self._run(FakeAlpaca(equity=50_000, price=self.price, bars=old), 50_000)
+        self.assertTrue(any("최신 봉" in c.title for c in rep.warnings))
+
+    def test_insufficient_bars_is_no_go(self):
+        rep = self._run(FakeAlpaca(equity=50_000, price=self.price,
+                                   bars=self.bars[:10]), 50_000)
+        self.assertFalse(rep.go)
+
+    def test_connection_failure_reports_key_hint(self):
+        from scalper.live import preflight
+
+        class Dead(FakeAlpaca):
+            def request(self, method, path, body=None, base=None):
+                raise AlpacaError("forbidden", status=403)
+
+        rep = preflight.run(Dead(), ["NVDA"], RiskConfig())
+        self.assertFalse(rep.go)
+        self.assertIn("페이퍼 키", rep.failures[0].fix)
+
+    def test_live_account_carries_a_warning(self):
+        from scalper.live import preflight
+        c = FakeAlpaca(equity=50_000, price=self.price, bars=self.bars)
+        c.paper = False
+        rep = preflight.run(c, ["NVDA"], RiskConfig(equity=50_000))
+        self.assertFalse(rep.paper)
+        self.assertTrue(any("실계좌" in x.title for x in rep.warnings))
+
+    def test_report_renders_as_text(self):
+        rep = self._run(FakeAlpaca(equity=50_000, price=self.price, bars=self.bars),
+                        50_000)
+        text = rep.render()
+        self.assertIn("GO", text)
+        self.assertIn("실제로는 내지 않습니다", text)
+
+
 if __name__ == "__main__":
     unittest.main()

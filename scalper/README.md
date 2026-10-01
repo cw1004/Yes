@@ -203,6 +203,7 @@ python3 -m scalper live NVDA AMD SPY --serve 8790  # 모니터 화면까지
 | `live/state.py` | 재시작해도 유지되는 하루 상태 (원자적 저장) |
 | `live/executor.py` | 주문 실행 + **브로커 대조** (핵심) |
 | `live/runner.py` | 신호 × 안전장치 × 주문을 묶은 루프 |
+| `live/preflight.py` | 투입 전 go/no-go 점검 — **주문을 한 건도 내지 않습니다** |
 | `live/monitor.py` | 읽기 전용 모니터 화면 |
 
 ### 8-2. 주문이 나가기 전에 통과해야 하는 관문
@@ -234,12 +235,40 @@ export ALPACA_API_SECRET="..."
 export FINNHUB_API_KEY="..."     # 선택 — 종목 뉴스 커버리지 향상
 
 python3 -m scalper check                        # 1. 키·네트워크 점검
-python3 -m scalper backtest NVDA --live         # 2. 실 데이터로 검증
-python3 -m scalper run --live                   # 3. 실 시세, 주문 없음 (신호만)
-python3 -m scalper live --serve 8790            # 4. 페이퍼 계좌 실제 주문
+python3 -m scalper preflight                    # 2. 이 계좌로 주문이 나갈 수 있는가
+python3 -m scalper backtest NVDA --live         # 3. 실 데이터로 검증
+python3 -m scalper run --live                   # 4. 실 시세, 주문 없음 (신호만)
+python3 -m scalper live --serve 8790            # 5. 페이퍼 계좌 실제 주문
 ```
 
-**4번을 최소 2주** 돌려 승률·손익비·MDD를 확인한 뒤에 실계좌를 얘기하세요.
+**5번을 최소 2주** 돌려 승률·손익비·MDD를 확인한 뒤에 실계좌를 얘기하세요.
+
+### 8-4-1. `preflight` 가 잡아주는 것
+
+`check` 는 "키가 있는가"를 봅니다. `preflight` 는 **"지금 이 계좌로 실제 주문이
+나갈 수 있는가"** 를 끝까지 확인하고, 주문은 한 건도 내지 않습니다.
+
+```
+❌ NVDA 1주도 살 수 없습니다
+   산정 수량 0.740주 (가격 101.40, 리스크 0.50%, 최대비중 25%)
+   → 이 종목은 자산 약 406$ 이상이어야 1주가 나옵니다.
+```
+
+실전 첫날에 부딪히는 문제는 대부분 전략이 아니라 계좌와 데이터입니다.
+
+- **1주도 못 사는 자산** — 브래킷 주문은 소수점 매수를 지원하지 않습니다.
+  종목별로 1주가 나오는 최소 자산을 역산해 알려줍니다.
+- **PDT** — 남은 당일매매 횟수까지 셉니다. 0회면 NO-GO.
+- **데이터 지연** — 무료 IEX 피드는 단타에 쓰기엔 지연이 큽니다.
+  최신 봉이 몇 분 전인지 실측해서 경고합니다.
+- **계좌 미승인·입금 미반영·매수여력 부족**
+- **지금 주문을 낸다면** 수량·손절·목표·손절 시 손실 금액까지 미리 보여줍니다.
+
+종료 코드는 GO 면 0, NO-GO 면 1 이라 스크립트에서 바로 쓸 수 있습니다.
+
+```bash
+python3 -m scalper preflight && python3 -m scalper live --serve 8790
+```
 
 ### 8-5. 실계좌 (2중 잠금)
 

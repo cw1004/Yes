@@ -186,21 +186,55 @@ def cmd_backtest(a) -> int:
     return 0
 
 
-def cmd_live(a) -> int:
-    """실제 브로커에 주문을 내는 경로. 기본은 페이퍼 계좌입니다."""
-    from .live import AlpacaClient, AlpacaError, GuardConfig, LiveRunner
+def _live_client(a):
+    """키 확인 + 실계좌 2중 잠금. preflight 와 live 가 공유합니다."""
+    from .live import AlpacaClient, AlpacaError
 
     key = os.environ.get("ALPACA_API_KEY", "")
     secret = os.environ.get("ALPACA_API_SECRET", "")
     if not (key and secret):
         print("ALPACA_API_KEY / ALPACA_API_SECRET 환경변수가 필요합니다.\n"
               "  https://alpaca.markets 에서 페이퍼 계좌 키를 먼저 받으세요.", file=sys.stderr)
+        return None
+    if a.real and os.environ.get("SCALPER_ALLOW_LIVE") != "1":
+        print("실계좌는 SCALPER_ALLOW_LIVE=1 까지 있어야 열립니다.\n"
+              "  페이퍼로 최소 2주 검증한 뒤에 켜세요.", file=sys.stderr)
+        return None
+    try:
+        return AlpacaClient(key, secret, paper=not a.real)
+    except AlpacaError as e:
+        print(f"클라이언트 초기화 실패: {e}", file=sys.stderr)
+        return None
+
+
+def cmd_preflight(a) -> int:
+    """주문을 내기 전에 계좌·데이터·수량이 실제로 맞는지 끝까지 확인합니다."""
+    from .live import preflight
+    from .live.guards import GuardConfig
+    from .live.client import AlpacaError
+
+    client = _live_client(a)
+    if client is None:
         return 2
 
-    paper = not a.real
-    if a.real and os.environ.get("SCALPER_ALLOW_LIVE") != "1":
-        print("실계좌 주문은 SCALPER_ALLOW_LIVE=1 까지 있어야 열립니다.\n"
-              "  페이퍼로 최소 2주 검증한 뒤에 켜세요.", file=sys.stderr)
+    try:
+        report = preflight.run(client, a.tickers or DEFAULT_TICKERS,
+                               cfg=_cfg_from_args(a),
+                               guard_cfg=GuardConfig(), feed=a.feed)
+    except AlpacaError as e:
+        print(f"점검 실패: {e}", file=sys.stderr)
+        return 1
+
+    print(report.render())
+    return 0 if report.go else 1
+
+
+def cmd_live(a) -> int:
+    """실제 브로커에 주문을 내는 경로. 기본은 페이퍼 계좌입니다."""
+    from .live import AlpacaError, GuardConfig, LiveRunner
+
+    client = _live_client(a)
+    if client is None:
         return 2
 
     cfg = _cfg_from_args(a)
@@ -212,12 +246,6 @@ def cmd_live(a) -> int:
         daily_loss_limit_pct=cfg.daily_loss_limit_pct * 100,
         min_equity=a.min_equity or 0.0,
     )
-
-    try:
-        client = AlpacaClient(key, secret, paper=paper)
-    except AlpacaError as e:
-        print(f"클라이언트 초기화 실패: {e}", file=sys.stderr)
-        return 2
 
     runner = LiveRunner(client, a.tickers or DEFAULT_TICKERS, cfg=cfg,
                         guard_cfg=guards, state_path=a.state,
@@ -339,6 +367,15 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--seed", type=int, default=7)
     common(sp)
     sp.set_defaults(func=cmd_backtest)
+
+    sp = sub.add_parser("preflight", help="실전 투입 가능 여부 점검 (주문 없음)")
+    sp.add_argument("tickers", nargs="*", help="점검할 종목 (기본 NVDA TSLA AAPL)")
+    sp.add_argument("--real", action="store_true",
+                    help="⚠ 실계좌로 점검 (SCALPER_ALLOW_LIVE=1 필요)")
+    sp.add_argument("--feed", default="iex", choices=["iex", "sip"],
+                    help="데이터 피드. 무료 플랜은 iex 만 됩니다")
+    common(sp)
+    sp.set_defaults(func=cmd_preflight)
 
     sp = sub.add_parser("live", help="실전 매매 (Alpaca)")
     sp.add_argument("tickers", nargs="*", help="종목 3개 (기본 NVDA TSLA AAPL)")

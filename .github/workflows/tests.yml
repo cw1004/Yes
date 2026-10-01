@@ -44,9 +44,15 @@ jobs:
           if python -m scalper live --iterations 1; then
             echo "실패: 키 없이도 live 가 실행됐습니다"; exit 1
           fi
+          if python -m scalper preflight; then
+            echo "실패: 키 없이도 preflight 가 실행됐습니다"; exit 1
+          fi
           # 실계좌는 환경변수 없이 열리면 안 됩니다.
           if ALPACA_API_KEY=x ALPACA_API_SECRET=y python -m scalper live --real; then
             echo "실패: SCALPER_ALLOW_LIVE 없이 실계좌가 열렸습니다"; exit 1
+          fi
+          if ALPACA_API_KEY=x ALPACA_API_SECRET=y python -m scalper preflight --real; then
+            echo "실패: SCALPER_ALLOW_LIVE 없이 실계좌 점검이 열렸습니다"; exit 1
           fi
           echo "실계좌 잠금 정상"
 
