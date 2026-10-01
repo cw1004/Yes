@@ -366,6 +366,62 @@ class TestBacktest(unittest.TestCase):
             self.assertGreater(t.qty, 0)
 
 
+class TestDoctor(unittest.TestCase):
+    """'안 열림' 을 구체적 원인으로 바꿔주는 진단기."""
+
+    def setUp(self):
+        from scalper import doctor
+        self.doctor = doctor
+
+    def test_detects_busy_port_and_finds_another(self):
+        import socket
+
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as held:
+            held.bind(("127.0.0.1", 0))
+            held.listen(1)
+            busy = held.getsockname()[1]
+            self.assertFalse(self.doctor.port_free("127.0.0.1", busy))
+            alt = self.doctor.find_free_port("127.0.0.1", busy)
+            self.assertIsNotNone(alt)
+            self.assertNotEqual(alt, busy)
+
+    def test_free_port_is_reported_free(self):
+        import socket
+
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.bind(("127.0.0.1", 0))
+            port = s.getsockname()[1]
+        self.assertTrue(self.doctor.port_free("127.0.0.1", port))
+
+    def test_find_free_port_gives_up_cleanly(self):
+        self.assertIsNone(self.doctor.find_free_port("127.0.0.1", 80, tries=0))
+
+    def test_lan_ip_never_raises(self):
+        self.assertIsInstance(self.doctor.lan_ip(), str)
+
+    def test_container_detection_returns_string(self):
+        self.assertIsInstance(self.doctor.in_container_like(), str)
+
+    def test_report_renders_every_level(self):
+        rep = self.doctor.Report()
+        rep.add(self.doctor.OK, "좋음")
+        rep.add(self.doctor.WARN, "경고", "설명", "해결")
+        rep.add(self.doctor.FAIL, "실패")
+        text = rep.render()
+        self.assertEqual(rep.failed, 1)
+        for part in ("좋음", "경고", "설명", "해결", "실패"):
+            self.assertIn(part, text)
+
+    def test_full_run_passes_in_a_healthy_checkout(self):
+        """실제로 서버를 띄워 스스로 접속하는 데까지 성공해야 합니다."""
+        import socket
+
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.bind(("127.0.0.1", 0))
+            port = s.getsockname()[1]
+        self.assertEqual(self.doctor.run(host="127.0.0.1", port=port), 0)
+
+
 class TestEnvFile(unittest.TestCase):
     """`.env` 지원 — 운영체제마다 다른 환경변수 설정법을 하나로 묶습니다."""
 

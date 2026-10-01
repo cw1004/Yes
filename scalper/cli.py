@@ -1,5 +1,6 @@
 """명령줄 진입점.
 
+    python3 -m scalper doctor                 화면이 안 뜰 때 원인 진단
     python3 -m scalper check                  환경 점검
     python3 -m scalper run                    대시보드 + 3슬롯 엔진 (시뮬레이션)
     python3 -m scalper run --live --auto      실 데이터 + 자동매매(페이퍼)
@@ -39,6 +40,32 @@ def _cfg_from_args(a) -> RiskConfig:
         if val is not None:
             setattr(cfg, key, type(getattr(cfg, key))(val))
     return cfg
+
+
+def _resolve_port(host: str, port: int) -> int | None:
+    """포트가 막혀 있으면 빈 번호로 비켜 갑니다.
+
+    여기서 그냥 터지면 사용자에게는 트레이스백만 보이고 '안 열린다' 로 끝납니다.
+    비켜 간 사실은 크게 알려서, 주소를 착각하지 않게 합니다.
+    """
+    from .doctor import find_free_port, port_free
+
+    if port_free(host, port):
+        return port
+    alt = find_free_port(host, port + 1)
+    if alt is None:
+        print(f"포트 {port} 부터 20개가 모두 사용 중입니다. "
+              f"--port 로 다른 번호를 지정하세요.", file=sys.stderr)
+        return None
+    print(f"⚠ 포트 {port} 이 이미 사용 중이라 {alt} 로 띄웁니다.", file=sys.stderr)
+    return alt
+
+
+def cmd_doctor(a) -> int:
+    """화면이 안 뜰 때 원인을 찾아줍니다. 실제로 서버를 띄워 스스로 접속해 봅니다."""
+    from . import doctor
+
+    return doctor.run(host=a.host, port=a.port)
 
 
 def cmd_check(a) -> int:
@@ -294,8 +321,12 @@ def cmd_live(a) -> int:
     print(f"  주기       {a.interval}초 · 상태파일 {a.state}")
     if a.serve:
         from .live.monitor import serve as serve_monitor
-        serve_monitor(runner, port=a.serve)
-        print(f"  모니터     http://127.0.0.1:{a.serve}  (읽기 전용)")
+
+        port = _resolve_port("127.0.0.1", a.serve)
+        if port is None:
+            return 2
+        serve_monitor(runner, port=port)
+        print(f"  모니터     http://127.0.0.1:{port}  (읽기 전용)")
     print(f"  정지       Ctrl+C 또는 `touch {guards.halt_file}` (즉시 전량 청산)")
     print(BAR)
 
@@ -337,12 +368,15 @@ def cmd_run(a) -> int:
 
     from .server import serve
 
-    httpd = serve(engine, host=a.host, port=a.port, interval=a.interval)
+    port = _resolve_port(a.host, a.port)
+    if port is None:
+        return 2
+    httpd = serve(engine, host=a.host, port=port, interval=a.interval)
     mode = ("실 데이터" if a.live else "시뮬레이션")
     order = {"alpaca": "Alpaca " + ("실계좌 ⚠" if a.live_account else "페이퍼"),
              "paper": "내장 모의체결", None: "체결 없음(신호만)"}[a.broker]
     print(BAR)
-    print(f"  대시보드   http://{a.host}:{a.port}")
+    print(f"  대시보드   http://{a.host}:{port}")
     print(f"  슬롯       {' / '.join(s.ticker for s in engine.slots)}")
     print(f"  데이터     {mode}      주문   {order}")
     print(f"  AUTO       {'ON' if a.auto else 'OFF'}      갱신주기 {a.interval}초")
@@ -378,6 +412,11 @@ def build_parser() -> argparse.ArgumentParser:
                         help="왕복 수수료+슬리피지 (bp, 기본 1.0)")
         sp.add_argument("--offline", action="store_true",
                         help="외부 호출 없이 시뮬레이터만 사용")
+
+    sp = sub.add_parser("doctor", help="화면이 안 뜰 때 원인 진단")
+    sp.add_argument("--host", default="127.0.0.1")
+    sp.add_argument("--port", type=int, default=8787)
+    sp.set_defaults(func=cmd_doctor)
 
     sp = sub.add_parser("check", help="환경 점검")
     sp.add_argument("--live-account", dest="live_account", action="store_true")
