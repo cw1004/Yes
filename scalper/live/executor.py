@@ -18,7 +18,8 @@ import math
 import time
 from dataclasses import dataclass, field
 
-from .client import AlpacaClient, AlpacaError, BrokerPosition, Order
+from .client import ALPACA_CAPS, AlpacaClient, BrokerPosition, Order
+from .types import BrokerError, Capabilities
 from .state import StateStore, TradeRecord
 
 
@@ -35,6 +36,7 @@ class LivePosition:
     opened_at: str = ""
     reasons: list[str] = field(default_factory=list)
     unrealized: float = 0.0
+    protected: bool = True      # 거래소에 손절 주문이 실제로 걸려 있는가
 
     @property
     def pnl_pct(self) -> float:
@@ -55,6 +57,7 @@ class LivePosition:
             "pnl_pct": round(self.pnl_pct, 3),
             "pnl_cash": round(self.unrealized, 2),
             "held_min": round(self.held_min(), 1),
+            "protected": self.protected,
             "opened_at": self.opened_at, "reasons": self.reasons,
         }
 
@@ -88,6 +91,10 @@ class LiveExecutor:
         self.positions: dict[str, LivePosition] = {}
         self.last_error: str = ""
 
+    @property
+    def caps(self) -> Capabilities:
+        return getattr(self.client, "caps", ALPACA_CAPS)
+
     # ── 동기화 ────────────────────────────────────────────────────────
     def sync(self, prices: dict[str, float] | None = None) -> list[ExecEvent]:
         """브로커 실제 상태를 읽어와 내부 상태를 맞춥니다. 매 틱 첫 번째로 호출.
@@ -98,7 +105,7 @@ class LiveExecutor:
         events: list[ExecEvent] = []
         try:
             broker_positions = self.client.positions()
-        except AlpacaError as e:
+        except BrokerError as e:
             self.last_error = str(e)
             return [ExecEvent("ERROR", "", f"포지션 조회 실패: {e}")]
         self.last_error = ""
@@ -144,7 +151,7 @@ class LiveExecutor:
         """의도 기록이 없으면 살아 있는 주문에서 손절/목표를 복원합니다."""
         try:
             orders = self.client.open_orders(pos.ticker)
-        except AlpacaError:
+        except BrokerError:
             return
         for o in orders:
             for leg in ([o.raw] + list(o.legs)):
@@ -194,7 +201,7 @@ class LiveExecutor:
             return 0.0, ""
         try:
             parent = self.client.get_order(entry_order_id)
-        except AlpacaError:
+        except BrokerError:
             return 0.0, ""
         for leg in parent.legs:
             o = Order.parse(leg)
@@ -213,19 +220,25 @@ class LiveExecutor:
         shares = int(math.floor(qty))
         if shares < 1:
             return ExecEvent("REJECT", ticker,
-                             f"산정 수량 {qty:.3f}주 < 1주 — 브래킷 주문은 소수점 매수를 "
+                             f"산정 수량 {qty:.3f}주 < 1주 — 이 브로커는 소수점 매수를 "
                              f"지원하지 않습니다. 계좌를 늘리거나 --risk-per-trade 를 높이세요.")
         if not (0 < stop < (price_hint or stop + 1)) or target <= stop:
             return ExecEvent("REJECT", ticker,
                              f"손절/목표 값이 올바르지 않습니다 (손절 {stop:.2f}, 목표 {target:.2f})")
 
+        caps = self.caps
         try:
-            order = self.client.submit_bracket(ticker, shares, stop, target)
-        except AlpacaError as e:
+            if caps.bracket:
+                order = self.client.submit_bracket(ticker, shares, stop, target)
+            else:
+                # 브래킷이 없는 브로커: 진입만 먼저 내고, 체결 뒤 손절을 따로 겁니다.
+                order = self.client.submit_entry(ticker, shares)
+        except BrokerError as e:
             return ExecEvent("REJECT", ticker, f"주문 거부: {e}", {"status": e.status})
 
         self.store.record_intent(ticker, order.id, stop, target, reasons)
-        filled = self._await_fill(order)
+        awaiter = getattr(self.client, "await_fill", None)
+        filled = awaiter(order, self.fill_timeout) if awaiter else self._await_fill(order)
 
         if filled is None or not filled.is_filled:
             status = filled.status if filled else "unknown"
@@ -239,17 +252,40 @@ class LiveExecutor:
             return ExecEvent("REJECT", ticker, f"체결 실패 ({status})")
 
         entry = filled.filled_avg_price or price_hint
+        protected, note = self._protect(ticker, filled.filled_qty, stop, caps)
+
         self.positions[ticker] = LivePosition(
             ticker=ticker, qty=filled.filled_qty, entry=entry, price=entry,
             stop=stop, target=target,
             opened_at=dt.datetime.now(dt.timezone.utc).isoformat(),
-            reasons=reasons)
+            reasons=reasons, protected=protected)
         return ExecEvent("ENTRY", ticker,
                          f"매수 체결 {filled.filled_qty:g}주 @ {entry:.2f} "
-                         f"(손절 {stop:.2f} / 목표 {target:.2f}) — "
+                         f"(손절 {stop:.2f} / 목표 {target:.2f}){note} — "
                          + ", ".join(reasons[:4]),
                          {"order_id": order.id, "entry": round(entry, 4),
-                          "qty": filled.filled_qty})
+                          "qty": filled.filled_qty, "protected": protected})
+
+    def _protect(self, ticker: str, qty: float, stop: float,
+                 caps: Capabilities) -> tuple[bool, str]:
+        """브래킷이 없으면 손절 주문을 따로 겁니다.
+
+        그마저 실패하면 포지션은 '프로그램이 살아 있는 동안만' 보호됩니다.
+        이건 조용히 넘어가면 안 되는 사실이라 메시지에 그대로 적습니다.
+        """
+        if caps.bracket:
+            return True, ""
+        if not caps.protective_stop:
+            return False, " ⚠ 거래소 손절 없음 — 프로그램이 꺼지면 무방비"
+        try:
+            prot = self.client.submit_protective(ticker, qty, stop)
+        except BrokerError as e:
+            return False, f" ⚠ 손절 주문 실패({e}) — 프로그램이 꺼지면 무방비"
+        if prot is None:
+            return False, " ⚠ 손절 주문 미접수 — 프로그램이 꺼지면 무방비"
+        self.store.state.intents.setdefault(ticker, {})["stop_order_id"] = prot.id
+        self.store.save()
+        return True, ""
 
     def _await_fill(self, order: Order) -> Order | None:
         """시장가라도 즉시 체결되지 않습니다. 상태가 확정될 때까지 폴링합니다."""
@@ -261,7 +297,7 @@ class LiveExecutor:
             time.sleep(0.6)
             try:
                 current = self.client.get_order(order.id)
-            except AlpacaError:
+            except BrokerError:
                 return current
         return current
 
@@ -279,13 +315,13 @@ class LiveExecutor:
         try:
             for o in self.client.open_orders(ticker):
                 self.client.cancel_order(o.id)
-        except AlpacaError as e:
+        except BrokerError as e:
             return ExecEvent("ERROR", ticker, f"잔여 주문 취소 실패: {e}")
 
         time.sleep(0.4)          # 취소가 반영될 짧은 여유
         try:
             self.client.close_position(ticker)
-        except AlpacaError as e:
+        except BrokerError as e:
             return ExecEvent("ERROR", ticker, f"청산 주문 실패: {e}")
 
         # 실제 확정은 다음 sync() 의 _settle_closed 가 합니다. 여기서는 의도만 남깁니다.
@@ -294,3 +330,8 @@ class LiveExecutor:
 
     def flatten_all(self, reason: str = "전량 청산") -> list[ExecEvent]:
         return [self.exit(t, reason) for t in list(self.positions)]
+
+    @property
+    def unprotected(self) -> list[str]:
+        """거래소에 손절이 걸려 있지 않은 포지션. 프로그램이 꺼지면 위험합니다."""
+        return [t for t, p in self.positions.items() if not p.protected]

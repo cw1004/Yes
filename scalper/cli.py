@@ -187,24 +187,58 @@ def cmd_backtest(a) -> int:
 
 
 def _live_client(a):
-    """키 확인 + 실계좌 2중 잠금. preflight 와 live 가 공유합니다."""
-    from .live import AlpacaClient, AlpacaError
+    """브로커 선택 + 실계좌 2중 잠금. preflight / live / kis-probe 가 공유합니다."""
+    from .live.types import BrokerError
 
-    key = os.environ.get("ALPACA_API_KEY", "")
-    secret = os.environ.get("ALPACA_API_SECRET", "")
-    if not (key and secret):
-        print("ALPACA_API_KEY / ALPACA_API_SECRET 환경변수가 필요합니다.\n"
-              "  https://alpaca.markets 에서 페이퍼 계좌 키를 먼저 받으세요.", file=sys.stderr)
-        return None
     if a.real and os.environ.get("SCALPER_ALLOW_LIVE") != "1":
         print("실계좌는 SCALPER_ALLOW_LIVE=1 까지 있어야 열립니다.\n"
-              "  페이퍼로 최소 2주 검증한 뒤에 켜세요.", file=sys.stderr)
+              "  모의투자로 최소 2주 검증한 뒤에 켜세요.", file=sys.stderr)
         return None
+
+    broker = getattr(a, "broker_api", "alpaca")
     try:
+        if broker == "kis":
+            from .live.kis import KISBroker, KISClient, KISCredentials, spec
+
+            creds = KISCredentials.from_env()
+            if not creds.complete:
+                print("KIS_APP_KEY / KIS_APP_SECRET / KIS_ACCOUNT(계좌 8자리) "
+                      "환경변수가 필요합니다.\n"
+                      "  https://apiportal.koreainvestment.com 에서 발급하고, "
+                      "모의투자 신청도 함께 하세요.", file=sys.stderr)
+                return None
+            client = KISClient(creds, paper=not a.real, spec=spec.load())
+            return KISBroker(client, exchange=getattr(a, "exchange", None))
+
+        from .live import AlpacaClient
+        key = os.environ.get("ALPACA_API_KEY", "")
+        secret = os.environ.get("ALPACA_API_SECRET", "")
+        if not (key and secret):
+            print("ALPACA_API_KEY / ALPACA_API_SECRET 환경변수가 필요합니다.\n"
+                  "  https://alpaca.markets 에서 페이퍼 계좌 키를 먼저 받으세요.\n"
+                  "  한국투자증권을 쓰려면 --broker-api kis 를 붙이세요.",
+                  file=sys.stderr)
+            return None
         return AlpacaClient(key, secret, paper=not a.real)
-    except AlpacaError as e:
-        print(f"클라이언트 초기화 실패: {e}", file=sys.stderr)
+    except BrokerError as e:
+        print(f"브로커 초기화 실패: {e}", file=sys.stderr)
         return None
+
+
+def cmd_kis_probe(a) -> int:
+    """KIS 응답을 날것으로 보여줍니다. 명세를 맞추는 용도. 주문은 내지 않습니다."""
+    from .live.kis import probe
+    from .live.types import BrokerError
+
+    a.broker_api = "kis"
+    broker = _live_client(a)
+    if broker is None:
+        return 2
+    try:
+        return probe.run(broker, a.symbol)
+    except BrokerError as e:
+        print(f"확인 실패: {e}", file=sys.stderr)
+        return 1
 
 
 def cmd_preflight(a) -> int:
@@ -368,12 +402,26 @@ def build_parser() -> argparse.ArgumentParser:
     common(sp)
     sp.set_defaults(func=cmd_backtest)
 
+    sp = sub.add_parser("kis-probe", help="한국투자증권 응답 확인 (주문 없음)")
+    sp.add_argument("symbol", nargs="?", default="NVDA", help="확인할 종목")
+    sp.add_argument("--real", action="store_true",
+                    help="⚠ 실전 계좌로 조회 (SCALPER_ALLOW_LIVE=1 필요)")
+    sp.add_argument("--exchange", default=None,
+                    choices=["NASDAQ", "NYSE", "AMEX"])
+    sp.set_defaults(func=cmd_kis_probe)
+
     sp = sub.add_parser("preflight", help="실전 투입 가능 여부 점검 (주문 없음)")
     sp.add_argument("tickers", nargs="*", help="점검할 종목 (기본 NVDA TSLA AAPL)")
     sp.add_argument("--real", action="store_true",
                     help="⚠ 실계좌로 점검 (SCALPER_ALLOW_LIVE=1 필요)")
     sp.add_argument("--feed", default="iex", choices=["iex", "sip"],
                     help="데이터 피드. 무료 플랜은 iex 만 됩니다")
+    sp.add_argument("--broker-api", dest="broker_api", default="alpaca",
+                    choices=["alpaca", "kis"],
+                    help="주문을 낼 증권사 (기본 alpaca)")
+    sp.add_argument("--exchange", default=None,
+                    choices=["NASDAQ", "NYSE", "AMEX"],
+                    help="KIS 전용 — 거래소 (기본 NASDAQ)")
     common(sp)
     sp.set_defaults(func=cmd_preflight)
 
@@ -399,6 +447,12 @@ def build_parser() -> argparse.ArgumentParser:
                     help="뉴스·매크로 없이 기술 신호만 사용")
     sp.add_argument("--serve", type=int, default=0, metavar="PORT",
                     help="읽기 전용 모니터 화면을 이 포트로 띄웁니다 (예: 8790)")
+    sp.add_argument("--broker-api", dest="broker_api", default="alpaca",
+                    choices=["alpaca", "kis"],
+                    help="주문을 낼 증권사 (기본 alpaca)")
+    sp.add_argument("--exchange", default=None,
+                    choices=["NASDAQ", "NYSE", "AMEX"],
+                    help="KIS 전용 — 거래소 (기본 NASDAQ)")
     common(sp)
     sp.set_defaults(func=cmd_live)
 

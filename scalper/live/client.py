@@ -20,130 +20,31 @@ import urllib.parse
 import urllib.request
 from dataclasses import dataclass, field
 
+from .types import (Account, BrokerError, BrokerPosition, Capabilities, Clock,
+                    Order, _f, _tick)
+
 PAPER_BASE = "https://paper-api.alpaca.markets"
 LIVE_BASE = "https://api.alpaca.markets"
 DATA_BASE = "https://data.alpaca.markets"
 
 RETRY_STATUS = {408, 429, 500, 502, 503, 504}
 
+# 공통 타입은 types.py 에 있습니다. 기존 import 경로를 유지하려고 여기서 재노출합니다.
+__all__ = ["AlpacaClient", "AlpacaError", "Account", "BrokerPosition", "Clock",
+           "Order", "Capabilities", "_f", "_tick"]
 
-class AlpacaError(RuntimeError):
-    """복구 불가능한 API 오류. 재시도를 이미 소진한 뒤에 올라옵니다."""
-
-    def __init__(self, message: str, status: int = 0, body: str = ""):
-        super().__init__(message)
-        self.status = status
-        self.body = body
+ALPACA_CAPS = Capabilities(bracket=True, protective_stop=True, market_order=True,
+                           fractional=False, pdt=True, name="alpaca")
 
 
-@dataclass
-class Order:
-    id: str
-    symbol: str
-    side: str
-    qty: float
-    filled_qty: float
-    filled_avg_price: float
-    status: str
-    order_type: str = ""
-    legs: list[dict] = field(default_factory=list)
-    raw: dict = field(default_factory=dict)
-
-    @property
-    def is_open(self) -> bool:
-        return self.status in {"new", "accepted", "pending_new", "partially_filled",
-                               "accepted_for_bidding", "held"}
-
-    @property
-    def is_filled(self) -> bool:
-        return self.status == "filled"
-
-    @classmethod
-    def parse(cls, d: dict) -> "Order":
-        return cls(
-            id=str(d.get("id", "")),
-            symbol=str(d.get("symbol", "")).upper(),
-            side=str(d.get("side", "")),
-            qty=_f(d.get("qty")),
-            filled_qty=_f(d.get("filled_qty")),
-            filled_avg_price=_f(d.get("filled_avg_price")),
-            status=str(d.get("status", "")),
-            order_type=str(d.get("type", "")),
-            legs=list(d.get("legs") or []),
-            raw=d,
-        )
-
-
-@dataclass
-class BrokerPosition:
-    symbol: str
-    qty: float
-    avg_entry_price: float
-    market_value: float
-    unrealized_pl: float
-    current_price: float
-
-    @classmethod
-    def parse(cls, d: dict) -> "BrokerPosition":
-        return cls(
-            symbol=str(d.get("symbol", "")).upper(),
-            qty=_f(d.get("qty")),
-            avg_entry_price=_f(d.get("avg_entry_price")),
-            market_value=_f(d.get("market_value")),
-            unrealized_pl=_f(d.get("unrealized_pl")),
-            current_price=_f(d.get("current_price")),
-        )
-
-
-@dataclass
-class Account:
-    equity: float
-    cash: float
-    buying_power: float
-    daytrade_count: int
-    pattern_day_trader: bool
-    trading_blocked: bool
-    account_blocked: bool
-    status: str
-    currency: str = "USD"
-
-    @property
-    def pdt_restricted(self) -> bool:
-        """자산 2.5만 달러 미만이면 5영업일 3회까지만 데이트레이딩이 안전합니다."""
-        return self.equity < 25_000 and self.daytrade_count >= 3
-
-    @classmethod
-    def parse(cls, d: dict) -> "Account":
-        return cls(
-            equity=_f(d.get("equity")),
-            cash=_f(d.get("cash")),
-            buying_power=_f(d.get("buying_power")),
-            daytrade_count=int(_f(d.get("daytrade_count"))),
-            pattern_day_trader=bool(d.get("pattern_day_trader")),
-            trading_blocked=bool(d.get("trading_blocked")),
-            account_blocked=bool(d.get("account_blocked")),
-            status=str(d.get("status", "")),
-            currency=str(d.get("currency", "USD")),
-        )
-
-
-@dataclass
-class Clock:
-    is_open: bool
-    timestamp: str
-    next_open: str
-    next_close: str
-
-
-def _f(v) -> float:
-    try:
-        return float(v)
-    except (TypeError, ValueError):
-        return 0.0
+class AlpacaError(BrokerError):
+    """복구 불가능한 Alpaca API 오류."""
 
 
 class AlpacaClient:
     """페이퍼가 기본. 실계좌는 호출부에서 명시적으로 열어야 합니다."""
+
+    caps = ALPACA_CAPS
 
     def __init__(self, key: str, secret: str, paper: bool = True,
                  max_retries: int = 4, timeout: int = 12):
@@ -256,6 +157,27 @@ class AlpacaClient:
         d = self.request("POST", "/v2/orders", body)
         assert isinstance(d, dict)
         return Order.parse(d)
+
+    def submit_entry(self, symbol: str, qty: int, limit: float | None = None) -> Order:
+        """브래킷 없이 진입만. 브래킷을 지원하지 않는 브로커와 경로를 맞추기 위한 것."""
+        body: dict = {
+            "symbol": symbol.upper(), "qty": str(int(qty)), "side": "buy",
+            "type": "limit" if limit else "market", "time_in_force": "day",
+        }
+        if limit:
+            body["limit_price"] = _tick(limit)
+        d = self.request("POST", "/v2/orders", body)
+        assert isinstance(d, dict)
+        return Order.parse(d)
+
+    def submit_protective(self, symbol: str, qty: float, stop: float) -> Order | None:
+        """진입 후 손절만 따로 거래소에 걸어 둡니다."""
+        body = {
+            "symbol": symbol.upper(), "qty": str(int(qty)), "side": "sell",
+            "type": "stop", "time_in_force": "day", "stop_price": _tick(stop),
+        }
+        d = self.request("POST", "/v2/orders", body)
+        return Order.parse(d) if isinstance(d, dict) else None
 
     def get_order(self, order_id: str, nested: bool = True) -> Order:
         q = "?nested=true" if nested else ""

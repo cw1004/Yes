@@ -22,7 +22,7 @@ from .. import indicators
 from ..indicators import Candle
 from ..strategy import RiskConfig, plan_levels, position_size
 from ..signals import buy_signal
-from .client import AlpacaClient, AlpacaError
+from .types import BrokerError
 from .guards import GuardConfig, TradingGuards
 
 OK, WARN, FAIL = "ok", "warn", "fail"
@@ -105,7 +105,7 @@ def _bar_age_min(candles: list[Candle], now: dt.datetime | None = None) -> float
     return (now.timestamp() - candles[-1].ts) / 60.0
 
 
-def run(client: AlpacaClient, tickers: list[str], cfg: RiskConfig | None = None,
+def run(client, tickers: list[str], cfg: RiskConfig | None = None,
         guard_cfg: GuardConfig | None = None, feed: str = "iex") -> PreflightReport:
     cfg = cfg or RiskConfig()
     rep = PreflightReport(paper=client.paper)
@@ -119,7 +119,7 @@ def run(client: AlpacaClient, tickers: list[str], cfg: RiskConfig | None = None,
     acct = None
     try:
         acct = client.account()
-    except AlpacaError as e:
+    except BrokerError as e:
         rep.add(FAIL, "계좌 연결 실패", str(e),
                 "API 키가 맞는지, 페이퍼/실계좌 키를 섞어 쓰지 않았는지 확인하세요. "
                 "페이퍼 키는 실계좌에서 동작하지 않습니다.")
@@ -142,8 +142,21 @@ def run(client: AlpacaClient, tickers: list[str], cfg: RiskConfig | None = None,
         rep.add(FAIL, "자산이 0 입니다", "",
                 "입금이 반영되었는지 확인하세요. 페이퍼 계좌는 보통 10만 달러로 시작합니다.")
 
-    # ── 2. PDT ──
-    if acct.equity < 25_000:
+    # ── 2. 거래소 손절 가능 여부 ──
+    caps = getattr(client, "caps", None)
+    if caps and not caps.exchange_side_stop:
+        rep.add(WARN, "이 브로커는 거래소에 손절을 걸 수 없습니다",
+                "브래킷(OCO)·스톱 주문 미지원 — 손절은 이 프로그램이 살아 있는 "
+                "동안에만 동작합니다.",
+                "프로그램이 꺼지거나 인터넷이 끊기면 포지션이 무방비가 됩니다. "
+                "종료 시에는 자동 청산되지만, 갑작스런 크래시는 막지 못합니다. "
+                "감당할 수 있는 금액으로만 하세요.")
+    elif caps:
+        rep.add(OK, "거래소 손절 가능",
+                "브래킷" if caps.bracket else "별도 손절 주문")
+
+    # ── 3. PDT ──
+    if (caps is None or caps.pdt) and acct.equity < 25_000:
         left = max(0, 3 - acct.daytrade_count)
         level = FAIL if acct.pdt_restricted else WARN
         rep.add(level,
@@ -151,10 +164,12 @@ def run(client: AlpacaClient, tickers: list[str], cfg: RiskConfig | None = None,
                 f"5영업일 중 당일매매 {acct.daytrade_count}회 사용 · 남은 횟수 {left}회",
                 "단타는 하루에도 여러 번 사고팝니다. 이 계좌로는 주 3회가 한계입니다. "
                 "자산을 2.5만 달러 이상으로 올리거나, 보유 기간을 하루 이상으로 늘리세요.")
-    else:
+    elif caps is None or caps.pdt:
         rep.add(OK, "PDT 제한 없음", f"자산 {acct.equity:,.0f} ≥ 25,000")
+    else:
+        rep.add(OK, "PDT 규정 비대상", "국내 증권사 경유 주문입니다")
 
-    # ── 3. 시장 시간 ──
+    # ── 4. 시장 시간 ──
     try:
         clock = client.clock()
         if clock.is_open:
@@ -162,10 +177,10 @@ def run(client: AlpacaClient, tickers: list[str], cfg: RiskConfig | None = None,
         else:
             rep.add(WARN, "장이 닫혀 있습니다", f"다음 개장 {clock.next_open}",
                     "장이 열린 뒤 다시 점검하면 데이터 신선도까지 정확히 확인됩니다.")
-    except AlpacaError as e:
+    except BrokerError as e:
         rep.add(FAIL, "시장 시간 조회 실패", str(e))
 
-    # ── 4. 안전장치 ──
+    # ── 5. 안전장치 ──
     guards = TradingGuards(guard_cfg or GuardConfig())
     if guards.halted():
         rep.add(FAIL, "킬 스위치가 켜져 있습니다", str(guards.halt_path),
@@ -173,12 +188,12 @@ def run(client: AlpacaClient, tickers: list[str], cfg: RiskConfig | None = None,
     else:
         rep.add(OK, "킬 스위치 해제됨", f"정지 방법: touch {guards.halt_path}")
 
-    # ── 5. 종목별 데이터 + 주문 시뮬레이션 ──
+    # ── 6. 종목별 데이터 + 주문 시뮬레이션 ──
     for ticker in tickers:
         ticker = ticker.upper()
         try:
             rows = client.bars(ticker, "5Min", 200, feed=feed)
-        except AlpacaError as e:
+        except BrokerError as e:
             rep.add(FAIL, f"{ticker} 봉 데이터 조회 실패", str(e),
                     "데이터 구독 플랜을 확인하세요. 무료 플랜은 feed=iex 만 됩니다.")
             rep.plans.append({"ticker": ticker, "blocked": "데이터 없음"})
@@ -208,7 +223,7 @@ def run(client: AlpacaClient, tickers: list[str], cfg: RiskConfig | None = None,
 
         try:
             price = client.latest_price(ticker)
-        except AlpacaError:
+        except BrokerError:
             price = 0.0
         if price <= 0:
             price = candles[-1].close
@@ -235,7 +250,7 @@ def run(client: AlpacaClient, tickers: list[str], cfg: RiskConfig | None = None,
                     f"{cfg.max_position_pct*100:.0f}%)",
                     f"이 종목은 자산 약 {need:,.0f}$ 이상이어야 1주가 나옵니다. "
                     f"더 싼 종목을 쓰거나 --risk-per-trade 를 올리세요. "
-                    f"(브래킷 주문은 소수점 매수를 지원하지 않습니다)")
+                    f"(이 브로커는 소수점 매수를 지원하지 않습니다)")
             rep.plans.append({"ticker": ticker, "blocked": "1주 미만"})
             continue
 
@@ -257,7 +272,7 @@ def run(client: AlpacaClient, tickers: list[str], cfg: RiskConfig | None = None,
             "score": sig.score,
         })
 
-    # ── 6. 리스크 설정 요약 ──
+    # ── 7. 리스크 설정 요약 ──
     worst = sum(p.get("risk", 0.0) for p in rep.plans if not p.get("blocked"))
     if worst and acct.equity:
         pct = worst / acct.equity * 100

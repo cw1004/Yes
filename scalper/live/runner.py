@@ -19,7 +19,7 @@ from ..macro import MacroReader
 from ..news import NewsCollector
 from ..signals import sell_signal
 from ..strategy import Position, RiskConfig, decide_entry, decide_exit
-from .client import AlpacaClient, AlpacaError
+from .types import BrokerError
 from .executor import ExecEvent, LiveExecutor
 from .guards import GuardConfig, GuardResult, TradingGuards
 from .state import StateStore
@@ -106,10 +106,16 @@ class LiveRunner:
         self.store.load(acct.equity)
         self.cfg.equity = acct.equity
         mode = "페이퍼" if self.client.paper else "⚠ 실계좌"
+        caps = getattr(self.client, "caps", None)
+        broker = caps.name if caps else "alpaca"
         self._log(0, "", "INFO",
-                  f"{mode} 연결 · 자산 {acct.equity:,.2f} {acct.currency} · "
-                  f"당일매매 {acct.daytrade_count}회 · 종목 "
-                  + "/".join(s.ticker for s in self.slots))
+                  f"{broker} {mode} 연결 · 자산 {acct.equity:,.2f} {acct.currency} · "
+                  f"종목 " + "/".join(s.ticker for s in self.slots))
+        if caps and not caps.exchange_side_stop:
+            self._log(0, "", "WARN",
+                      "이 브로커는 거래소에 손절을 걸 수 없습니다. 손절은 이 "
+                      "프로그램이 살아 있는 동안에만 동작합니다. 종료 시 보유분은 "
+                      "자동 청산됩니다.")
         if self.store.state.trades:
             self._log(0, "", "INFO",
                       f"오늘 기록 복원: {len(self.store.state.trades)}건, "
@@ -145,7 +151,7 @@ class LiveRunner:
         slot.last_bars_at = now
         try:
             rows = self.client.bars(slot.ticker, "5Min", 200)
-        except AlpacaError as e:
+        except BrokerError as e:
             self._log(slot.index, slot.ticker, "WARN", f"봉 조회 실패: {e}")
             return
         if rows:
@@ -182,7 +188,7 @@ class LiveRunner:
         for slot in self.slots:
             try:
                 p = self.client.latest_price(slot.ticker)
-            except AlpacaError:
+            except BrokerError:
                 p = 0.0
             if p > 0:
                 slot.price = p
@@ -271,7 +277,7 @@ class LiveRunner:
             while not self.stopped:
                 try:
                     self.step()
-                except AlpacaError as e:
+                except BrokerError as e:
                     self._log(0, "", "ERROR", f"API 오류 (계속 시도): {e}")
                     time.sleep(min(interval * 4, 30))
                 i += 1
@@ -279,9 +285,33 @@ class LiveRunner:
                     break
                 time.sleep(interval)
         except KeyboardInterrupt:
-            self._log(0, "", "INFO", "중단 요청 — 보유 포지션은 브래킷 주문으로 남습니다")
+            self._log(0, "", "INFO", "중단 요청")
         finally:
+            self._protect_on_exit()
             self.summary()
+
+    def _protect_on_exit(self) -> None:
+        """종료 전, 거래소 손절이 없는 포지션은 들고 나가면 안 됩니다.
+
+        브래킷을 지원하는 브로커면 손절이 거래소에 남으므로 그대로 둡니다.
+        지원하지 않으면 프로그램이 꺼지는 순간 무방비가 되므로 청산합니다.
+        """
+        naked = self.executor.unprotected
+        if not naked:
+            if self.executor.positions:
+                self._log(0, "", "INFO",
+                          "보유 포지션은 거래소에 걸린 손절 주문으로 보호됩니다")
+            return
+        self._log(0, "", "WARN",
+                  f"거래소 손절이 없는 포지션 {len(naked)}건을 청산합니다 "
+                  f"({', '.join(naked)}) — 들고 나가면 무방비입니다")
+        for ticker in naked:
+            try:
+                self._emit(self.executor.exit(ticker, "종료 — 무방비 방지"),
+                           self._slot_index(ticker))
+            except BrokerError as e:
+                self._log(0, ticker, "ERROR",
+                          f"청산 실패: {e} — 증권사 앱에서 직접 확인하세요")
 
     def summary(self) -> None:
         st = self.store.state

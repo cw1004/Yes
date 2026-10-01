@@ -13,3 +13,7 @@ assets/stock/*
 # 스캘퍼 실전 상태 파일 (계좌 정보가 들어갑니다)
 .scalper_state.json
 .scalper_halt
+
+# 한국투자증권 접근토큰 (자격증명)
+.kis_token.json
+my_spec.json
