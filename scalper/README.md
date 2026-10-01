@@ -15,6 +15,80 @@ python3 -m scalper run --live --auto --broker alpaca   # Alpaca 페이퍼 계좌
 
 ---
 
+## 0. 실행 방법 (처음이라면 여기부터)
+
+### 준비물 — Python 3.10 이상, 그게 전부
+
+설치할 패키지가 없습니다. 표준 라이브러리만 씁니다.
+
+```bash
+python3 --version      # macOS / Linux
+py --version           # Windows (python3 대신 py 를 씁니다)
+```
+
+없으면 https://www.python.org/downloads/ 에서 받으세요.
+**Windows 설치 시 "Add python.exe to PATH" 를 반드시 체크**하세요.
+
+### 1) 코드 받기
+
+```bash
+git clone https://github.com/cw1004/Yes.git
+cd Yes
+git checkout claude/three-ticker-scalp-scanner-auto-ialt9u
+```
+
+git 이 없으면 GitHub 페이지에서 **Code → Download ZIP** 으로 받아 풀어도 됩니다.
+
+### 2) 키 넣기 — `.env` 파일 하나로
+
+환경변수는 운영체제마다 설정법이 다르고 터미널을 닫으면 사라집니다.
+`.env` 파일을 쓰면 어디서든 똑같이 동작합니다.
+
+```bash
+cp scalper/.env.example .env     # Windows: copy scalper\.env.example .env
+```
+
+`.env` 를 열어 본인 키를 채웁니다. 한국투자증권이면 이 세 줄이면 됩니다.
+
+```bash
+export KIS_APP_KEY="발급받은_앱키"
+export KIS_APP_SECRET="발급받은_시크릿"
+export KIS_ACCOUNT="12345678"      # 계좌번호 앞 8자리
+```
+
+`.env` 는 `.gitignore` 에 있어 커밋되지 않습니다. 그래도 **남에게 보여주지 마세요.**
+`chmod 600 .env` 를 권장합니다.
+
+### 3) 실행 — 순서대로
+
+```bash
+python3 -m scalper run                              # ① 시뮬레이션 (키 없이도 됨)
+python3 -m scalper kis-probe                        # ② 응답 형식 확인 (조회만)
+python3 -m scalper preflight --broker-api kis       # ③ go/no-go
+python3 -m scalper live --broker-api kis --serve 8790   # ④ 모의투자 매매
+```
+
+Windows 에서는 `python3` 대신 `py` 를 씁니다.
+
+```powershell
+py -m scalper run
+```
+
+①은 키가 없어도 바로 돌아갑니다. http://127.0.0.1:8787 을 열면 화면이 뜹니다.
+**먼저 ①로 화면과 동작을 확인한 다음** ②~④로 넘어가세요.
+
+### 자주 막히는 곳
+
+| 증상 | 원인과 해결 |
+|---|---|
+| `No module named scalper` | `Yes` 폴더 안에서 실행해야 합니다. `cd Yes` |
+| `python3: command not found` | Windows 입니다. `py -m scalper ...` 로 쓰세요 |
+| 키를 넣었는데 못 읽음 | `.env` 가 **현재 폴더**에 있어야 합니다. 실행 시 "N개 설정을 읽었습니다" 가 떠야 정상 |
+| 포트가 이미 사용 중 | `--serve 8791` 등 다른 번호를 쓰세요 |
+| 멈추고 싶을 때 | `Ctrl+C`, 또는 `touch .scalper_halt` (보유분 청산 후 정지) |
+
+---
+
 ## 1. 무엇이 들어 있나
 
 | 모듈 | 역할 |

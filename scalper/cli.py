@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import pathlib
 import sys
 import time
 
@@ -474,5 +475,17 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    # 키는 .env 파일로도 넣을 수 있습니다. 이미 설정된 환경변수가 우선입니다.
+    from . import envfile
+
+    applied, path = envfile.load()
+    if applied:
+        print(f"· {path} 에서 {len(applied)}개 설정을 읽었습니다 "
+              f"({', '.join(sorted(applied)[:4])}{' …' if len(applied) > 4 else ''})",
+              file=sys.stderr)
+        if envfile.is_world_readable(pathlib.Path(path)):
+            print(f"  ⚠ {path} 를 다른 사용자도 읽을 수 있습니다. "
+                  f"chmod 600 {path} 를 권장합니다.", file=sys.stderr)
+
     args = build_parser().parse_args(argv)
     return args.func(args)

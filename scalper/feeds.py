@@ -33,7 +33,7 @@ class TickSimulator:
     """
 
     def __init__(self, ticker: str, bars: int = 180, seed: int | None = None,
-                 interval_sec: int = 300):
+                 interval_sec: int = 300, start_ts: int | None = None):
         self.ticker = ticker.upper()
         self.interval = interval_sec
         # PYTHONHASHSEED 에 흔들리지 않도록 crc32 로 고정 — 같은 티커는 항상 같은 경로.
@@ -43,7 +43,10 @@ class TickSimulator:
         self.vol_base = 40_000 + self.rng.random() * 120_000
         self.drift = self.rng.uniform(-0.00006, 0.00010)
         self.candles: list[Candle] = []
-        now = int(time.time())
+        # VWAP 은 UTC 날짜마다 리셋됩니다. 시작 시각이 실행 시각에 따라 달라지면
+        # 날짜 경계가 어디 떨어지느냐로 결과가 바뀌어, 테스트가 돌리는 시간에 따라
+        # 성공했다 실패했다 합니다. 그래서 고정할 수 있게 열어 둡니다.
+        now = int(time.time()) if start_ts is None else int(start_ts)
         start = now - bars * self.interval
         for i in range(bars):
             self.candles.append(self._next_candle(start + i * self.interval))

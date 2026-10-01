@@ -1,5 +1,8 @@
 """스캘퍼 로직 테스트 — 네트워크 없이 전부 돌아갑니다."""
 
+import os
+import pathlib
+import tempfile
 import time
 import unittest
 
@@ -335,9 +338,13 @@ class TestEngine(unittest.TestCase):
         self.assertTrue(eng.slots[1].step(None, None, 0, 0.0) is not None)
 
 
+# 실행 시각에 따라 결과가 바뀌지 않도록 고정한 기준 시각 (2026-09-30 14:00 UTC).
+ANCHOR_TS = 1790000000
+
+
 class TestBacktest(unittest.TestCase):
     def test_backtest_produces_consistent_stats(self):
-        candles = TickSimulator("NVDA", bars=300).history()
+        candles = TickSimulator("NVDA", bars=300, start_ts=ANCHOR_TS).history()
         res = run_backtest("NVDA", candles, RiskConfig(equity=10_000))
         self.assertEqual(res.wins, sum(1 for t in res.trades if t.pnl > 0))
         self.assertAlmostEqual(res.net, sum(t.pnl for t in res.trades), places=6)
@@ -345,7 +352,7 @@ class TestBacktest(unittest.TestCase):
 
     def test_no_lookahead_same_result_when_future_appended(self):
         """미래 캔들을 뒤에 붙여도 앞부분 매매는 바뀌지 않아야 합니다."""
-        candles = TickSimulator("AMD", bars=400).history()
+        candles = TickSimulator("AMD", bars=400, start_ts=ANCHOR_TS).history()
         short = run_backtest("AMD", candles[:300], RiskConfig())
         long = run_backtest("AMD", candles, RiskConfig())
         n = len(short.trades)
@@ -354,9 +361,99 @@ class TestBacktest(unittest.TestCase):
             self.assertEqual((a.entry_ts, round(a.entry, 6)), (b.entry_ts, round(b.entry, 6)))
 
     def test_every_trade_has_stop_below_entry(self):
-        candles = TickSimulator("SPY", bars=350).history()
+        candles = TickSimulator("SPY", bars=350, start_ts=ANCHOR_TS).history()
         for t in run_backtest("SPY", candles, RiskConfig()).trades:
             self.assertGreater(t.qty, 0)
+
+
+class TestEnvFile(unittest.TestCase):
+    """`.env` 지원 — 운영체제마다 다른 환경변수 설정법을 하나로 묶습니다."""
+
+    def setUp(self):
+        from scalper import envfile
+        self.envfile = envfile
+        self.tmp = tempfile.TemporaryDirectory()
+        self.saved = dict(os.environ)
+
+    def tearDown(self):
+        os.environ.clear()
+        os.environ.update(self.saved)
+        self.tmp.cleanup()
+
+    def _write(self, text: str) -> str:
+        p = pathlib.Path(self.tmp.name) / ".env"
+        p.write_text(text, encoding="utf-8")
+        return str(p)
+
+    def test_parses_export_and_plain_forms(self):
+        d = self.envfile.parse("export A=1\nB=2\n")
+        self.assertEqual(d, {"A": "1", "B": "2"})
+
+    def test_strips_matching_quotes(self):
+        d = self.envfile.parse("A=\"with spaces\"\nB='single'\n")
+        self.assertEqual(d["A"], "with spaces")
+        self.assertEqual(d["B"], "single")
+
+    def test_keeps_hash_inside_quotes(self):
+        d = self.envfile.parse('A="se#cret"\nB=plain # 주석\n')
+        self.assertEqual(d["A"], "se#cret")
+        self.assertEqual(d["B"], "plain")
+
+    def test_ignores_comments_and_blanks(self):
+        d = self.envfile.parse("# 주석\n\n   \nA=1\n나쁜줄\n")
+        self.assertEqual(d, {"A": "1"})
+
+    def test_secret_with_equals_sign_survives(self):
+        d = self.envfile.parse("A=abc==def==\n")
+        self.assertEqual(d["A"], "abc==def==")
+
+    def test_existing_environment_wins(self):
+        os.environ["KIS_APP_KEY"] = "from-shell"
+        path = self._write("KIS_APP_KEY=from-file\n")
+        applied, _ = self.envfile.load(path)
+        self.assertEqual(os.environ["KIS_APP_KEY"], "from-shell")
+        self.assertNotIn("KIS_APP_KEY", applied)
+
+    def test_empty_value_is_not_applied(self):
+        os.environ.pop("KIS_APP_KEY", None)
+        path = self._write('KIS_APP_KEY=""\n')
+        applied, _ = self.envfile.load(path)
+        self.assertEqual(applied, [])
+        self.assertNotIn("KIS_APP_KEY", os.environ)
+
+    def test_loads_when_not_already_set(self):
+        os.environ.pop("KIS_ACCOUNT", None)
+        path = self._write("export KIS_ACCOUNT=12345678\n")
+        applied, used = self.envfile.load(path)
+        self.assertEqual(applied, ["KIS_ACCOUNT"])
+        self.assertEqual(os.environ["KIS_ACCOUNT"], "12345678")
+        self.assertEqual(used, path)
+
+    def test_missing_file_is_silent(self):
+        self.assertEqual(self.envfile.load("/nonexistent/.env"), ([], ""))
+
+    def test_returns_key_names_never_values(self):
+        os.environ.pop("KIS_APP_SECRET", None)
+        path = self._write("KIS_APP_SECRET=super-secret\n")
+        applied, _ = self.envfile.load(path)
+        self.assertEqual(applied, ["KIS_APP_SECRET"])
+        self.assertNotIn("super-secret", " ".join(applied))
+
+    def test_example_template_sets_no_credentials(self):
+        """.env.example 을 그대로 복사해 써도 가짜 자격증명이 들어가면 안 됩니다."""
+        sample = pathlib.Path("scalper/.env.example")
+        if not sample.exists():
+            self.skipTest("템플릿 없음")
+        parsed = self.envfile.parse(sample.read_text(encoding="utf-8"))
+        for key in parsed:
+            os.environ.pop(key, None)
+        applied, _ = self.envfile.load(str(sample))
+        secrets = [k for k in applied
+                   if any(w in k for w in ("KEY", "SECRET", "TOKEN", "ACCOUNT"))]
+        self.assertEqual(secrets, [], f"템플릿이 자격증명을 설정했습니다: {secrets}")
+        # 주석이 값에 섞여 들어가지 않아야 합니다.
+        for key, value in parsed.items():
+            self.assertNotIn("#", value, f"{key} 값에 주석이 섞였습니다: {value!r}")
 
 
 if __name__ == "__main__":

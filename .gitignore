@@ -14,6 +14,9 @@ assets/stock/*
 .scalper_state.json
 .scalper_halt
 
+# API 키 (절대 커밋하지 마세요)
+.env
+
 # 한국투자증권 접근토큰 (자격증명)
 .kis_token.json
 my_spec.json
