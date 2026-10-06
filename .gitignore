@@ -1,3 +1,8 @@
 __pycache__/
 *.pyc
 sim/out/frames.npz
+# 6 MB APNGs regenerate from the tracked field frames in one command:
+#   python3 sim/render_adsorber.py
+sim/out/adsorber_drawn.png
+sim/out/adsorber_vent.png
+sim/out/*.log

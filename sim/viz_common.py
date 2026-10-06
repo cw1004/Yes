@@ -4,8 +4,10 @@ constant hue - never a rainbow), plus the validated categorical trio."""
 import math
 
 # --- categorical series slots 1-3, validated by the dataviz validator ---
-SERIES_LIGHT = ["#2a78d6", "#eb6834", "#1baf7a"]   # die, plate, coolant out
-SERIES_DARK  = ["#3987e5", "#d95926", "#199e70"]
+SERIES_LIGHT = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100"]
+SERIES_DARK  = ["#3987e5", "#d95926", "#199e70", "#c98500"]
+# slots 1-3 validate all-pairs in both modes; slot 4 (yellow) is adjacent-only,
+# so it is used for a series that is also directly labelled, never alone
 SURF_LIGHT, SURF_DARK = "#fcfcfb", "#1a1a19"
 
 def _f(c): return c/12.92 if c <= 0.04045 else ((c+0.055)/1.055)**2.4

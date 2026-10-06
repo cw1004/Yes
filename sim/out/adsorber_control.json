@@ -1,0 +1,63 @@
+[
+ {
+  "name": "CONTROL bond +/-30 (fixed back area)",
+  "x_hi": 1.0017867961826972,
+  "x_lo": 0.4573542625393618,
+  "swing": 0.5444325336433353,
+  "T_hot": 118.10300336769102,
+  "dtb": 20.854837936851595,
+  "ice": 6.8436664523209085,
+  "kw": {
+   "theta_bond_deg": 30.0,
+   "back_full": true,
+   "night_vent": true,
+   "U_night": 20.0
+  }
+ },
+ {
+  "name": "CONTROL bond +/-90 (fixed back area)",
+  "x_hi": 1.0019132470565624,
+  "x_lo": 0.3847206807548347,
+  "swing": 0.6171925663017277,
+  "T_hot": 125.9217126855122,
+  "dtb": 9.623487326751743,
+  "ice": 7.858684540818135,
+  "kw": {
+   "theta_bond_deg": 90.0,
+   "back_full": true,
+   "night_vent": true,
+   "U_night": 20.0
+  }
+ },
+ {
+  "name": "FIX  vent + bond90 + charge 1.10",
+  "x_hi": 1.0779482244644514,
+  "x_lo": 0.3857356155330622,
+  "swing": 0.6922126089313891,
+  "T_hot": 125.89299919481337,
+  "dtb": 10.371668182336336,
+  "ice": 8.914055368390803,
+  "kw": {
+   "theta_bond_deg": 90.0,
+   "charge_scale": 1.1,
+   "night_vent": true,
+   "U_night": 20.0
+  }
+ },
+ {
+  "name": "FIX  vent + bond90 + chg1.10 + k0.4",
+  "x_hi": 1.0866724321111585,
+  "x_lo": 0.3651566605008388,
+  "swing": 0.7215157716103198,
+  "T_hot": 128.24684455537462,
+  "dtb": 9.45918868391449,
+  "ice": 9.320557098693003,
+  "kw": {
+   "theta_bond_deg": 90.0,
+   "charge_scale": 1.1,
+   "k_bed": 0.4,
+   "night_vent": true,
+   "U_night": 20.0
+  }
+ }
+]
