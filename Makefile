@@ -7,7 +7,7 @@ NARRATION ?= ko
 CAPTION ?=            # 비우면 내레이션과 동일 (예: CAPTION=ko)
 LANG_OPT = --lang $(NARRATION) $(if $(CAPTION),--caption-lang $(CAPTION),)
 
-.PHONY: help setup check scripts all hindi fast test clean
+.PHONY: help setup check scripts all hindi fast test clean mirror-init mirror
 
 help:            ## 사용 가능한 명령 보기
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -36,3 +36,9 @@ test:            ## 테스트 실행
 
 clean:           ## 생성물 삭제
 	rm -rf output
+
+mirror-init:     ## STYLE MIRROR 옷장 DB + 예시 옷 17벌 만들기
+	$(PY) -m stylemirror init --sample
+
+mirror:          ## STYLE MIRROR 앱/거울 서버 실행 (같은 와이파이 휴대폰 접속 허용)
+	$(PY) -m stylemirror serve --lan

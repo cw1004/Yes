@@ -1,0 +1,427 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111111">
+<title>STYLE MIRROR</title>
+<style>
+:root {
+  --bg: #f6f5f2; --card: #ffffff; --text: #1d1d1f; --sub: #6b6b70; --line: #e4e2dc;
+  --accent: #2f6df6; --good: #1a9b5b; --warn: #d98a00; --bad: #d64545; --chip: #efeee9;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111113; --card: #1c1c1f; --text: #f2f2f4; --sub: #a0a0a8; --line: #2c2c31;
+    --accent: #6c97ff; --good: #3ccf86; --warn: #f2b134; --bad: #ff6b6b; --chip: #26262b;
+  }
+}
+:root[data-theme="dark"], body.mirror {
+  --bg: #000; --card: #0b0b0b; --text: #f5f5f5; --sub: #9a9a9a; --line: #222;
+  --accent: #8fb0ff; --good: #3ccf86; --warn: #f2b134; --bad: #ff6b6b; --chip: #161616;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--text);
+  font-family: -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif; }
+body { padding: 0 16px 96px; max-width: 720px; margin: 0 auto; }
+header { display: flex; align-items: center; justify-content: space-between; padding: 16px 0 8px; }
+h1 { font-size: 18px; letter-spacing: .08em; margin: 0; }
+.badge { font-size: 12px; padding: 4px 8px; border-radius: 99px; background: var(--chip); color: var(--sub); }
+.badge.on { color: var(--good); }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 16px; margin: 12px 0; }
+.weather { display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; }
+.weather .t { font-size: 32px; font-weight: 700; }
+.muted { color: var(--sub); font-size: 14px; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+select, input, textarea, button { font: inherit; color: var(--text); }
+select, input[type=text], textarea { background: var(--bg); border: 1px solid var(--line);
+  border-radius: 10px; padding: 10px; min-width: 0; }
+button { border: 0; border-radius: 12px; padding: 12px 16px; background: var(--chip); cursor: pointer; }
+button.primary { background: var(--accent); color: #fff; font-weight: 600; }
+button:disabled { opacity: .5; }
+.grow { flex: 1; }
+.camera { position: relative; border-radius: 16px; overflow: hidden; background: #000; aspect-ratio: 3/4; }
+.camera video, .camera img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.camera video.selfie { transform: scaleX(-1); }
+.count { position: absolute; inset: 0; display: grid; place-items: center; font-size: 96px;
+  font-weight: 800; color: #fff; text-shadow: 0 2px 12px #000; pointer-events: none; }
+.score-wrap { display: flex; gap: 16px; align-items: center; }
+.ring { width: 120px; height: 120px; flex: none; }
+.ring text { font-weight: 800; fill: var(--text); }
+.grade { font-size: 18px; font-weight: 700; }
+.bars { display: grid; gap: 8px; margin-top: 12px; }
+.bar { display: grid; grid-template-columns: 1fr auto; gap: 4px; font-size: 14px; }
+.bar .track { grid-column: 1 / -1; height: 8px; border-radius: 99px; background: var(--chip); overflow: hidden; }
+.bar .fill { height: 100%; border-radius: 99px; background: var(--accent); }
+ul.list { margin: 8px 0 0; padding-left: 20px; }
+ul.list li { margin: 4px 0; }
+.good li::marker { content: "👍 "; } .fix li::marker { content: "✏️ "; } .tip li::marker { content: "☂ "; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { padding: 8px 12px; border-radius: 99px; background: var(--chip); border: 1px solid transparent; font-size: 14px; }
+.chip.sel { border-color: var(--accent); color: var(--accent); }
+.items { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+.item { background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 8px; font-size: 13px; position: relative; }
+.item img, .item .ph { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 8px; background: var(--chip);
+  display: grid; place-items: center; color: var(--sub); font-size: 28px; }
+.item .del { position: absolute; top: 4px; right: 4px; padding: 2px 8px; font-size: 12px; }
+.outfit { border-top: 1px solid var(--line); padding-top: 12px; margin-top: 12px; }
+.outfit:first-of-type { border: 0; margin: 0; padding: 0; }
+.msg { font-size: 17px; line-height: 1.5; }
+.hist { display: flex; align-items: flex-end; gap: 6px; height: 120px; }
+.hist div { flex: 1; background: var(--accent); border-radius: 6px 6px 0 0; min-height: 4px; position: relative; }
+.hist span { position: absolute; top: -18px; left: 0; right: 0; text-align: center; font-size: 11px; color: var(--sub); }
+nav { position: fixed; left: 0; right: 0; bottom: 0; display: flex; background: var(--card);
+  border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom); }
+nav button { flex: 1; background: none; border-radius: 0; padding: 14px 4px; color: var(--sub); }
+nav button.on { color: var(--accent); font-weight: 700; }
+.hidden { display: none !important; }
+.spin { display: inline-block; width: 16px; height: 16px; border: 2px solid currentColor; border-right-color: transparent;
+  border-radius: 50%; animation: s 0.8s linear infinite; vertical-align: -3px; }
+@keyframes s { to { transform: rotate(360deg); } }
+/* 거울 모드: 검은 배경이 하프미러를 통해 '거울'이 되고, 글자만 떠 보인다 */
+body.mirror { max-width: none; padding: 32px 48px; font-size: 22px; }
+body.mirror nav, body.mirror .phone-only { display: none !important; }
+body.mirror .card { border: 0; background: transparent; }
+body.mirror .camera { width: 160px; aspect-ratio: 3/4; position: fixed; right: 32px; bottom: 32px; opacity: .6; }
+body.mirror .msg { font-size: 30px; }
+body.mirror .ring { width: 200px; height: 200px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>STYLE MIRROR</h1>
+  <span id="aiBadge" class="badge">연결 중…</span>
+</header>
+
+<section class="card weather" id="weather"><span class="muted">날씨 불러오는 중…</span></section>
+
+<section class="card row phone-only">
+  <select id="owner" aria-label="사용자"><option value="">가족 공용</option></select>
+  <input id="newOwner" type="text" placeholder="이름 추가" class="grow" maxlength="12" style="min-width:110px">
+  <select id="occasion" aria-label="일정"></select>
+</section>
+
+<!-- ====================== 1) 채점 ====================== -->
+<main id="tab-score">
+  <section class="card">
+    <div class="camera" id="cam">
+      <video id="video" playsinline autoplay muted class="selfie hidden"></video>
+      <img id="shot" class="hidden" alt="촬영한 사진">
+      <div class="count" id="count"></div>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <button id="btnCam" class="phone-only">📷 카메라 켜기</button>
+      <button id="btnFlip" class="phone-only hidden">↔ 전/후면</button>
+      <label class="phone-only"><input type="checkbox" id="timer" checked> 3초 타이머</label>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button id="btnShoot" class="primary grow">오늘 코디 채점하기</button>
+      <label class="phone-only" style="display:contents">
+        <input id="file" type="file" accept="image/*" capture="user" class="hidden">
+        <button id="btnFile" type="button">사진 선택</button>
+      </label>
+    </div>
+    <p class="muted phone-only" id="camHint">휴대폰을 세워 두고 전신이 나오게 찍으면 더 정확해요. 사진은 채점 후 저장되지 않습니다.</p>
+  </section>
+
+  <section class="card phone-only" id="pickCard">
+    <b>사진 없이 채점</b>
+    <p class="muted" style="margin:4px 0 8px">오늘 입은 옷을 옷장에서 고르세요.</p>
+    <div class="chips" id="pick"></div>
+    <div class="row" style="margin-top:12px"><button id="btnPickScore">고른 옷으로 채점</button></div>
+  </section>
+
+  <section class="card hidden" id="result"></section>
+</main>
+
+<!-- ====================== 2) 오늘 추천 ====================== -->
+<main id="tab-today" class="hidden">
+  <section class="card">
+    <div class="row">
+      <input id="request" type="text" class="grow" placeholder="예) 오늘 결혼식 가는데 뭐 입지?">
+      <button id="btnRec" class="primary">추천</button>
+    </div>
+  </section>
+  <section class="card hidden" id="recResult"></section>
+</main>
+
+<!-- ====================== 3) 옷장 ====================== -->
+<main id="tab-closet" class="hidden">
+  <section class="card">
+    <b>옷 등록</b>
+    <p class="muted" style="margin:4px 0 8px">옷 사진을 찍으면 AI가 종류·색·두께를 자동으로 채워요.</p>
+    <div class="row">
+      <input id="gFile" type="file" accept="image/*" capture="environment" class="grow">
+    </div>
+    <div class="row" style="margin-top:8px">
+      <input id="gName" type="text" placeholder="이름 (예: 네이비 니트)" class="grow">
+      <select id="gCat"></select>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <input id="gColor" type="text" placeholder="색" style="width:90px">
+      <input id="gMat" type="text" placeholder="소재" style="width:90px">
+      <select id="gStyle"></select>
+      <select id="gWarm">
+        <option value="1">아주 얇음</option><option value="2">얇음</option><option value="3" selected>보통</option>
+        <option value="4">두꺼움</option><option value="5">아주 두꺼움</option>
+      </select>
+      <label><input type="checkbox" id="gWater"> 방수</label>
+    </div>
+    <div class="row" style="margin-top:8px"><button id="btnAdd" class="primary grow">옷장에 추가</button></div>
+  </section>
+  <section class="card"><div class="items" id="closet"></div></section>
+</main>
+
+<!-- ====================== 4) 기록 ====================== -->
+<main id="tab-history" class="hidden">
+  <section class="card">
+    <b>최근 코디 점수</b>
+    <div class="hist" id="hist" style="margin-top:28px"></div>
+    <div id="histList" class="muted" style="margin-top:12px"></div>
+  </section>
+</main>
+
+<nav>
+  <button data-tab="score" class="on">채점</button>
+  <button data-tab="today">오늘 추천</button>
+  <button data-tab="closet">옷장</button>
+  <button data-tab="history">기록</button>
+</nav>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const MIRROR = new URLSearchParams(location.search).get("mode") === "mirror";
+if (MIRROR) document.body.classList.add("mirror");
+let STATUS = null, stream = null, facing = "user", closetItems = [], picked = new Set();
+
+function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; } }
+
+async function api(path, body, method) {
+  const opt = body !== undefined ? { method: method || "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : { method: method || "GET" };
+  const r = await fetch(path, opt);
+  const data = await r.json();
+  if (!r.ok) throw new Error(data.error || r.statusText);
+  return data;
+}
+const ctx = () => ({ owner: $("owner").value, occasion: $("occasion").value });
+
+// ------------------------------------------------------------ 초기화
+async function init() {
+  STATUS = await api("/api/status");
+  const w = STATUS.weather;
+  $("weather").innerHTML = `<span class="t">${Math.round(w.temp)}°</span>
+    <span>${esc(w.condition)} · 체감 ${Math.round(w.feels_like)}° · ${Math.round(w.temp_min)}°/${Math.round(w.temp_max)}° · 비 ${w.rain_chance}%${w.pm25 != null ? " · 미세먼지 " + esc(w.dust_level) : ""}</span>
+    <span class="muted">${esc(w.city)}</span>`;
+  $("aiBadge").textContent = STATUS.ai ? "AI 코치 ON" : "오프라인 코치";
+  $("aiBadge").classList.toggle("on", STATUS.ai);
+  $("occasion").innerHTML = Object.entries(STATUS.occasions).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join("");
+  $("gCat").innerHTML = Object.entries(STATUS.categories).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join("");
+  $("gStyle").innerHTML = STATUS.styles.map((s) => `<option>${s}</option>`).join("");
+  const owners = new Set([...(STATUS.owners || []), ...((store("owners") || "").split(",").filter(Boolean))]);
+  $("owner").innerHTML = `<option value="">가족 공용</option>` + [...owners].map((o) => `<option>${esc(o)}</option>`).join("");
+  $("owner").value = store("owner") || "";
+  $("occasion").value = store("occasion") || "daily";
+  if (!STATUS.ai) $("camHint").textContent = "AI가 꺼져 있어 사진 채점 대신 아래 '사진 없이 채점'을 이용하세요. (ANTHROPIC_API_KEY 설정 시 사진 채점)";
+  await loadCloset();
+  if (MIRROR) { startCamera(); recommend(); setInterval(recommend, 30 * 60 * 1000); }
+}
+
+$("owner").onchange = () => { store("owner", $("owner").value); loadCloset(); };
+$("occasion").onchange = () => store("occasion", $("occasion").value);
+$("newOwner").onchange = () => {
+  const name = $("newOwner").value.trim(); if (!name) return;
+  const list = new Set((store("owners") || "").split(",").filter(Boolean)); list.add(name); store("owners", [...list].join(","));
+  $("owner").insertAdjacentHTML("beforeend", `<option>${esc(name)}</option>`); $("owner").value = name; $("newOwner").value = "";
+  store("owner", name); loadCloset();
+};
+
+document.querySelectorAll("nav button").forEach((b) => b.onclick = () => {
+  document.querySelectorAll("nav button").forEach((x) => x.classList.toggle("on", x === b));
+  ["score", "today", "closet", "history"].forEach((t) => $("tab-" + t).classList.toggle("hidden", t !== b.dataset.tab));
+  if (b.dataset.tab === "history") loadHistory();
+});
+
+// ------------------------------------------------------------ 카메라
+async function startCamera() {
+  if (!navigator.mediaDevices || !window.isSecureContext) {
+    $("camHint").textContent = "이 주소에서는 실시간 카메라를 쓸 수 없어 '사진 선택'으로 촬영합니다. (휴대폰 기본 카메라가 열려요)";
+    return false;
+  }
+  try {
+    if (stream) stream.getTracks().forEach((t) => t.stop());
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facing, width: { ideal: 1280 } }, audio: false });
+    $("video").srcObject = stream; $("video").classList.remove("hidden"); $("shot").classList.add("hidden");
+    $("video").classList.toggle("selfie", facing === "user");
+    $("btnFlip").classList.remove("hidden"); $("btnCam").textContent = "📷 카메라 끄기";
+    return true;
+  } catch (e) { $("camHint").textContent = "카메라 권한이 필요합니다: " + e.message; return false; }
+}
+function stopCamera() {
+  if (stream) stream.getTracks().forEach((t) => t.stop()); stream = null;
+  $("video").classList.add("hidden"); $("btnFlip").classList.add("hidden"); $("btnCam").textContent = "📷 카메라 켜기";
+}
+$("btnCam").onclick = () => stream ? stopCamera() : startCamera();
+$("btnFlip").onclick = () => { facing = facing === "user" ? "environment" : "user"; startCamera(); };
+$("btnFile").onclick = () => $("file").click();
+
+// 사진을 긴 변 1024px JPEG 로 줄여 전송 (속도·비용 절약)
+function toJpeg(source, w, h, mirror) {
+  const scale = Math.min(1, 1024 / Math.max(w, h));
+  const c = document.createElement("canvas"); c.width = Math.round(w * scale); c.height = Math.round(h * scale);
+  const g = c.getContext("2d");
+  if (mirror) { g.translate(c.width, 0); g.scale(-1, 1); }
+  g.drawImage(source, 0, 0, c.width, c.height);
+  return c.toDataURL("image/jpeg", 0.85);
+}
+function fileToJpeg(file) {
+  return new Promise((ok, fail) => {
+    const img = new Image();
+    img.onload = () => { ok(toJpeg(img, img.naturalWidth, img.naturalHeight, false)); URL.revokeObjectURL(img.src); };
+    img.onerror = fail; img.src = URL.createObjectURL(file);
+  });
+}
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+$("btnShoot").onclick = async () => {
+  if (!stream && !(await startCamera())) { $("file").click(); return; }
+  if ($("timer").checked || MIRROR) {
+    for (let i = 3; i > 0; i--) { $("count").textContent = i; await sleep(1000); }
+    $("count").textContent = "";
+  }
+  const v = $("video");
+  const data = toJpeg(v, v.videoWidth, v.videoHeight, facing === "user");
+  $("shot").src = data; $("shot").classList.remove("hidden"); v.classList.add("hidden");
+  await score({ image: data });
+  if (!MIRROR) v.classList.add("hidden"); else v.classList.remove("hidden");
+};
+$("file").onchange = async (e) => {
+  const f = e.target.files[0]; if (!f) return;
+  const data = await fileToJpeg(f);
+  $("shot").src = data; $("shot").classList.remove("hidden"); $("video").classList.add("hidden");
+  await score({ image: data }); e.target.value = "";
+};
+
+// ------------------------------------------------------------ 채점
+function ring(total) {
+  const r = 52, c = 2 * Math.PI * r, p = Math.max(0, Math.min(100, total)) / 100;
+  const color = total >= 80 ? "var(--good)" : total >= 60 ? "var(--warn)" : "var(--bad)";
+  return `<svg class="ring" viewBox="0 0 120 120" role="img" aria-label="${total}점">
+    <circle cx="60" cy="60" r="${r}" fill="none" stroke="var(--chip)" stroke-width="10"/>
+    <circle cx="60" cy="60" r="${r}" fill="none" stroke="${color}" stroke-width="10" stroke-linecap="round"
+      stroke-dasharray="${c * p} ${c}" transform="rotate(-90 60 60)"/>
+    <text x="60" y="68" text-anchor="middle" font-size="34">${total}</text></svg>`;
+}
+const list = (cls, title, arr) => arr && arr.length ? `<div style="margin-top:12px"><b>${title}</b><ul class="list ${cls}">${arr.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div>` : "";
+
+async function score(extra) {
+  const box = $("result"); box.classList.remove("hidden");
+  box.innerHTML = `<span class="spin"></span> 코디 분석 중…`;
+  try {
+    const r = await api("/api/score", { ...ctx(), ...extra });
+    let html = "";
+    if (r.total != null) {
+      html += `<div class="score-wrap">${ring(r.total)}<div><div class="grade">${esc(r.grade)}</div>
+        <div class="muted">${r.source === "ai" ? "AI 사진 분석" : "옷장 정보 기반"} · ${esc(STATUS.occasions[$("occasion").value])}</div></div></div>`;
+      html += `<div class="bars">${r.scores.map((s) => `<div class="bar"><span>${esc(s.label)}</span><span>${s.score}/${s.max}</span>
+        <div class="track"><div class="fill" style="width:${(100 * s.score / s.max).toFixed(0)}%"></div></div></div>`).join("")}</div>`;
+    }
+    html += `<p class="msg">${esc(r.message)}</p>`;
+    if (r.seen_items && r.seen_items.length) html += `<p class="muted">인식한 옷: ${r.seen_items.map(esc).join(", ")}</p>`;
+    html += list("good", "잘한 점", r.good_points) + list("fix", "이렇게 바꿔 보세요", r.fixes);
+    if (r.suggestions && r.suggestions.length) html += `<div style="margin-top:12px"><b>옷장에서 추천</b><div class="items" style="margin-top:8px">${r.suggestions.map(itemCard).join("")}</div></div>`;
+    html += list("tip", "오늘의 날씨 팁", r.tips);
+    box.innerHTML = html;
+  } catch (e) { box.innerHTML = `<span style="color:var(--bad)">오류: ${esc(e.message)}</span>`; }
+  box.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+$("btnPickScore").onclick = () => {
+  if (!picked.size) { alert("오늘 입은 옷을 하나 이상 골라 주세요"); return; }
+  $("shot").classList.add("hidden");
+  score({ worn_ids: [...picked] });
+};
+
+// ------------------------------------------------------------ 옷장
+function itemCard(g, withDelete) {
+  const pic = g.photo ? `<img src="/photos/${esc(g.photo)}" alt="">` : `<div class="ph">${{top:"👕",bottom:"👖",dress:"👗",outer:"🧥",shoes:"👟",accessory:"🧢"}[g.category] || "👚"}</div>`;
+  return `<div class="item">${pic}<div style="margin-top:6px"><b>#${g.id}</b> ${esc(g.name)}</div>
+    <div class="muted">${esc(g.category_ko)} · ${esc(g.style)}${g.waterproof ? " · 방수" : ""}</div>
+    ${withDelete ? `<button class="del" data-del="${g.id}">삭제</button>` : ""}</div>`;
+}
+async function loadCloset() {
+  const owner = $("owner").value;
+  closetItems = (await api("/api/closet" + (owner ? "?owner=" + encodeURIComponent(owner) : ""))).items;
+  $("closet").innerHTML = closetItems.length ? closetItems.map((g) => itemCard(g, true)).join("") : `<span class="muted">아직 등록된 옷이 없어요.</span>`;
+  picked = new Set([...picked].filter((id) => closetItems.some((g) => g.id === id)));
+  $("pick").innerHTML = closetItems.map((g) => `<button class="chip ${picked.has(g.id) ? "sel" : ""}" data-pick="${g.id}">${esc(g.name)}</button>`).join("") || `<span class="muted">옷장 탭에서 옷을 먼저 등록하세요.</span>`;
+}
+$("pick").onclick = (e) => {
+  const id = +e.target.dataset.pick; if (!id) return;
+  picked.has(id) ? picked.delete(id) : picked.add(id); e.target.classList.toggle("sel");
+};
+$("closet").onclick = async (e) => {
+  const id = e.target.dataset.del; if (!id || !confirm("이 옷을 삭제할까요?")) return;
+  await api("/api/closet/" + id, undefined, "DELETE"); loadCloset();
+};
+
+let gPhoto = null;
+$("gFile").onchange = async (e) => {
+  const f = e.target.files[0]; if (!f) return;
+  gPhoto = await fileToJpeg(f);
+  if (!STATUS.ai) return;
+  $("gName").value = "AI가 분석 중…";
+  try {
+    const { tag } = await api("/api/garment/tag", { image: gPhoto });
+    if (!tag) { $("gName").value = ""; alert("옷을 찾지 못했어요. 옷이 잘 보이게 다시 찍어 주세요."); return; }
+    $("gName").value = tag.name; $("gCat").value = tag.category; $("gColor").value = tag.color;
+    $("gMat").value = tag.material; $("gStyle").value = tag.style; $("gWarm").value = tag.warmth; $("gWater").checked = tag.waterproof;
+  } catch (err) { $("gName").value = ""; alert("자동 분석 실패: " + err.message); }
+};
+$("btnAdd").onclick = async () => {
+  const name = $("gName").value.trim(); if (!name) { alert("이름을 입력하세요"); return; }
+  await api("/api/closet", { owner: $("owner").value, name, category: $("gCat").value, color: $("gColor").value,
+    material: $("gMat").value, style: $("gStyle").value, warmth: +$("gWarm").value, waterproof: $("gWater").checked, image: gPhoto });
+  gPhoto = null; ["gFile", "gName", "gColor", "gMat"].forEach((id) => $(id).value = ""); $("gWater").checked = false;
+  loadCloset();
+};
+
+// ------------------------------------------------------------ 오늘 추천
+async function recommend() {
+  const box = $("recResult"); box.classList.remove("hidden"); box.innerHTML = `<span class="spin"></span> 코디 고르는 중…`;
+  if (MIRROR) $("tab-today").classList.remove("hidden");
+  try {
+    const r = await api("/api/recommend", { ...ctx(), request: $("request").value });
+    let html = `<p class="msg">${esc(r.message)}</p>`;
+    r.outfits.forEach((o, i) => {
+      if (MIRROR && i !== r.choice) return;  // 거울에는 최종 추천 하나만
+      html += `<div class="outfit"><b>${i === r.choice ? "⭐ 추천 " : ""}코디 ${i + 1}</b>
+        <div class="items" style="margin-top:8px">${o.items.map((g) => itemCard(g)).join("")}</div>
+        <ul class="list good">${o.reasons.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>
+        <div class="row phone-only" style="margin-top:8px"><button data-wear="${o.items.map((g) => g.id).join(",")}">이걸로 입을게요</button></div></div>`;
+    });
+    if (r.outfits[0]) html += list("tip", "오늘의 날씨 팁", r.outfits[0].tips);
+    box.innerHTML = html;
+  } catch (e) { box.innerHTML = `<span style="color:var(--bad)">오류: ${esc(e.message)}</span>`; }
+}
+$("btnRec").onclick = recommend;
+$("request").onkeydown = (e) => { if (e.key === "Enter") recommend(); };
+$("recResult").onclick = async (e) => {
+  const ids = e.target.dataset.wear; if (!ids) return;
+  await api("/api/worn", { ids: ids.split(",").map(Number) });
+  picked = new Set(ids.split(",").map(Number)); loadCloset();
+  e.target.textContent = "✔ 기록했어요"; e.target.disabled = true;
+};
+
+// ------------------------------------------------------------ 기록
+async function loadHistory() {
+  const owner = $("owner").value;
+  const h = (await api("/api/history" + (owner ? "?owner=" + encodeURIComponent(owner) : ""))).history.reverse();
+  $("hist").innerHTML = h.map((x) => `<div style="height:${x.total}%"><span>${x.total}</span></div>`).join("") || `<span class="muted">아직 기록이 없어요.</span>`;
+  $("histList").innerHTML = h.length ? `평균 ${Math.round(h.reduce((a, x) => a + x.total, 0) / h.length)}점 · 최고 ${Math.max(...h.map((x) => x.total))}점` : "";
+}
+
+init().catch((e) => { $("weather").innerHTML = `<span style="color:var(--bad)">서버 연결 실패: ${esc(e.message)}</span>`; });
+</script>
+</body>
+</html>

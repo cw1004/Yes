@@ -7,3 +7,6 @@ gTTS>=2.5.0            # 무료 대안
 
 # 선택
 imageio-ffmpeg>=0.4.9  # 시스템에 ffmpeg 이 없을 때 대체 바이너리
+
+# STYLE MIRROR (AI 코디 코치) — 선택. 없으면 규칙 기반 코치로 동작
+anthropic>=0.70.0

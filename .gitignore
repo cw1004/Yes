@@ -9,3 +9,5 @@ assets/stock/*
 !assets/stock/.gitkeep
 !assets/**/README.md
 .DS_Store
+mirror_data/
+mirror.config.json

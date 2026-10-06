@@ -21,6 +21,9 @@ python3 -m india2030 make --range 1-100 --workers 4 --lang hi --caption-lang ko
   키가 있으면 Claude 대본·고품질 TTS로 바로 품질이 올라갑니다.
 - 결과물: `mp4` 영상, 썸네일 `jpg`, 대본 `json`, 자막 `srt`, 업로드용 `upload_index.csv`.
 
+> **같은 저장소의 다른 프로젝트:** [STYLE MIRROR — AI 외출 코디 코치 앱/스마트 거울](stylemirror/README.md)
+> (`python3 -m stylemirror init --sample && python3 -m stylemirror serve --lan`)
+
 ---
 
 ## 1. 설치
