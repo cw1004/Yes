@@ -257,3 +257,9 @@ make test        # 또는 python3 -m unittest discover -s tests
 | 음성이 안 나옴 | `check` 의 `TTS 가능` 확인 → `pip install edge-tts`, 사내망이면 프록시/방화벽 확인 |
 | 너무 느림 | `--preset veryfast --crf 26 --workers 8` |
 | 특정 회차만 다시 | `python3 -m india2030 make --range 42 --overwrite` |
+
+---
+
+## 별도 프로젝트: 1인 뷰티 위탁 셀러 도구
+
+피부 타입 설문 → 루틴 세트 추천 → 마진 계산 → 대량발주서 변환. 사업 구조 분석은 [`beauty_seller/README.md`](beauty_seller/README.md) 참고.

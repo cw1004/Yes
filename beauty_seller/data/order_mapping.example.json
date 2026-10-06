@@ -1,0 +1,41 @@
+{
+  "_설명": "marketplace_columns: 마켓 주문 엑셀(CSV 저장)의 열 이름. supplier_columns: 공급사 대량발주 양식의 열 이름 → 채울 값. 실제 양식에 맞게 열 이름만 바꾸면 됩니다.",
+  "marketplace_columns": {
+    "order_id": "상품주문번호",
+    "product": "상품명",
+    "option": "옵션정보",
+    "qty": "수량",
+    "name": "수취인명",
+    "phone": "수취인연락처1",
+    "zip": "우편번호",
+    "address": "통합배송지",
+    "memo": "배송메세지"
+  },
+  "supplier_columns": {
+    "상품코드": "supplier_code",
+    "주문수량": "qty",
+    "수령인": "name",
+    "수령인휴대폰": "phone",
+    "우편번호": "zip",
+    "주소": "address",
+    "배송메시지": "memo",
+    "참조주문번호": "order_id"
+  },
+  "default_memo": "안전배송 부탁드립니다.",
+  "product_map": {
+    "건성 루틴 세트 / 4단계": [
+      {"supplier_code": "A-1002", "qty": 1},
+      {"supplier_code": "A-3001", "qty": 1},
+      {"supplier_code": "A-4001", "qty": 1},
+      {"supplier_code": "A-5001", "qty": 1}
+    ],
+    "지성 루틴 세트 / 3단계": [
+      {"supplier_code": "A-1003", "qty": 1},
+      {"supplier_code": "A-4002", "qty": 1},
+      {"supplier_code": "A-5002", "qty": 1}
+    ],
+    "판테놀 진정 세럼 단품": [
+      {"supplier_code": "A-3001", "qty": 1}
+    ]
+  }
+}
