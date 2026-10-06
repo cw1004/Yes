@@ -25,6 +25,7 @@ from urllib.parse import parse_qs, urlparse
 from . import stylist
 from .closet import CATEGORIES, STYLES, Closet, Garment
 from .coach import Coach
+from .commerce import Shop, tracked_url
 from .config import MirrorConfig
 from .weather import Weather, get_weather
 
@@ -41,6 +42,7 @@ class MirrorApp:
         self.cfg = cfg
         self.closet = Closet(cfg.db_path)
         self.coach = Coach(cfg, self.closet)
+        self.shop = Shop(self.closet)
         cfg.photo_dir.mkdir(parents=True, exist_ok=True)
         self._weather: Optional[Weather] = None
         self._weather_at = 0.0
@@ -125,10 +127,35 @@ def make_handler(app: MirrorApp):
                         "owners": app.closet.owners(),
                         "occasions": {k: v["ko"] for k, v in stylist.OCCASIONS.items()},
                         "categories": CATEGORIES, "styles": STYLES,
+                        "shop": len(app.shop.all()) > 0,
+                        "public_url": app.cfg.public_url or f"http://{self.headers.get('Host', '')}",
                     })
                 if path == "/api/closet":
                     items = app.closet.all(owner=q.get("owner") or None)
                     return self._json({"items": [g.to_dict() for g in items]})
+                if path.startswith("/go/"):
+                    # 구매 링크: 클릭을 기록하고 DB 에 등록된 상품 주소로만 보낸다(오픈 리다이렉트 방지)
+                    prod = app.shop.get(path[4:])
+                    if not prod:
+                        return self._error("없는 상품", 404)
+                    src = q.get("src", "app")[:20]
+                    app.shop.log("click", prod.id, q.get("owner", ""), src)
+                    self.send_response(HTTPStatus.FOUND)
+                    self.send_header("Location", tracked_url(prod.url, src))
+                    self.send_header("Content-Length", "0")
+                    self.end_headers()
+                    return None
+                if path == "/api/shop":
+                    owner = q.get("owner") or None
+                    occasion = q.get("occasion") if q.get("occasion") in stylist.OCCASIONS else "daily"
+                    with app.lock:
+                        r = app.shop.suggest(app.weather(), occasion, owner, source=q.get("src", "shop"))
+                    r["is_child"] = app.shop.is_child(owner)
+                    r["wishlist"] = [] if r["is_child"] else [
+                        p.to_dict() for p in app.shop.wishlist(owner or "")]
+                    return self._json(r)
+                if path == "/api/commerce/stats":
+                    return self._json({"products": app.shop.stats()})
                 if path == "/api/history":
                     return self._json({"history": app.closet.score_history(q.get("owner") or None)})
                 return self._error("없는 주소", 404)
@@ -155,13 +182,34 @@ def make_handler(app: MirrorApp):
                         if result.get("total") is not None:
                             app.closet.log_score(result["total"], owner, occasion,
                                                  result.get("source", "rules"), result["message"])
+                            if result.get("verdict") != "good":  # 잘 입었으면 쇼핑 권유 안 함
+                                worn = [g for g in (app.closet.get(int(i)) for i in body.get("worn_ids") or []) if g]
+                                result["shop"] = app.shop.suggest(app.weather(), occasion, owner or None,
+                                                                  worn=worn, source="score")
                     return self._json(result)
 
                 if path == "/api/recommend":
                     with app.lock:
                         result = app.coach.recommend(app.weather(), occasion, owner or None,
                                                      body.get("request", ""))
+                        result["shop"] = app.shop.suggest(app.weather(), result["occasion"],
+                                                          owner or None, source=body.get("src", "today"))
                     return self._json(result)
+
+                if path == "/api/wish":
+                    pid = str(body.get("product_id", ""))
+                    if not app.shop.get(pid):
+                        return self._error("없는 상품", 404)
+                    if app.shop.is_child(owner or None):
+                        return self._error("어린이 프로필에서는 찜할 수 없어요", 403)
+                    app.shop.wish(owner, pid, bool(body.get("on", True)))
+                    return self._json({"ok": True})
+
+                if path == "/api/profile":
+                    if not owner:
+                        return self._error("이름이 필요합니다")
+                    app.shop.set_child(owner, bool(body.get("is_child")))
+                    return self._json({"ok": True, "is_child": app.shop.is_child(owner)})
 
                 if path == "/api/worn":
                     app.closet.mark_worn(int(i) for i in body.get("ids", []))

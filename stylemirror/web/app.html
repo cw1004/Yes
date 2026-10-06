@@ -74,6 +74,18 @@ nav { position: fixed; left: 0; right: 0; bottom: 0; display: flex; background: 
   border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom); }
 nav button { flex: 1; background: none; border-radius: 0; padding: 14px 4px; color: var(--sub); }
 nav button.on { color: var(--accent); font-weight: 700; }
+.prod { display: grid; grid-template-columns: 96px 1fr; gap: 12px; padding: 12px 0; border-top: 1px solid var(--line); }
+.prod:first-of-type { border-top: 0; }
+.prod .pic { width: 96px; height: 96px; border-radius: 12px; background: var(--chip); object-fit: cover;
+  display: grid; place-items: center; font-size: 36px; }
+.ad { display: inline-block; font-size: 11px; padding: 1px 6px; border-radius: 4px; border: 1px solid var(--sub); color: var(--sub); margin-right: 4px; vertical-align: 1px; }
+.gain { color: var(--good); font-weight: 700; }
+.price s { color: var(--sub); font-size: 13px; margin-left: 4px; }
+.price .off { color: var(--bad); font-weight: 700; margin-right: 4px; }
+a.buy { display: inline-block; text-decoration: none; text-align: center; border-radius: 12px; padding: 10px 14px;
+  background: var(--accent); color: #fff; font-weight: 600; }
+.notice { font-size: 12px; color: var(--sub); margin-top: 8px; }
+.qr { background: #fff; padding: 8px; border-radius: 8px; width: 156px; height: 156px; }
 .hidden { display: none !important; }
 .spin { display: inline-block; width: 16px; height: 16px; border: 2px solid currentColor; border-right-color: transparent;
   border-radius: 50%; animation: s 0.8s linear infinite; vertical-align: -3px; }
@@ -181,9 +193,21 @@ body.mirror .ring { width: 200px; height: 200px; }
   </section>
 </main>
 
+<!-- ====================== 5) 쇼핑 ====================== -->
+<main id="tab-shop" class="hidden">
+  <section class="card">
+    <div class="row"><b class="grow">내 옷장에 꼭 필요한 아이템</b>
+      <label class="muted"><input type="checkbox" id="kid"> 어린이 프로필(쇼핑 끔)</label></div>
+    <p class="muted" style="margin:4px 0 0">오늘 날씨·일정 기준으로, 사면 점수가 실제로 오르는 상품만 보여 드려요.</p>
+  </section>
+  <section class="card" id="shopBox"><span class="muted">불러오는 중…</span></section>
+  <section class="card" id="wishBox"></section>
+</main>
+
 <nav>
   <button data-tab="score" class="on">채점</button>
   <button data-tab="today">오늘 추천</button>
+  <button data-tab="shop" id="navShop">쇼핑</button>
   <button data-tab="closet">옷장</button>
   <button data-tab="history">기록</button>
 </nav>
@@ -223,12 +247,14 @@ async function init() {
   $("owner").value = store("owner") || "";
   $("occasion").value = store("occasion") || "daily";
   if (!STATUS.ai) $("camHint").textContent = "AI가 꺼져 있어 사진 채점 대신 아래 '사진 없이 채점'을 이용하세요. (ANTHROPIC_API_KEY 설정 시 사진 채점)";
+  if (!STATUS.shop) $("navShop").classList.add("hidden");
   await loadCloset();
   if (MIRROR) { startCamera(); recommend(); setInterval(recommend, 30 * 60 * 1000); }
 }
 
-$("owner").onchange = () => { store("owner", $("owner").value); loadCloset(); };
-$("occasion").onchange = () => store("occasion", $("occasion").value);
+const shopVisible = () => !$("tab-shop").classList.contains("hidden");
+$("owner").onchange = () => { store("owner", $("owner").value); loadCloset(); if (shopVisible()) loadShop(); };
+$("occasion").onchange = () => { store("occasion", $("occasion").value); if (shopVisible()) loadShop(); };
 $("newOwner").onchange = () => {
   const name = $("newOwner").value.trim(); if (!name) return;
   const list = new Set((store("owners") || "").split(",").filter(Boolean)); list.add(name); store("owners", [...list].join(","));
@@ -238,8 +264,9 @@ $("newOwner").onchange = () => {
 
 document.querySelectorAll("nav button").forEach((b) => b.onclick = () => {
   document.querySelectorAll("nav button").forEach((x) => x.classList.toggle("on", x === b));
-  ["score", "today", "closet", "history"].forEach((t) => $("tab-" + t).classList.toggle("hidden", t !== b.dataset.tab));
+  ["score", "today", "shop", "closet", "history"].forEach((t) => $("tab-" + t).classList.toggle("hidden", t !== b.dataset.tab));
   if (b.dataset.tab === "history") loadHistory();
+  if (b.dataset.tab === "shop") loadShop();
 });
 
 // ------------------------------------------------------------ 카메라
@@ -331,6 +358,7 @@ async function score(extra) {
     html += list("good", "잘한 점", r.good_points) + list("fix", "이렇게 바꿔 보세요", r.fixes);
     if (r.suggestions && r.suggestions.length) html += `<div style="margin-top:12px"><b>옷장에서 추천</b><div class="items" style="margin-top:8px">${r.suggestions.map(itemCard).join("")}</div></div>`;
     html += list("tip", "오늘의 날씨 팁", r.tips);
+    html += shopBlock(r.shop, "score");
     box.innerHTML = html;
   } catch (e) { box.innerHTML = `<span style="color:var(--bad)">오류: ${esc(e.message)}</span>`; }
   box.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -401,7 +429,9 @@ async function recommend() {
         <div class="row phone-only" style="margin-top:8px"><button data-wear="${o.items.map((g) => g.id).join(",")}">이걸로 입을게요</button></div></div>`;
     });
     if (r.outfits[0]) html += list("tip", "오늘의 날씨 팁", r.outfits[0].tips);
+    html += shopBlock(r.shop, MIRROR ? "mirror" : "today");
     box.innerHTML = html;
+    if (MIRROR) drawQr();
   } catch (e) { box.innerHTML = `<span style="color:var(--bad)">오류: ${esc(e.message)}</span>`; }
 }
 $("btnRec").onclick = recommend;
@@ -412,6 +442,62 @@ $("recResult").onclick = async (e) => {
   picked = new Set(ids.split(",").map(Number)); loadCloset();
   e.target.textContent = "✔ 기록했어요"; e.target.disabled = true;
 };
+
+// ------------------------------------------------------------ 쇼핑 (점수 기반 추천)
+const won = (n) => n.toLocaleString("ko-KR") + "원";
+const ICON = { top: "👕", bottom: "👖", dress: "👗", outer: "🧥", shoes: "👟", accessory: "🧣" };
+function goUrl(p, src) {
+  const q = new URLSearchParams({ src, owner: $("owner").value });
+  return `/go/${encodeURIComponent(p.id)}?${q}`;
+}
+function productCard(p, it, src) {
+  const pic = p.image_url ? `<img class="pic" src="${esc(p.image_url)}" alt="">` : `<div class="pic">${ICON[p.category] || "🛍"}</div>`;
+  const price = p.discount ? `<span class="off">${p.discount}%</span>${won(p.final_price)}<s>${won(p.price)}</s>` : won(p.final_price);
+  const why = it ? `<div><span class="gain">${it.before}점 → ${it.after}점 (+${it.gain})</span></div>
+      <div class="muted">${esc(it.reason)}${it.matches ? ` · 내 옷 ${it.matches}벌과 어울림` : ""}</div>` : "";
+  return `<div class="prod">${pic}<div>
+      <div><span class="ad">${esc(p.label)}</span><b>${esc(p.name)}</b></div>
+      <div class="price">${price} <span class="muted">· ${esc(p.shop)}</span></div>${why}
+      <div class="row" style="margin-top:8px">
+        <a class="buy" href="${goUrl(p, src)}" target="_blank" rel="noopener sponsored">구매하러 가기</a>
+        <button data-wish="${esc(p.id)}">♡ 찜</button></div></div></div>`;
+}
+function shopBlock(shop, src) {
+  if (!shop || !STATUS.shop || shop.blocked) return "";
+  let html = `<div class="outfit"><b>🛍 ${esc(shop.message)}</b>`;
+  (shop.closet_fixes || []).slice(0, 2).forEach((f) => html += `<p class="muted" style="margin:6px 0">👕 옷장의 #${f.item.id} ${esc(f.item.name)} → +${f.gain}점</p>`);
+  const items = MIRROR ? shop.items.slice(0, 1) : shop.items;
+  html += items.map((it) => productCard(it.product, it, src)).join("");
+  if (MIRROR && items[0]) html += `<div class="row" style="margin-top:8px"><div class="qr" id="qr" data-url="${esc(STATUS.public_url + goUrl(items[0].product, "mirror"))}"></div>
+      <span class="muted">휴대폰으로 찍으면<br>상품 페이지가 열려요</span></div>`;
+  if (shop.notice) html += `<p class="notice">※ ${esc(shop.notice)}</p>`;
+  return html + `</div>`;
+}
+function drawQr() {
+  const el = $("qr"); if (!el) return;
+  const draw = () => { el.innerHTML = ""; new QRCode(el, { text: el.dataset.url, width: 140, height: 140 }); };
+  if (window.QRCode) return draw();
+  const sc = document.createElement("script");
+  sc.src = "https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js";
+  sc.onload = draw; sc.onerror = () => { el.outerHTML = `<span class="muted">${esc(el.dataset.url)}</span>`; };
+  document.head.appendChild(sc);
+}
+async function loadShop() {
+  const q = new URLSearchParams({ owner: $("owner").value, occasion: $("occasion").value });
+  const r = await api("/api/shop?" + q);
+  $("kid").checked = r.is_child; $("kid").disabled = !$("owner").value;
+  if (r.blocked) { $("shopBox").innerHTML = `<span class="muted">${esc(r.message)}</span>`; $("wishBox").innerHTML = ""; return; }
+  $("shopBox").innerHTML = shopBlock(r, "shop").replace(/^<div class="outfit">/, "<div>");
+  $("wishBox").innerHTML = `<b>♡ 찜한 상품</b>` + (r.wishlist.length ? r.wishlist.map((p) => productCard(p, null, "wish")).join("") : `<p class="muted">아직 없어요.</p>`);
+}
+$("kid").onchange = async () => {
+  await api("/api/profile", { owner: $("owner").value, is_child: $("kid").checked }); loadShop();
+};
+document.addEventListener("click", async (e) => {
+  const id = e.target.dataset && e.target.dataset.wish; if (!id) return;
+  try { await api("/api/wish", { owner: $("owner").value, product_id: id }); e.target.textContent = "♥ 찜함"; e.target.disabled = true; }
+  catch (err) { alert(err.message); }
+});
 
 // ------------------------------------------------------------ 기록
 async function loadHistory() {

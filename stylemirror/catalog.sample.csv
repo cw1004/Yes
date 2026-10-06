@@ -1,0 +1,21 @@
+id,name,category,color,material,pattern,style,warmth,waterproof,price,sale_price,shop,url,image_url,sponsored,in_stock
+P001,방수 숏 트렌치코트,outer,베이지,나일론,solid,business,3,1,129000,99000,내 쇼핑몰,https://example.com/shop/p001,,0,1
+P002,경량 패딩 조끼,outer,네이비,폴리,solid,casual,3,0,59000,49000,내 쇼핑몰,https://example.com/shop/p002,,0,1
+P003,울 블렌드 싱글 코트,outer,카멜,울,solid,formal,4,0,239000,189000,제휴몰 A,https://partner-a.example.com/item/3003?aff=MYCODE,,1,1
+P004,후드 웜 롱패딩,outer,블랙,다운,solid,casual,5,1,219000,0,제휴몰 B,https://partner-b.example.com/goods/4004?aff=MYCODE,,1,1
+P005,라이트 데님 셔켓,outer,라이트블루,데님,solid,street,2,0,69000,0,내 쇼핑몰,https://example.com/shop/p005,,0,1
+P006,구김 없는 화이트 셔츠,top,화이트,코튼 혼방,solid,business,2,0,49000,39000,내 쇼핑몰,https://example.com/shop/p006,,0,1
+P007,캐시미어 터치 니트,top,아이보리,울 혼방,solid,minimal,4,0,89000,69000,제휴몰 A,https://partner-a.example.com/item/3007?aff=MYCODE,,1,1
+P008,쿨링 반팔 티셔츠,top,그레이,기능성 폴리,solid,sporty,1,0,25000,19000,내 쇼핑몰,https://example.com/shop/p008,,0,1
+P009,스트라이프 롱슬리브,top,네이비,코튼,stripe,casual,2,0,35000,0,제휴몰 B,https://partner-b.example.com/goods/4009?aff=MYCODE,,1,1
+P010,기모 일자 슬랙스,bottom,차콜,폴리 기모,solid,business,4,0,59000,45000,내 쇼핑몰,https://example.com/shop/p010,,0,1
+P011,린넨 와이드 팬츠,bottom,베이지,린넨,solid,minimal,1,0,49000,0,제휴몰 A,https://partner-a.example.com/item/3011?aff=MYCODE,,1,1
+P012,스트레치 조거 팬츠,bottom,블랙,기능성 폴리,solid,sporty,2,0,39000,29000,내 쇼핑몰,https://example.com/shop/p012,,0,1
+P013,하객룩 미디 원피스,dress,네이비,폴리,solid,formal,2,0,99000,79000,제휴몰 B,https://partner-b.example.com/goods/4013?aff=MYCODE,,1,1
+P014,니트 롱 원피스,dress,그레이,울 혼방,solid,minimal,4,0,109000,0,제휴몰 A,https://partner-a.example.com/item/3014?aff=MYCODE,,1,1
+P015,방수 첼시 부츠,shoes,블랙,러버 가죽,solid,casual,3,1,89000,69000,내 쇼핑몰,https://example.com/shop/p015,,0,1
+P016,클래식 더비 슈즈,shoes,브라운,가죽,solid,formal,3,0,139000,0,제휴몰 A,https://partner-a.example.com/item/3016?aff=MYCODE,,1,1
+P017,경량 러닝화,shoes,화이트,메시,solid,sporty,2,0,79000,59000,제휴몰 B,https://partner-b.example.com/goods/4017?aff=MYCODE,,1,1
+P018,울 머플러,accessory,차콜,울,solid,minimal,4,0,39000,29000,내 쇼핑몰,https://example.com/shop/p018,,0,1
+P019,자외선 차단 버킷햇,accessory,베이지,코튼,solid,casual,1,0,29000,0,제휴몰 B,https://partner-b.example.com/goods/4019?aff=MYCODE,,1,1
+P020,가죽 미니 크로스백,accessory,블랙,가죽,solid,minimal,1,0,69000,55000,내 쇼핑몰,https://example.com/shop/p020,,0,0

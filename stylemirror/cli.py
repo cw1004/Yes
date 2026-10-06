@@ -22,6 +22,7 @@ from pathlib import Path
 
 from . import __version__, stylist
 from .closet import CATEGORIES, SAMPLE_CLOSET, STYLES, Closet, Garment
+from .commerce import Shop
 from .coach import Coach
 from .config import MirrorConfig
 from .weather import get_weather, offline_weather
@@ -78,6 +79,51 @@ def cmd_init(args) -> int:
             closet.add(Garment(**{**g.__dict__, "id": None}))
             added += 1
     print(f"옷장 DB: {cfg.db_path}  (예시 옷 {added}벌 추가, 전체 {len(closet.all())}벌)")
+    if args.sample:
+        n = Shop(closet).import_csv(SAMPLE_CATALOG)
+        print(f"예시 상품 {n}개 등록 (실제 판매 상품은: python3 -m stylemirror catalog 내상품.csv)")
+    return 0
+
+
+SAMPLE_CATALOG = Path(__file__).parent / "catalog.sample.csv"
+
+
+def cmd_catalog(args) -> int:
+    shop = Shop(Closet(_cfg(args).db_path))
+    if args.csv:
+        print(f"{shop.import_csv(Path(args.csv))}개 상품을 가져왔습니다.")
+    for p in shop.all(in_stock_only=False):
+        stock = "" if p.in_stock else " (품절)"
+        print(f"  {p.id:<8} [{'광고' if p.sponsored else '판매'}] {p.name} "
+              f"{p.final_price:,}원 · {p.shop}{stock}")
+    return 0
+
+
+def cmd_shop(args) -> int:
+    cfg = _cfg(args)
+    closet = Closet(cfg.db_path)
+    shop = Shop(closet)
+    worn = [g for g in (closet.get(i) for i in args.ids) if g]
+    r = shop.suggest(_weather(cfg, args.offline), args.occasion, args.owner, worn=worn, source="cli")
+    print(r["message"])
+    for f in r.get("closet_fixes", []):
+        print(f"  👕 옷장: {f['item']['label']}  +{f['gain']}점")
+    for it in r["items"]:
+        p = it["product"]
+        print(f"  🛒 [{p['label']}] {p['name']} {p['final_price']:,}원  "
+              f"{it['before']}→{it['after']}점 (+{it['gain']}) · 내 옷 {it['matches']}벌과 어울림")
+        print(f"      이유: {it['reason']}")
+    if r.get("notice"):
+        print(f"\n※ {r['notice']}")
+    return 0
+
+
+def cmd_stats(args) -> int:
+    shop = Shop(Closet(_cfg(args).db_path))
+    print(f"  {'상품':<20} {'노출':>5} {'클릭':>5} {'찜':>4} {'CTR':>6} {'평균상승':>6}")
+    for d in shop.stats():
+        print(f"  {d['name'][:18]:<20} {d['impressions']:>5} {d['clicks']:>5} {d['wishes']:>4} "
+              f"{d['ctr']:>5}% {d['avg_gain'] or 0:>6}")
     return 0
 
 
@@ -149,11 +195,12 @@ def cmd_score(args) -> int:
 def cmd_serve(args) -> int:
     from .server import serve
     cfg = _cfg(args)
-    if args.lan:
-        cfg.host = "0.0.0.0"
-        print(f"같은 와이파이의 휴대폰에서 접속: http://{_lan_ip()}:{args.port or cfg.port}/")
     if args.port:
         cfg.port = args.port
+    if args.lan:
+        cfg.host = "0.0.0.0"
+        cfg.public_url = cfg.public_url or f"http://{_lan_ip()}:{cfg.port}"
+        print(f"같은 와이파이의 휴대폰에서 접속: {cfg.public_url}/")
     serve(cfg)
     return 0
 
@@ -198,6 +245,19 @@ def main(argv=None) -> int:
             s.add_argument("ids", nargs="*", type=int, help="오늘 입은 옷 번호")
             s.add_argument("--photo", help="전신 사진 파일 (AI 필요)")
         s.set_defaults(fn=fn)
+
+    s = sub.add_parser("catalog", help="판매 상품 목록 보기 / CSV 가져오기")
+    s.add_argument("csv", nargs="?", help="가져올 상품 CSV (catalog.sample.csv 형식)")
+    s.set_defaults(fn=cmd_catalog)
+
+    s = sub.add_parser("shop", help="점수를 올려 주는 상품 추천")
+    s.add_argument("ids", nargs="*", type=int, help="오늘 입은 옷 번호 (비우면 옷장 최고 코디 기준)")
+    s.add_argument("--occasion", default="daily", choices=list(stylist.OCCASIONS))
+    s.add_argument("--owner")
+    s.add_argument("--offline", action="store_true")
+    s.set_defaults(fn=cmd_shop)
+
+    sub.add_parser("stats", help="상품별 노출·클릭·찜 통계").set_defaults(fn=cmd_stats)
 
     s = sub.add_parser("serve", help="앱·거울 서버 실행")
     s.add_argument("--port", type=int)

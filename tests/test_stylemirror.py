@@ -274,5 +274,140 @@ class TestServer(unittest.TestCase):
         self.assertTrue(img.startswith(b"\xff\xd8"))
 
 
+
+# ====================================================================== 커머스
+from stylemirror.commerce import Product, Shop, tracked_url  # noqa: E402
+
+CATALOG = Path(__file__).resolve().parent.parent / "stylemirror" / "catalog.sample.csv"
+
+
+class TestCommerce(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.full = sample_closet(self.tmp.name)
+        self.shop = Shop(self.full)
+        self.assertEqual(self.shop.import_csv(CATALOG), 20)
+        # 셔츠·슬랙스·스니커즈만 있는 작은 옷장
+        self.small = Closet(Path(self.tmp.name) / "small.db")
+        for i in (0, 5, 14):
+            self.small.add(Garment(**{**SAMPLE_CLOSET[i].__dict__, "id": None}))
+        self.small_shop = Shop(self.small)
+        self.small_shop.import_csv(CATALOG)
+
+    def tearDown(self):
+        self.full.close()
+        self.small.close()
+        self.tmp.cleanup()
+
+    def test_closet_first(self):
+        """옷장에 트렌치코트가 있으면 트렌치코트를 팔지 않고 옷장 옷을 알려 준다."""
+        worn = [by_name(self.full, "화이트 옥스포드 셔츠"), by_name(self.full, "네이비 슬랙스")]
+        r = self.shop.suggest(weather(14, rain=80, cond="비"), "office", worn=worn)
+        self.assertEqual(r["items"], [])
+        self.assertEqual(r["closet_fixes"][0]["item"]["name"], "베이지 트렌치코트")
+        self.assertIn("살 필요 없어요", r["message"])
+
+    def test_good_outfit_sells_nothing(self):
+        worn = [by_name(self.full, n) for n in ("네이비 니트", "네이비 슬랙스", "차콜 울 코트", "블랙 로퍼")]
+        r = self.shop.suggest(weather(8, lo=4, hi=12), "office", worn=worn)
+        self.assertEqual(r["items"], [])
+        self.assertEqual(r["notice"], "")
+
+    def test_gap_is_sold_with_real_gain(self):
+        r = self.small_shop.suggest(weather(8, rain=80, cond="비"), "office", source="test")
+        self.assertTrue(r["items"])
+        top = r["items"][0]
+        self.assertEqual(top["product"]["category"], "outer")
+        self.assertTrue(top["product"]["waterproof"])
+        self.assertGreaterEqual(top["gain"], 5)
+        self.assertEqual(top["after"] - top["before"], top["gain"])
+        self.assertTrue(r["notice"])
+        cats = [it["product"]["category"] for it in r["items"]]
+        self.assertEqual(len(cats), len(set(cats)))  # 같은 종류 중복 없음
+        self.assertNotIn("P020", [it["product"]["id"] for it in r["items"]])  # 품절 제외
+        stats = {d["id"]: d for d in self.small_shop.stats()}
+        self.assertEqual(stats[top["product"]["id"]]["impressions"], 1)
+
+    def test_child_profile_blocks_shopping(self):
+        self.small_shop.set_child("민준", True)
+        r = self.small_shop.suggest(weather(8, rain=80, cond="비"), owner="민준")
+        self.assertEqual((r["items"], r["blocked"]), ([], "child"))
+        self.small_shop.set_child("민준", False)
+        self.assertTrue(self.small_shop.suggest(weather(8, rain=80, cond="비"), owner="민준")["items"])
+
+    def test_product_validation_and_labels(self):
+        with self.assertRaises(ValueError):
+            Product(id="x", name="x", category="top", url="javascript:alert(1)")
+        p = Product(id="x", name="x", category="top", url="https://a.example/p?aff=1",
+                    price=100000, sale_price=80000, sponsored="0")
+        d = p.to_dict()
+        self.assertEqual((d["final_price"], d["discount"], d["label"]), (80000, 20, "판매"))
+        url = tracked_url(p.url, "score")
+        self.assertIn("aff=1", url)
+        self.assertIn("utm_campaign=score", url)
+
+    def test_wishlist(self):
+        self.shop.wish("엄마", "P001")
+        self.shop.wish("엄마", "P001")  # 중복 무시
+        self.assertEqual([p.id for p in self.shop.wishlist("엄마")], ["P001"])
+        self.shop.wish("엄마", "P001", on=False)
+        self.assertEqual(self.shop.wishlist("엄마"), [])
+
+
+class TestCommerceServer(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.TemporaryDirectory()
+        cfg = MirrorConfig(data_dir=Path(cls.tmp.name), use_ai=False)
+        cls.app = MirrorApp(cfg)
+        cls.app._weather, cls.app._weather_at = weather(8, rain=80, cond="비"), 1e18
+        for i in (0, 5, 14):
+            cls.app.closet.add(Garment(**{**SAMPLE_CLOSET[i].__dict__, "id": None}))
+        cls.app.shop.import_csv(CATALOG)
+        cls.httpd = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(cls.app))
+        cls.base = f"http://127.0.0.1:{cls.httpd.server_address[1]}"
+        threading.Thread(target=cls.httpd.serve_forever, daemon=True).start()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.httpd.shutdown()
+        cls.httpd.server_close()
+        cls.app.closet.close()
+        cls.tmp.cleanup()
+
+    call = TestServer.call
+
+    def test_score_attaches_shop(self):
+        _, r = self.call("/api/score", {"worn_ids": [1, 2], "occasion": "office"})
+        self.assertNotEqual(r["verdict"], "good")
+        self.assertTrue(r["shop"]["items"])
+
+    def test_redirect_logs_click(self):
+        class NoRedirect(urllib.request.HTTPRedirectHandler):
+            def redirect_request(self, *a, **kw):
+                return None
+        opener = urllib.request.build_opener(NoRedirect)
+        with self.assertRaises(urllib.error.HTTPError) as cm:
+            opener.open(self.base + "/go/P001?src=mirror&owner=x")
+        self.assertEqual(cm.exception.code, 302)
+        loc = cm.exception.headers["Location"]
+        self.assertTrue(loc.startswith("https://example.com/shop/p001?"))
+        self.assertIn("utm_campaign=mirror", loc)
+        clicks = {d["id"]: d["clicks"] for d in self.app.shop.stats()}
+        self.assertEqual(clicks["P001"], 1)
+        self.assertEqual(self.call("/go/evil.example.com")[0], 404)
+
+    def test_profile_wish_and_shop_tab(self):
+        self.assertEqual(self.call("/api/wish", {"owner": "아빠", "product_id": "P001"})[0], 200)
+        _, r = self.call("/api/shop?owner=" + urllib.parse.quote("아빠"))
+        self.assertEqual(r["wishlist"][0]["id"], "P001")
+        self.call("/api/profile", {"owner": "아이", "is_child": True})
+        _, r = self.call("/api/shop?owner=" + urllib.parse.quote("아이"))
+        self.assertTrue(r["is_child"])
+        self.assertEqual(r["items"], [])
+        self.assertEqual(self.call("/api/wish", {"owner": "아이", "product_id": "P001"})[0], 403)
+        self.assertEqual(self.call("/api/wish", {"product_id": "NOPE"})[0], 404)
+
+
 if __name__ == "__main__":
     unittest.main()

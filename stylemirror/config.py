@@ -22,6 +22,8 @@ class MirrorConfig:
     # 로컬 웹서버
     host: str = "127.0.0.1"
     port: int = 8080
+    # 거울 QR 코드가 가리킬 주소(휴대폰에서 접속 가능한 주소). 비우면 serve --lan 이 자동 설정
+    public_url: str = ""
     # Claude 설정 (ANTHROPIC_API_KEY 가 없으면 규칙 기반 코치로 자동 동작)
     llm_model: str = "claude-opus-5-5"
     llm_effort: str = "low"          # 거울은 응답 속도가 중요 → low 권장
