@@ -1,0 +1,14 @@
+{
+  "_설명": "4주 운영 후 실측값으로 범위를 좁혀 다시 돌리세요: python3 -m beauty_seller simulate --config beauty_seller/data/sim_config.example.json. 값은 [낮음, 높음] 또는 [낮음, 높음, \"log\"]. 아래 숫자는 예시입니다.",
+  "uncertain": {
+    "organic_m1": [250, 350, "log"],
+    "base_cr": [0.022, 0.032],
+    "cpq": [700, 900, "log"]
+  },
+  "fixed": {
+    "list_price": 66000,
+    "fee_rate": 0.06,
+    "hourly_value": 15000,
+    "content_hours": 30
+  }
+}

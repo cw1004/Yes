@@ -29,9 +29,49 @@ def read_csv(path):
     return list(csv.DictReader(io.StringIO(text, newline="")))
 
 
+REQUIRED = ("order_id", "product", "qty", "name", "phone", "zip", "address")
+FORMULA_PREFIX = ("=", "+", "-", "@", "\t", "\r")
+
+
 def load_mapping(path):
     with open(path, encoding="utf-8") as f:
-        return json.load(f)
+        mapping = json.load(f)
+    missing = [k for k in REQUIRED if k not in mapping.get("marketplace_columns", {})]
+    if missing:
+        raise ValueError(f"매핑에 필수 열이 없습니다: {missing}")
+    return mapping
+
+
+def check_columns(rows, mapping):
+    """주문 파일에 매핑된 열이 실제로 있는지 확인. 열 이름이 바뀐 엑셀을 조용히 통과시키지 않는다."""
+    if not rows:
+        return
+    cols = mapping["marketplace_columns"]
+    absent = [src for k, src in cols.items() if k in REQUIRED and src not in rows[0]]
+    if absent:
+        raise ValueError(f"주문 파일에 열이 없습니다: {absent} (마켓 엑셀 양식이 바뀌었는지 확인)")
+
+
+def normalize_phone(v):
+    digits = re.sub(r"\D", "", v)
+    if digits.startswith("82") and len(digits) in (11, 12):  # +82 10-... → 010-...
+        digits = "0" + digits[2:]
+    if len(digits) == 11:
+        return f"{digits[:3]}-{digits[3:7]}-{digits[7:]}"
+    if len(digits) == 10:
+        cut = 2 if digits.startswith("02") else 3
+        return f"{digits[:cut]}-{digits[cut:-4]}-{digits[-4:]}"
+    return v
+
+
+def normalize_zip(v):
+    v = v.strip()
+    return v.zfill(5) if v.isdigit() and len(v) == 4 else v  # 엑셀이 앞자리 0을 지운 경우
+
+
+def safe_cell(v):
+    """엑셀 수식 주입 방지: 수식으로 해석될 수 있는 값 앞에 ' 를 붙인다."""
+    return "'" + v if isinstance(v, str) and v.startswith(FORMULA_PREFIX) else v
 
 
 def _validate(order):
@@ -52,25 +92,33 @@ def _validate(order):
     return errs
 
 
-def convert(rows, mapping):
-    """반환: (공급사 발주 행 목록, 오류 행 목록). 세트 상품은 구성품별 행으로 펼친다."""
+def convert(rows, mapping, already_ordered=()):
+    """반환: (공급사 발주 행 목록, 오류 행 목록). 세트 상품은 구성품별 행으로 펼친다.
+
+    already_ordered: 이전 실행에서 발주한 주문번호. 같은 주문을 두 번 발주하지 않도록 건너뛴다.
+    """
+    check_columns(rows, mapping)
     cols, pmap, out_cols = mapping["marketplace_columns"], mapping["product_map"], mapping["supplier_columns"]
     memo_default = mapping.get("default_memo", "")
-    ok, bad = [], []
+    done, ok, bad = set(already_ordered), [], []
     for row in rows:
-        try:
-            order = {k: (row.get(src) or "").strip() for k, src in cols.items()}
-        except AttributeError:
-            bad.append({"주문번호": "", "사유": "행 형식 오류"})
+        order = {k: str(row.get(src) or "").strip() for k, src in cols.items()}
+        order["phone"] = normalize_phone(order["phone"])
+        order["zip"] = normalize_zip(order["zip"])
+        if order["order_id"] in done:
+            bad.append({"주문번호": order["order_id"], "사유": "중복 주문번호(이미 발주됨) — 건너뜀"})
             continue
         key = order["product"] + (f" / {order['option']}" if order.get("option") else "")
         components = pmap.get(key) or pmap.get(order["product"])
         errs = _validate(order)
         if components is None:
             errs.append(f"상품 매핑 없음({key})")
+        if not order["order_id"]:
+            errs.append("주문번호 없음")
         if errs:
             bad.append({"주문번호": order["order_id"], "사유": "; ".join(errs)})
             continue
+        done.add(order["order_id"])
         for comp in components:
             values = {
                 "supplier_code": comp["supplier_code"],
@@ -79,8 +127,23 @@ def convert(rows, mapping):
                 "address": order["address"], "memo": order.get("memo") or memo_default,
                 "order_id": order["order_id"],
             }
-            ok.append({header: values[field] for header, field in out_cols.items()})
+            ok.append({header: safe_cell(values[field]) for header, field in out_cols.items()})
     return ok, bad
+
+
+def load_ledger(path):
+    """발주 완료 주문번호 장부(한 줄에 하나). 없으면 빈 집합."""
+    p = Path(path)
+    if not p.exists():
+        return set()
+    return {line.strip() for line in p.read_text(encoding="utf-8").splitlines() if line.strip()}
+
+
+def append_ledger(path, order_ids):
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "a", encoding="utf-8") as f:
+        for oid in order_ids:
+            f.write(oid + "\n")
 
 
 def write_csv(path, rows, fieldnames):
