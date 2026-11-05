@@ -6,8 +6,9 @@
 ## 실행
 
 ```bash
-pip install numpy matplotlib
-python -m si100_sim.analyze
+pip install numpy matplotlib CoolProp
+python -m si100_sim.analyze        # 메탄올 기준 개선안
+python -m si100_sim.refrigerants   # 메탄올 대체 냉매 비교
 ```
 
 결과는 `output/si100/` 에 저장됩니다.
@@ -16,6 +17,7 @@ python -m si100_sim.analyze
 | --- | --- |
 | `sensitivity.png` / `.csv` | 변수 8개를 하나씩 바꿨을 때 집열판 1 m²당 얼음량 |
 | `improvement_path.png` / `.csv` | 개선안을 차례로 누적 적용했을 때 얼음량 |
+| `refrigerants.png` / `.csv` | 같은 활성탄에 냉매 11종을 바꿔 넣었을 때 얼음량, 압력, GWP, 안전 등급 |
 
 ## 모델
 
@@ -25,6 +27,15 @@ python -m si100_sim.analyze
 - 가열량 = 등량 가열 + 등압 탈착(현열 + 흡착열). 흡착열 = 증발 잠열 + 흡착 퍼텐셜.
 - 집열 효율 = 0.75 − U × (평균 흡착기 온도 − 외기) / 700 W/m².
   집열판이 하루에 받는 열로 가열할 수 있는 만큼 활성탄을 넣는다고 가정합니다.
+
+## 냉매 비교 방법 (`refrigerants.py`)
+
+- 물성은 CoolProp 에서 가져옵니다.
+- 흡착은 Dubinin 체적 충전 이론으로 옮깁니다: 활성탄 기공 부피 V0 와 지수 n 은 메탄올 표에서 구하고,
+  냉매별 특성 에너지는 친화 계수 β(끓는점 액체 몰부피 비)를 곱해 정합니다.
+- β 는 근사값이라 ±25 % 를 바꿔 본 범위를 함께 냅니다. 냉매 간 순위를 고르는 선별용이며,
+  최종 선정 전에는 후보 냉매의 흡착 등온선을 직접 측정해야 합니다.
+- 체적 모델은 흡착상 밀도의 온도 변화를 넣어 다시 맞췄기 때문에, 메탄올 값이 `analyze.py` 보다 조금 높게 나옵니다.
 
 ## 한계
 
