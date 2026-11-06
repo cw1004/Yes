@@ -23,7 +23,10 @@ REV = "A"
 
 
 class Sheet:
-    def __init__(self, n: int, total: int, title: str, subtitle: str, dwg: str, scale: str):
+    def __init__(self, n: int, total: int, title: str, subtitle: str, dwg: str, scale: str,
+                 project: str = "SI-100 태양열 흡착식 제빙기 · 시제품 1 m²", rev: str = REV, date: str = DATE,
+                 warning: str = "AI 보조 초안 — 자격 있는 설계자의 검토·승인 전 제작 금지 · 수치는 평형 시뮬레이션 기반"):
+        self.project, self.rev, self.date, self.warning = project, rev, date, warning
         self.fig = plt.figure(figsize=(W / 25.4, H / 25.4))
         self.ax = self.fig.add_axes([0, 0, 1, 1])
         self.ax.set_xlim(0, W)
@@ -153,7 +156,7 @@ class Sheet:
         x0, y0, w = 250.0, 10.0, 160.0
         self.rect(x0, y0, w, 44, lw=BOLD, fill="white")
         self.line(x0, y0 + 37, x0 + w, y0 + 37, lw=MED)
-        self.text(x0 + 3, y0 + 40.5, "SI-100 태양열 흡착식 제빙기 · 시제품 1 m²", size=6.2, weight="bold")
+        self.text(x0 + 3, y0 + 40.5, self.project, size=6.2, weight="bold")
         self.text(x0 + w - 3, y0 + 40.5, "ISO 128 / ISO 2768-mK", size=4.8, ha="right")
         self.line(x0, y0 + 19, x0 + w, y0 + 19, lw=MED)
         self.line(x0 + 112, y0 + 9, x0 + 112, y0 + 37, lw=MED)
@@ -169,11 +172,11 @@ class Sheet:
         self.text(x0 + 3, y0 + 14, "DWG No.", size=4.2, color="#6b7686")
         self.text(x0 + 22, y0 + 14, dwg, size=9.5, weight="bold")
         self.text(x0 + 115, y0 + 14, "REV", size=4.2, color="#6b7686")
-        self.text(x0 + 125, y0 + 14, REV, size=9.5, weight="bold")
+        self.text(x0 + 125, y0 + 14, self.rev, size=9.5, weight="bold")
         self.text(x0 + 137, y0 + 14, "SHEET", size=4.2, color="#6b7686")
         self.text(x0 + 157, y0 + 14, f"{n} / {total}", size=8.5, weight="bold", ha="right")
         cols = [("DRAWN", "AI 보조 초안"), ("CHECKED", "— 검토 전 —"), ("APPROVED", "— 미승인 —"),
-                ("MATERIAL", "BOM 참조"), ("DATE", DATE)]
+                ("MATERIAL", "BOM 참조"), ("DATE", self.date)]
         cw = w / len(cols)
         for i, (k, v) in enumerate(cols):
             cx = x0 + i * cw
@@ -183,8 +186,7 @@ class Sheet:
             self.text(cx + 1.5, y0 + 2.8, v, size=4.8)
         # 제작 금지 표시
         self.rect(10, 10, 236, 7, lw=MED, fill="#fdf1ef", color="#a83226")
-        self.text(128, 13.5, "AI 보조 초안 — 자격 있는 설계자의 검토·승인 전 제작 금지 · 수치는 평형 시뮬레이션 기반",
-                  size=5.6, ha="center", weight="bold", color="#a83226")
+        self.text(128, 13.5, self.warning, size=5.6, ha="center", weight="bold", color="#a83226")
 
     def save(self, pdf):
         pdf.savefig(self.fig)
